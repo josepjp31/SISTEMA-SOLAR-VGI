@@ -9,6 +9,7 @@ Projecte desenvolupat per a l'assignatura de **Visualització Gràfica Interacti
 Eina de visualització gràfica interactiva d'alt realisme encarregada per l'**IEEC (Institut d'Estudis Espaials de Catalunya)**. L'aplicació permet simular i consultar amb precisió temporal (dia, mes, any, hora, minut, segon) la posició i el moviment dels principals cossos celestes del Sistema Solar (Sol, planetes, satèl·lits naturals, cinturó d'asteroides i Plutó), oferint a més navegació espacial interactiva i càmeres d'inspecció.
 
 El projecte està implementat en **C++** sota el framework docent **EntornVGI** utilitzant **GLFW**, interfície interactiva amb **Dear ImGui** i **OpenGL 4.6** modern (VAO, VBO, shaders GLSL i matemàtiques amb GLM).
+
 ---
 
 ## Característiques Principals
