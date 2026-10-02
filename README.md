@@ -8,8 +8,7 @@ Projecte desenvolupat per a l'assignatura de **Visualització Gràfica Interacti
 
 Eina de visualització gràfica interactiva d'alt realisme encarregada per l'**IEEC (Institut d'Estudis Espaials de Catalunya)**. L'aplicació permet simular i consultar amb precisió temporal (dia, mes, any, hora, minut, segon) la posició i el moviment dels principals cossos celestes del Sistema Solar (Sol, planetes, satèl·lits naturals, cinturó d'asteroides i Plutó), oferint a més navegació espacial interactiva i càmeres d'inspecció.
 
-El projecte està implementat en **C++** sota el framework docent **EntornVGI** amb **GLFW** i **OpenGL 4.6** modern (VAO, VBO, shaders GLSL i GLM).
-
+El projecte està implementat en **C++** sota el framework docent **EntornVGI** utilitzant **GLFW**, interfície interactiva amb **Dear ImGui** i **OpenGL 4.6** modern (VAO, VBO, shaders GLSL i matemàtiques amb GLM).
 ---
 
 ## Característiques Principals
@@ -47,10 +46,11 @@ El projecte està implementat en **C++** sota el framework docent **EntornVGI** 
 ## Requisits i Compilació
 
 1. **Entorn:** Windows 10/11 amb **Visual Studio 2022 o 2026**.
-2. **Dependències:**
-   * Suport C++ per a GLFW (instal·lable des de l'instal·lador de Visual Studio).
-   * OpenGL 4.6 (compatibilitat de drivers de la GPU).
-   * Llibreries incloses a la base de l'entorn: `GLEW`, `GLM`, `SOIL`.
+2. **Dependències Gràfiques (incloses a la solució):**
+   * **OpenGL 4.6** (drivers de targeta gràfica actualitzats).
+   * **GLFW 3.x** (gestió de finestra, context i entrades/gamepad).
+   * **Dear ImGui** (interfície gràfica d'usuari immediata).
+   * `GLEW`, `GLM` i `SOIL`.
 3. **Passos per executar:**
    * Obrir la solució `EntornVGI.sln` (o `.slnx`).
    * Configurar l'arquitectura en **`x64`** i perfil **`Debug`** o **`Release`**.
