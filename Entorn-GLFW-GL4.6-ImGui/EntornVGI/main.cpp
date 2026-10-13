@@ -1,3 +1,4 @@
+#include "escenari.h"
 
 //******** PRACTICA VISUALITZACIÓ GRÀFICA INTERACTIVA (Escola Enginyeria - UAB)
 //******** Entorn bàsic VS2026 MONOFINESTRA amb OpenGL 4.6, interfície GLFW 3.4, ImGui i llibreries GLM
@@ -650,7 +651,7 @@ void configura_Escena() {
 
 // dibuixa_Escena: Funcio que crida al dibuix dels diferents elements de l'escana
 void dibuixa_Escena() {
-
+	
 	//glUseProgram(shader_programID);
 
 //	Dibuix SkyBox Cúbic.
@@ -668,6 +669,9 @@ void dibuixa_Escena() {
 		npts_T, PC_t, pas_CS, sw_Punts_Control, dibuixa_TriedreFrenet,
 		ObOBJ,				// Classe de l'objecte OBJ que conté els VAO's
 		GTMatrix);
+
+	//#~#~#~#
+	currentEscenari->dibuixaEscenari();
 }
 
 
@@ -6149,6 +6153,8 @@ void OnTimer()
 		// Crida a OnPaint() per redibuixar l'escena
 		//OnPaint();
 	}
+	//#~#~#~#
+	currentEscenari->updateVariables();
 }
 
 // ---------------- Entorn VGI: Funcions locals a main.cpp
@@ -6326,7 +6332,7 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severi
 	fprintf(stderr, "\n");
 }
 
-
+Escenari* currentEscenari;
 // main(): Funció principal del programa. Inicialitza la finestra, els callbacks i el bucle principal d'operació
 int main()
 {
@@ -6461,6 +6467,11 @@ int main()
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
 	ImGui_ImplOpenGL3_Init("#version 130");
 	// Entorn VGI.ImGui: End Setup Dear ImGui context
+
+	//#~#~#~#
+	Escenari escenaris[5];
+	currentEscenari = &escenaris[0];
+	currentEscenari->creaEscenari();
 
 	// Loop until the user closes the window
 	while (!glfwWindowShouldClose(window))
