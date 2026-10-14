@@ -1,16 +1,16 @@
 #pragma once
 #include "objLoader.h"
-#include "escenari.cpp"
 
 class Escenari
 {
 public:
+	Escenari() { m_objectList = new Object[10]; }
+
 	void creaEscenari();
 	void dibuixaEscenari();
 	void updateVariables();
 
 private:
-	Escenari() { m_objectList = new Object[10]; }
 
 	//camera
 	Object* m_objectList;
@@ -21,14 +21,15 @@ private:
 class Object
 {
 public:
-	Object();//Usar InitObject de COBJModel en el constructor
+	Object() { m_mMatrix = glm::mat4(1.0); }//Usar InitObject de COBJModel en el constructor
 	~Object();//Usar UnInitObject de COBJModel en el destructor
 
-private:
 	//Vector4D m_position;
 	//Vector4D m_rotation;
 	//Vector4D m_scale;
+	glm::mat4 m_mMatrix;
 	COBJModel m_model;
+private:
 };
 
 //#~#~#~# Ponemos el OnPaint() en el while en el OnTimer()???
