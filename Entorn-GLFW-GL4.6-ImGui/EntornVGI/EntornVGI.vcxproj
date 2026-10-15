@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -115,6 +115,10 @@
       <AdditionalDependencies>glfw3dll.lib;opengl32.lib;glew32.lib;glew32s.lib;SOIL2.lib;nfd_d.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>MSVCRT;LIBCMT;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y /d /q "$(ProjectDir)..\lib\x64\*.dll" "$(OutDir)"</Command>
+      <Message>Copiant DLLs (glew32, glfw3) a la carpeta de sortida</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -136,6 +140,10 @@
       <AdditionalDependencies>glfw3.lib;opengl32.lib;glew32.lib;glew32s.lib;SOIL2.lib;nfd_d.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>LIBCMT;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
+    <PostBuildEvent>
+      <Command>xcopy /y /d /q "$(ProjectDir)..\lib\x64\*.dll" "$(OutDir)"</Command>
+      <Message>Copiant DLLs (glew32, glfw3) a la carpeta de sortida</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\include\ImGui\imgui.cpp" />
@@ -146,6 +154,7 @@
     <ClCompile Include="..\include\ImGui\imgui_tables.cpp" />
     <ClCompile Include="..\include\ImGui\imgui_widgets.cpp" />
     <ClCompile Include="escena.cpp" />
+    <ClCompile Include="escenari.cpp" />
     <ClCompile Include="glut_geometry.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="material.cpp" />
@@ -184,6 +193,7 @@
     <ClInclude Include="..\include\ImGui\nfd.h" />
     <ClInclude Include="constants.h" />
     <ClInclude Include="escena.h" />
+    <ClInclude Include="escenari.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="glut_geometry.h" />
     <ClInclude Include="main.h" />

@@ -1,5 +1,3 @@
-#include "escenari.h"
-
 //******** PRACTICA VISUALITZACIÓ GRÀFICA INTERACTIVA (Escola Enginyeria - UAB)
 //******** Entorn bàsic VS2026 MONOFINESTRA amb OpenGL 4.6, interfície GLFW 3.4, ImGui i llibreries GLM
 //******** Ferran Poveda, Marc Vivet, Carme Julià, Débora Gil, Enric Martí (Setembre 2026)
@@ -20,7 +18,11 @@
 #include "visualitzacio.h"
 #include "escena.h"
 #include "main.h"
+#include "escenari.h"
 //#include <iostream>
+
+// Escenari actiu (s'inicialitza a main()). Declarat aqui perque s'usa a dibuixa_Escena() i OnTimer().
+Escenari* currentEscenari = nullptr;
 
 void InitGL()
 {
@@ -671,7 +673,7 @@ void dibuixa_Escena() {
 		GTMatrix);
 
 	//#~#~#~#
-	currentEscenari->dibuixaEscenari();
+	if (currentEscenari != nullptr) currentEscenari->dibuixaEscenari(shader_programID);
 }
 
 
@@ -6154,7 +6156,7 @@ void OnTimer()
 		//OnPaint();
 	}
 	//#~#~#~#
-	currentEscenari->updateVariables();
+	if (currentEscenari != nullptr) currentEscenari->updateVariables();
 }
 
 // ---------------- Entorn VGI: Funcions locals a main.cpp
@@ -6332,7 +6334,6 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severi
 	fprintf(stderr, "\n");
 }
 
-Escenari* currentEscenari;
 // main(): Funció principal del programa. Inicialitza la finestra, els callbacks i el bucle principal d'operació
 int main()
 {
@@ -6515,6 +6516,10 @@ int main()
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
+
+	//#~#~#~# Alliberar escenaris (VAOs) mentre el context OpenGL encara existeix
+	currentEscenari = nullptr;
+	for (Escenari& e : escenaris) e.alliberaEscenari();
 
 	glfwDestroyWindow(window);
 
