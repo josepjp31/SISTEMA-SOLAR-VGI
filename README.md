@@ -31,6 +31,13 @@ El projecte està implementat en **C++** sota el framework docent **EntornVGI** 
   * **Càmera Nau/Coet:** Navegació espacial en primera i tercera persona controlable per teclat o comandament.
   * **Càmeres Especials:** Sonda Voyager, Estació Espacial Internacional (ISS) i vista des de l'observatori UAB.
 
+## Documentació i dades
+
+* [Requisits principals](docs/REQUISITS_PRINCIPALS.md): abast, prioritats i criteris d'acceptació.
+* [Casos d'ús](docs/Casos%20d'Ús_%20Simulador%20del%20Sistema%20Solar.md): fluxos d'interacció previstos.
+* [Guia de desenvolupament](docs/GUIA_DESENVOLUPAMENT_SISTEMA_SOLAR.md): adequació de l'entorn i fases proposades.
+* [Catàleg planetari](docs/planetes/README.md) i [dades inicials en JSON](docs/planetes/planetes.json): unitats, valors físics/orbitals i noms previstos per als mapes de textures.
+
 ---
 
 ##  Membres de l'Equip (Grup 05)

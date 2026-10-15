@@ -2,6 +2,8 @@
 # Compilación y Binarios
 # =========================
 x64/
+# Excepcio: les llibreries de tercers (x64) SI s'han de pujar per poder compilar i executar
+!Entorn-GLFW-GL4.6-ImGui/lib/x64/
 x86/
 [Dd]ebug/
 [Rr]elease/
@@ -10,7 +12,6 @@ x86/
 *.pdb
 *.ilk
 *.idb
-*.lib
 *.exp
 *.tlog
 *.lastbuildstate

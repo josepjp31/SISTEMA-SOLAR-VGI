@@ -1,4 +1,3 @@
-
 //******** PRACTICA VISUALITZACIÓ GRÀFICA INTERACTIVA (Escola Enginyeria - UAB)
 //******** Entorn bàsic VS2026 MONOFINESTRA amb OpenGL 4.6, interfície GLFW 3.4, ImGui i llibreries GLM
 //******** Ferran Poveda, Marc Vivet, Carme Julià, Débora Gil, Enric Martí (Setembre 2026)
@@ -19,7 +18,11 @@
 #include "visualitzacio.h"
 #include "escena.h"
 #include "main.h"
+#include "escenari.h"
 //#include <iostream>
+
+// Escenari actiu (s'inicialitza a main()). Declarat aqui perque s'usa a dibuixa_Escena() i OnTimer().
+Escenari* currentEscenari = nullptr;
 
 void InitGL()
 {
@@ -650,7 +653,7 @@ void configura_Escena() {
 
 // dibuixa_Escena: Funcio que crida al dibuix dels diferents elements de l'escana
 void dibuixa_Escena() {
-
+	
 	//glUseProgram(shader_programID);
 
 //	Dibuix SkyBox Cúbic.
@@ -668,6 +671,9 @@ void dibuixa_Escena() {
 		npts_T, PC_t, pas_CS, sw_Punts_Control, dibuixa_TriedreFrenet,
 		ObOBJ,				// Classe de l'objecte OBJ que conté els VAO's
 		GTMatrix);
+
+	//#~#~#~#
+	if (currentEscenari != nullptr) currentEscenari->dibuixaEscenari(shader_programID);
 }
 
 
@@ -6149,6 +6155,8 @@ void OnTimer()
 		// Crida a OnPaint() per redibuixar l'escena
 		//OnPaint();
 	}
+	//#~#~#~#
+	if (currentEscenari != nullptr) currentEscenari->updateVariables();
 }
 
 // ---------------- Entorn VGI: Funcions locals a main.cpp
@@ -6326,7 +6334,6 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severi
 	fprintf(stderr, "\n");
 }
 
-
 // main(): Funció principal del programa. Inicialitza la finestra, els callbacks i el bucle principal d'operació
 int main()
 {
@@ -6462,6 +6469,11 @@ int main()
 	ImGui_ImplOpenGL3_Init("#version 130");
 	// Entorn VGI.ImGui: End Setup Dear ImGui context
 
+	//#~#~#~#
+	Escenari escenaris[5];
+	currentEscenari = &escenaris[0];
+	currentEscenari->creaEscenari();
+
 	// Loop until the user closes the window
 	while (!glfwWindowShouldClose(window))
 	{
@@ -6504,6 +6516,10 @@ int main()
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
+
+	//#~#~#~# Alliberar escenaris (VAOs) mentre el context OpenGL encara existeix
+	currentEscenari = nullptr;
+	for (Escenari& e : escenaris) e.alliberaEscenari();
 
 	glfwDestroyWindow(window);
 
