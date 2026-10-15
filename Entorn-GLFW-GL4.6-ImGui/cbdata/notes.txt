@@ -1,0 +1,9 @@
+-Lucas Luna-
+
+Since moons (other than earth moon) are pretty stable, they will be calculated using keplerian calculations
+
+There's dwarf planets Eris, Haumea and Makemake. If included, it will be the same case as the moons.
+
+ISS, and Hubble will be similarly generated
+
+Webb will be anchored to lagrange L2. if calculated or looked at i leave for the future.
