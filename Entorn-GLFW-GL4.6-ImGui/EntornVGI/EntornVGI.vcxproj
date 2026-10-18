@@ -155,6 +155,7 @@
     <ClCompile Include="..\include\ImGui\imgui_widgets.cpp" />
     <ClCompile Include="escena.cpp" />
     <ClCompile Include="escenari.cpp" />
+    <ClCompile Include="InterficieUI.cpp" />
     <ClCompile Include="glut_geometry.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="material.cpp" />
@@ -194,6 +195,7 @@
     <ClInclude Include="constants.h" />
     <ClInclude Include="escena.h" />
     <ClInclude Include="escenari.h" />
+    <ClInclude Include="InterficieUI.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="glut_geometry.h" />
     <ClInclude Include="main.h" />

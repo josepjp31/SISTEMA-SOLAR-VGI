@@ -30,6 +30,9 @@
     <ClCompile Include="escenari.cpp">
       <Filter>Archivos de origen</Filter>
     </ClCompile>
+    <ClCompile Include="InterficieUI.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
     <ClCompile Include="glut_geometry.cpp">
       <Filter>Archivos de origen</Filter>
     </ClCompile>
@@ -78,6 +81,9 @@
       <Filter>Archivos de encabezado</Filter>
     </ClInclude>
     <ClInclude Include="escenari.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="InterficieUI.h">
       <Filter>Archivos de encabezado</Filter>
     </ClInclude>
     <ClInclude Include="framework.h">

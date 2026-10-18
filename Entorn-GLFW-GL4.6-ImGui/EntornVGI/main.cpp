@@ -19,10 +19,16 @@
 #include "escena.h"
 #include "main.h"
 #include "escenari.h"
+#include "InterficieUI.h"
 //#include <iostream>
 
 // Escenari actiu (s'inicialitza a main()). Declarat aqui perque s'usa a dibuixa_Escena() i OnTimer().
 Escenari* currentEscenari = nullptr;
+// Llista d'escenaris de la simulacio (0: Didactic, 1: Escala Real)
+Escenari* escenaris = nullptr;
+
+// Estat global de la interficie d'usuari del simulador
+EstatSimulacio g_EstatSimulador;
 
 void InitGL()
 {
@@ -301,9 +307,9 @@ void InitGL()
 	m_EsfeIncEAvall.R = 0.0;	m_EsfeIncEAvall.alfa = 0.0;	m_EsfeIncEAvall.beta = 0.0;
 
 	// Entorn VGI: Variables que controlen paràmetres visualització: Mides finestra Windows i PV
-	w = 640;			h = 480;			// Mides de la finestra Windows (w-amplada,h-alçada)
-	width_old = 640;	height_old = 480;	// Mides de la resolució actual de la pantalla (finestra Windows)
-	w_old = 640;		h_old = 480;		// Mides de la finestra Windows (w-amplada,h-alçada) per restaurar Finestra des de fullscreen
+	w = 1280;			h = 720;			// Mides de la finestra Windows (w-amplada,h-alçada)
+	width_old = 1280;	height_old = 720;	// Mides de la resolució actual de la pantalla (finestra Windows)
+	w_old = 1280;		h_old = 720;		// Mides de la finestra Windows (w-amplada,h-alçada) per restaurar Finestra des de fullscreen
 	OPV.R = cam_Esferica[0];	OPV.alfa = cam_Esferica[1];		OPV.beta = cam_Esferica[2];		// Origen PV en esfèriques
 	//OPV.R = 15.0;		OPV.alfa = 0.0;		OPV.beta = 0.0;										// Origen PV en esfèriques
 	Vis_Polar = POLARZ;	oPolars = -1;
@@ -477,10 +483,8 @@ void OnPaint(GLFWwindow* window)
 	// TODO: Agregue aquí su código de controlador de mensajes
 	GLdouble vpv[3] = { 0.0, 0.0, 1.0 };
 
-	// Entorn VGI.ImGui: Menú ImGui condicionat al color de fons
-	if ((c_fons.r < 0.5) || (c_fons.g < 0.5) || (c_fons.b < 0.5))
-		ImGui::StyleColorsLight();
-	else ImGui::StyleColorsDark();
+	// Entorn VGI.ImGui: Estil visual fosc per a simulacio espacial (gestionat a InterficieUI::InicialitzarEstil)
+	// No invoquem StyleColorsLight per evitar fons blancs i textos foscos illegibles sobre fons d'espai.
 
 	// Entorn VGI: Cridem a les funcions de l'escena i la projecció segons s'hagi 
 	// seleccionat una projecció o un altra
@@ -915,112 +919,37 @@ void Barra_Estat()
 //		- menú propi de l'aplicació EntornVGI [show_EntornVGI_window()]
 void draw_Menu_ImGui()
 {
-	// Start the Dear ImGui frame
+	// Iniciar frame d'ImGui
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-	if (show_demo_window)
-		ImGui::ShowDemoWindow(&show_demo_window);
+	// Renderitzat de la interficie completa del simulador (Selector inicial, Menus, Panells)
+	InterficieUI::Renderitzar(g_EstatSimulador, currentEscenari, escenaris);
 
-	// 2. Show another simple window.
-	if (show_another_window)
+	// Sincronitzar la camera quan es tria el mode didactic al selector inicial
+	static bool s_selectorModesAnterior = g_EstatSimulador.mostrarSelectorModes;
+	if (s_selectorModesAnterior && !g_EstatSimulador.mostrarSelectorModes)
 	{
-		ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-		ImGui::Text("Hello from another window!");
-		if (ImGui::Button("Close Me"))
-			show_another_window = false;
-		ImGui::End();
-	}
-
-	// 1. Show the EntornVGI window. Finestra amb totes les opcions de l'aplicació.
-	if (show_EntornVGI_window)
-		ShowEntornVGIWindow(&show_EntornVGI_window); //ShowEntornVGIWindow(&show_EntornVGI_window);
-
-	// 3. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
-	{
-		static float f = 0.0f;
-		static int counter = 0;
-		static float PV[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-
-		ImGui::Begin("Status Menu");                          // Create a window called "Status Menu" and append into it.
-
-		ImGui::Text("Finestres EntornVGI:");               // Display some text (you can use a format strings too)
-		ImGui::SameLine();
-		ImGui::Checkbox("EntornVGI Window", &show_EntornVGI_window);
-		ImGui::Separator();
-		ImGui::Spacing();
-
-		// Transformació PV de Coord. esfèriques (R,anglev,angleh) --> Coord. cartesianes (PVx,PVy,PVz)
-		if (camera == CAM_NAVEGA) { PV[0] = opvN.x; PV[1] = opvN.y; PV[2] = opvN.z; }
-		else {
-			cam_Esferica[0] = OPV.R;	cam_Esferica[1] = OPV.alfa; cam_Esferica[2] = OPV.beta;
-			if (Vis_Polar == POLARZ)
-			{
-				PV[0] = OPV.R * cos(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-				PV[1] = OPV.R * sin(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-				PV[2] = OPV.R * sin(OPV.alfa * PI / 180);
-			}
-			else if (Vis_Polar == POLARY)
-			{
-				PV[0] = OPV.R * sin(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-				PV[1] = OPV.R * sin(OPV.alfa * PI / 180);
-				PV[2] = OPV.R * cos(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-			}
-			else {
-				PV[0] = OPV.R * sin(OPV.alfa * PI / 180);
-				PV[1] = OPV.R * cos(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-				PV[2] = OPV.R * sin(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-			}
+		if (g_EstatSimulador.modeActual == ModeSimulacio::INTUITIU)
+		{
+			OPV.alfa = 25.0; // Inclinacio orbital inicial a 25 graus respecte a l'eix vertical
+			camera = CAM_ESFERICA;
 		}
+	}
+	s_selectorModesAnterior = g_EstatSimulador.mostrarSelectorModes;
 
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
-		ImGui::SeparatorText("CAMERA:");
-		ImGui::PopStyleColor();
-
-		ImGui::InputFloat3("Esferiques (R,alfa,beta)", cam_Esferica);
-		ImGui::InputFloat3("Cartesianes (PVx,PVy,PVz)", PV);
-		//ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
-		ImGui::SeparatorText("COLORS:");
-		ImGui::PopStyleColor();
-		ImGui::ColorEdit3("Color de Fons", (float*)&clear_colorB); // Edit 3 floats representing a background color
-		ImGui::ColorEdit3("Color d'Objecte", (float*)&clear_colorO); // Edit 3 floats representing a object color
-		c_fons.r = clear_colorB.x;	c_fons.g = clear_colorB.y;	c_fons.b = clear_colorB.z;	c_fons.a = clear_colorB.w;
-		col_obj.r = clear_colorO.x;	col_obj.g = clear_colorO.y;	col_obj.b = clear_colorO.z;		col_obj.a = clear_colorO.w;
-		ImGui::Separator();
-
-
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
-		ImGui::SeparatorText("TRANSFORMA:");
-		ImGui::PopStyleColor();
-		float tras_ImGui[3] = { (float)TG.VTras.x,(float)TG.VTras.y,(float)TG.VTras.z };
-		ImGui::InputFloat3("Traslacio (Tx,Ty,Tz)", tras_ImGui);
-		float rota_ImGui[3] = { (float)TG.VRota.x,(float)TG.VRota.y,(float)TG.VRota.z };
-		ImGui::InputFloat3("Rotacio (Rx,Ry,Rz)", rota_ImGui);
-		float scal_ImGui[3] = { (float)TG.VScal.x,(float)TG.VScal.y,(float)TG.VScal.z };
-		ImGui::InputFloat3("Escala (Sx, Sy, Sz)", scal_ImGui);
-
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
-		ImGui::SeparatorText("ImGui:");               // Display some text (you can use a format strings too)
-		ImGui::PopStyleColor();
-		ImGui::Checkbox("Demo ImGui Window", &show_demo_window);      // Edit bools storing our window open/close state
-		ImGui::SameLine();
-		ImGui::Checkbox("Another ImGui Window", &show_another_window);
-		ImGui::Spacing();
-
-		ImGui::Text("imgui versions: (%s) (%d)", IMGUI_VERSION, IMGUI_VERSION_NUM);
-		ImGui::Spacing();
-
-		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-		ImGui::End();
+	// Finestres auxiliars d'enginyeria (nomes visibles un cop triat el mode)
+	if (!g_EstatSimulador.mostrarSelectorModes)
+	{
+		if (show_demo_window)
+			ImGui::ShowDemoWindow(&show_demo_window);
+		if (show_EntornVGI_window)
+			MostraEntornVGIWindow(&show_EntornVGI_window);
 	}
 
-	// Rendering ImGui Menus
+	// Renderitzat de les comandes de dibuix generades per ImGui
 	ImGui::Render();
-	//ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
 // Entorn VGI: Funció que mostra el menú principal de l'Entorn VGI amb els seus desplegables.
@@ -3823,6 +3752,9 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 	//io.AddMouseButtonEvent(button, true);
 
 	// (2) ONLY forward mouse data to your underlying app/game.
+	// Bloquejar interaccions de teclat de l'escena mentre el selector inicial de modes sigui actiu
+	if (g_EstatSimulador.mostrarSelectorModes) return;
+
 	if (!io.WantCaptureKeyboard) { //<Tractament mouse de l'aplicació>}
 		// EntornVGI: Si tecla pulsada és ESCAPE, tancar finestres i aplicació.
 		if (mods == 0 && key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) glfwSetWindowShouldClose(window, GL_TRUE);
@@ -5739,6 +5671,9 @@ void OnMouseButton(GLFWwindow* window, int button, int action, int mods)
 	ImGuiIO& io = ImGui::GetIO();
 	io.AddMouseButtonEvent(button, action);
 
+	// Bloquejar interaccions del ratoli sobre l'escena mentre el selector inicial de modes sigui actiu
+	if (g_EstatSimulador.mostrarSelectorModes) return;
+
 	// (2) ONLY forward mouse data to your underlying app/game.
 	if (!io.WantCaptureMouse) { //<Tractament mouse de l'aplicació>}
 		// OnLButtonDown
@@ -5800,6 +5735,9 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 	CSize gir = { 0,0 }, girn = { 0,0 }, girT = { 0,0 }, zoomincr = { 0,0 };
 
 	// TODO: Add your message handler code here and/or call default
+	// Bloquejar rotacions de camera mentre el selector inicial de modes sigui actiu
+	if (g_EstatSimulador.mostrarSelectorModes) return;
+
 	if (m_ButoEAvall && mobil && projeccio != CAP)
 	{
 		// Entorn VGI: Determinació dels angles (en graus) segons l'increment
@@ -6074,7 +6012,10 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 	ImGuiIO& io = ImGui::GetIO();
 	//io.AddMouseButtonEvent(button, true);
 
-// (2) ONLY forward mouse data to your underlying app/game.
+// Bloquejar zoom interactiu mentre el selector inicial de modes sigui actiu
+	if (g_EstatSimulador.mostrarSelectorModes) return;
+
+	// (2) ONLY forward mouse data to your underlying app/game.
 	if (!io.WantCaptureMouse) { // <Tractament mouse de l'aplicació>}
 		// Funció de zoom quan està activada la funció pan o les T. Geomètriques
 		if ((zzoom || zzoomO) || (transX) || (transY) || (transZ))
@@ -6136,6 +6077,17 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 /* ------------------------------------------------------------------------- */
 void OnTimer()
 {
+	static double tempsAnterior = glfwGetTime();
+	double tempsActual = glfwGetTime();
+	double dt = tempsActual - tempsAnterior;
+	tempsAnterior = tempsActual;
+
+	if (g_EstatSimulador.modeActual == ModeSimulacio::ESCALA_REAL)
+	{
+		// En mode escala, el temps avanca segons la velocitat seleccionada (1 min/s a 20 dies/s)
+		g_EstatSimulador.tempsSimulacio.AvancarSegons(dt);
+	}
+
 	// TODO: Agregue aquí su código de controlador de mensajes o llame al valor predeterminado
 	if (anima) {
 		// Codi de tractament de l'animació quan transcorren els ms. del crono.
@@ -6250,7 +6202,7 @@ void OnFull_Screen(GLFWmonitor* monitor, GLFWwindow* window)
 		glfwSetWindowMonitor(window, monitor, 0, 0, mode->width, mode->height, mode->refreshRate);
 	}
 	else {	// Restore last window size and position
-		glfwSetWindowMonitor(window, nullptr, 216, 239, 640, 480, mode->refreshRate);
+		glfwSetWindowMonitor(window, nullptr, 100, 100, w_old, h_old, mode->refreshRate);
 	}
 }
 
@@ -6373,7 +6325,7 @@ int main()
 #endif
 
 	// Create a windowed mode window and its OpenGL context */
-	window = glfwCreateWindow(640, 480, "Entorn Grafic VS2022 amb GLFW i OpenGL 4.6 (Visualitzacio Grafica Interactiva - Grau en Enginyeria Informatica - Escola Enginyeria - UAB)", NULL, NULL);
+	window = glfwCreateWindow(1280, 720, "Entorn Grafic VS2022 amb GLFW i OpenGL 4.6 (Visualitzacio Grafica Interactiva - Grau en Enginyeria Informatica - Escola Enginyeria - UAB)", NULL, NULL);
 	if (!window)
 	{
 		fprintf(stderr, "Failed to open GLFW window. If you have an Intel GPU, they are not 4.6 compatible. Try the 2.1 version of the tutorials.\n");
@@ -6461,18 +6413,17 @@ int main()
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
 // Entorn VGI.ImGui: Setup Dear ImGui style
-	//ImGui::StyleColorsDark();
-	ImGui::StyleColorsLight();
+	InterficieUI::InicialitzarEstil();
 
 	// Entorn VGI.ImGui: Setup Platform/Renderer backends
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
 	ImGui_ImplOpenGL3_Init("#version 130");
 	// Entorn VGI.ImGui: End Setup Dear ImGui context
 
-	//#~#~#~#
-	Escenari escenaris[5];
+	//#~#~#~# Inicialitzacio de la llista d'escenaris (index 0: Didactic, index 1: Escala Real)
+	escenaris = new Escenari[5];
 	currentEscenari = &escenaris[0];
-	currentEscenari->creaEscenari();
+	// Nota: creaEscenari() es crida quan l'usuari confirma el mode al selector inicial
 
 	// Loop until the user closes the window
 	while (!glfwWindowShouldClose(window))
@@ -6487,7 +6438,7 @@ int main()
 
 		// Entorn VGI. Timer: for each timer do this
 		time -= delta;
-		if ((time <= 0.0) && (satelit || anima)) OnTimer();
+		if (((time <= 0.0) && (satelit || anima)) || currentEscenari != nullptr) OnTimer();
 
 		// Poll for and process events
 		glfwPollEvents();
@@ -6519,7 +6470,12 @@ int main()
 
 	//#~#~#~# Alliberar escenaris (VAOs) mentre el context OpenGL encara existeix
 	currentEscenari = nullptr;
-	for (Escenari& e : escenaris) e.alliberaEscenari();
+	if (escenaris != nullptr)
+	{
+		for (int i = 0; i < 5; ++i) escenaris[i].alliberaEscenari();
+		delete[] escenaris;
+		escenaris = nullptr;
+	}
 
 	glfwDestroyWindow(window);
 
