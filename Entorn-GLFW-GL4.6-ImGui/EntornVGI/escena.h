@@ -17,8 +17,8 @@ void dibuixa_Eixos(GLuint ax_programID, bool eix, GLuint axis_Id, CMask3D reixa,
 void dibuixa_Skybox(GLuint sk_programID, GLuint cmTexture, char eix_Polar, glm::mat4 MatriuProjeccio, glm::mat4 MatriuVista);
 
 // Entorn VGI: dibuixa_EscenaGL -> Dibuix de l'escena GL
-void dibuixa_EscenaGL(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D reixa, CPunt3D hreixa, char objecte, CColor col_object, 
-	bool sw_mat[5], 
+void dibuixa_EscenaGL(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D reixa, CPunt3D hreixa, char objecte, CColor col_object,
+	bool sw_mat[5],
 	bool textur, GLuint texturID[NUM_MAX_TEXTURES], bool textur_map, bool flagInvertY,
 	int nptsU, CPunt3D PC_u[MAX_PATCH_CORBA], GLfloat pasCS, bool sw_PC, bool dib_TFrenet,
 	COBJModel* objecteOBJ,
@@ -31,6 +31,8 @@ void dibuixa(GLuint sh_programID, char obj, glm::mat4 MatriuTG);
 void arc(GLuint sh_programID, glm::mat4 MatriuTG, bool sw_mat[5]);
 //oid sea(GLint shaderId, glm::mat4 MatriuVista, glm::mat4 MatriuTG, CColor colorM);
 CVAO loadSea_VAO(CColor colorM);
+//sistema solar
+void sistema_solar(GLuint sh_programID, glm::mat4 MatriuTG, bool sw_mat[5], GLuint texturID[NUM_MAX_TEXTURES], bool textur_map);
 
 // Entorn VGI: Tie (Nau enemiga Star Wars) - Objecte fet per alumnes.
 void tie(GLint shaderId, glm::mat4 MatriuTG, bool sw_mat[4]);
