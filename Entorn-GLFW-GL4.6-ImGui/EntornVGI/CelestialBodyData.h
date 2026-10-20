@@ -51,4 +51,7 @@ struct CB {
 
 glm::mat4 getCB_posMat(CelestialBodyId body, CelestialBodyId origin, double et);
 glm::mat4 getCB_rotMat(CelestialBodyId body, double et);
-glm::mat4 getCB_radii(CelestialBodyId body);
+//glm::mat4 getCB_radii(CelestialBodyId body);
+
+void loadCspiceKernels();
+void unloadCspiceKernels();

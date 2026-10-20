@@ -112,7 +112,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>..\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3dll.lib;opengl32.lib;glew32.lib;glew32s.lib;SOIL2.lib;nfd_d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cspice.lib;glfw3dll.lib;opengl32.lib;glew32.lib;glew32s.lib;SOIL2.lib;nfd_d.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>MSVCRT;LIBCMT;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
     <PostBuildEvent>
@@ -153,6 +153,7 @@
     <ClCompile Include="..\include\ImGui\imgui_impl_opengl3.cpp" />
     <ClCompile Include="..\include\ImGui\imgui_tables.cpp" />
     <ClCompile Include="..\include\ImGui\imgui_widgets.cpp" />
+    <ClCompile Include="CelestialBodyData.cpp" />
     <ClCompile Include="escena.cpp" />
     <ClCompile Include="escenari.cpp" />
     <ClCompile Include="glut_geometry.cpp" />
@@ -191,6 +192,7 @@
     </ClInclude>
     <ClInclude Include="..\include\ImGui\imstb_textedit.h" />
     <ClInclude Include="..\include\ImGui\nfd.h" />
+    <ClInclude Include="CelestialBodyData.h" />
     <ClInclude Include="constants.h" />
     <ClInclude Include="escena.h" />
     <ClInclude Include="escenari.h" />

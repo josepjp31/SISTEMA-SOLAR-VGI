@@ -8,7 +8,7 @@
 
 // NASA CSPICE C API
 extern "C" {
-#include "SpiceUsr.h"
+#include "cspice\SpiceUsr.h"
 }
 
 std::unordered_map<CelestialBodyId, CB> cbList = {
@@ -30,6 +30,28 @@ std::unordered_map<CelestialBodyId, CB> cbList = {
 
 };
 
+std::string kernels[] = { 
+    "cbdata\\naif0012.tls",
+    "cbdata\\pck00011.tpc",
+    "cbdata\\de440.bsp",
+    "cbdata\\1000036.bsp",
+    "cbdata\\codes_300ast_20100725.bsp",
+    "cbdata\\plu060.bsp",
+    "cbdata\\vgr1.x2100.bsp",
+    "cbdata\\vgr2.x2100.bsp"
+};
+
+void loadCspiceKernels()
+{
+    for (std::string &file : kernels)
+        furnsh_c(file.c_str());
+}
+
+void unloadCspiceKernels()
+{
+    kclear_c();
+}
+
 glm::mat4 getCB_posMat(CelestialBodyId body, CelestialBodyId origin, double et)
 {
     glm::mat4 transfMatrix = glm::mat4(1.0f);
@@ -38,7 +60,11 @@ glm::mat4 getCB_posMat(CelestialBodyId body, CelestialBodyId origin, double et)
     double lt;
 
     spkezr_c(cbList[body].m_id.c_str(), et, "J2000", "NONE", cbList[origin].m_id.c_str(), state, &lt);
-
+    if (failed_c())
+    {
+        reset_c();
+        return transfMatrix;
+    }
     glm::vec3 positionVector(0.0f);
 
     positionVector.x = static_cast<float>(state[0] * KM_TO_AU);
@@ -51,13 +77,18 @@ glm::mat4 getCB_posMat(CelestialBodyId body, CelestialBodyId origin, double et)
 }
 glm::mat4 getCB_rotMat(CelestialBodyId body, double et)
 {
-    double rot[3][3];
+    double rot[3][3] = {};
     glm::mat4 rotationMatrix = glm::mat4(1.0f);
     
     if (!cbList[body].m_hasRotFrame)
         return rotationMatrix;
 
     pxform_c("J2000", cbList[body].m_rotationFrame.c_str(), et, rot);
+    if (failed_c())
+    {
+        reset_c();
+        return rotationMatrix;
+    }
 
     glm::mat3 spiceRot = glm::make_mat3(&rot[0][0]);
     rotationMatrix = glm::mat4(glm::transpose(spiceRot));
@@ -65,20 +96,21 @@ glm::mat4 getCB_rotMat(CelestialBodyId body, double et)
     return rotationMatrix;
 }
 
-float getCB_radius(CelestialBodyId body) //Probably will get erased.
-{
-    const CB props = cbList[body];
+//float getCB_radii(CelestialBodyId body) //Probably will get erased.
+//{
+//    const CB props = cbList[body];
+//
+//
+//    double radii[3] = { 0.0 };
+//    SpiceInt dimReturned;
+//
+//    bodvrd_c(props.m_name.c_str(), "RADII", 3, &dimReturned, radii);
+//
+//    // 5. Isolate the first element (Equatorial X radius) and convert KM to AU
+//    double equatorialRadiusKm = radii[0];
+//    float radiusInAU = static_cast<float>(equatorialRadiusKm * KM_TO_AU);
+//
+//    return radiusInAU;
+//}
 
 
-    double radii[3] = { 0.0 };
-    SpiceInt dimReturned;
-
-    bodvrd_c(props.m_name.c_str(), "RADII", 3, &dimReturned, radii);
-    bodvrd_c(props.m_name.c_str(), "RADII", 3, &dimReturned, radii);
-
-    // 5. Isolate the first element (Equatorial X radius) and convert KM to AU
-    double equatorialRadiusKm = radii[0];
-    float radiusInAU = static_cast<float>(equatorialRadiusKm * KM_TO_AU);
-
-    return radiusInAU;
-}
