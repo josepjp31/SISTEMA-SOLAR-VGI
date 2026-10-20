@@ -7,7 +7,6 @@
 //					- Per a dialeg de cerca de fitxers, s'utilitza la llibreria NativeFileDialog
 //
 
-
 // Entorn VGI.ImGui: Includes llibreria ImGui
 #include "ImGui\imgui.h"
 #include "ImGui\imgui_impl_glfw.h"
@@ -20,6 +19,8 @@
 #include "escena.h"
 #include "main.h"
 //#include <iostream>
+ #include "escenari.h"
+static Escenari* escenariActual;
 
 void InitGL()
 {
@@ -743,7 +744,8 @@ void dibuixa_Escena() {
 		textura, texturesID, textura_map, tFlag_invert_Y,
 		npts_T, PC_t, pas_CS, sw_Punts_Control, dibuixa_TriedreFrenet,
 		ObOBJ,				// Classe de l'objecte OBJ que conté els VAO's
-		GTMatrix);
+		GTMatrix,
+		escenariActual);
 }
 
 
@@ -2919,7 +2921,7 @@ void OnObjecteTie()
 	Set_VAOList(GLUT_USER6, loadgluDisk_EBO(0.0f, 1.5f, 8, 1)); // Càrrega disk com a VAO
 }
 
-// CarregaPlaneta: Carrega la textura del Sol (idx=0) o d'un planeta (idx=1..8) sobre l'esfera actual.
+// CarregaPlaneta: Carrega la textura del Sol (idx=0) o d'un planeta (idx=1..8) sobre l'esfera actual. #€#€#€# Va a dibuixaEscenari()
 void CarregaPlaneta(int idx)
 {
 	static char* fitxers[] = {
@@ -2963,7 +2965,7 @@ void MostraCos(int idx)
 	CarregaPlaneta(idx);		// Textura del cos
 }
 
-void OnSistemaTots()
+void OnSistemaTots() //#€#€#€# Va a 
 {
 	static char* fitxers[9] = {
 		(char*)".\\textures\\sun\\\\2k_sun.jpg",
@@ -6857,7 +6859,7 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severi
 	fprintf(stderr, "\n");
 }
 
-
+//COMMMMMMMMM static Escenari* escenariActual = new Escenari();
 // main(): Funció principal del programa. Inicialitza la finestra, els callbacks i el bucle principal d'operació
 int main()
 {
@@ -6993,6 +6995,9 @@ int main()
 	ImGui_ImplOpenGL3_Init("#version 130");
 	// Entorn VGI.ImGui: End Setup Dear ImGui context
 
+	escenariActual = new Escenari();
+	escenariActual->creaEscenari();
+	OnSistemaTots();//Cuando creaEscenari() funcione lo quitamos (lo de dentro de creaEscenari es OnSistemaTots() pero comentado pq no se poner bien los includes)
 // Loop until the user closes the window
 	while (!glfwWindowShouldClose(window))
 	{	// Poll for and process events */

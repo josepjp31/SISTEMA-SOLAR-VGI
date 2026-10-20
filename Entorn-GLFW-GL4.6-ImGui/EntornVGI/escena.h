@@ -8,7 +8,8 @@
 #define GLSOURCE_H
 
 // Entorn VGI: OBJECTE OBJ. Include per la definició de l'objecte Obj_OBJ
-#include "objLoader.h"	
+#include "escenari.h"
+#include "objLoader.h"
 
 /* ------------------------------------------------------------------------- */
 /*                            Funcions de les escenes                        */
@@ -22,7 +23,8 @@ void dibuixa_EscenaGL(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D rei
 	bool textur, GLuint texturID[NUM_MAX_TEXTURES], bool textur_map, bool flagInvertY,
 	int nptsU, CPunt3D PC_u[MAX_PATCH_CORBA], GLfloat pasCS, bool sw_PC, bool dib_TFrenet,
 	COBJModel* objecteOBJ,
-	glm::mat4 MatriuTG);
+	glm::mat4 MatriuTG,
+	Escenari* escenariActual);
 
 // Entorn VGI: dibuixa -> Funció que dibuixa objectes simples de la llibreria GLUT segons obj
 void dibuixa(GLuint sh_programID, char obj, glm::mat4 MatriuTG);

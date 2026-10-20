@@ -11,6 +11,8 @@
 //	  Versió 2.5:	- Objectes cubRGB i Tie (nau Star Wars fet per alumnes)
 //
 
+#include "escenari.h"
+
 #include "framework.h"
 #include "material.h"
 #include "visualitzacio.h"
@@ -81,7 +83,8 @@ void dibuixa_EscenaGL(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D rei
 	int nptsU, CPunt3D PC_u[MAX_PATCH_CORBA], GLfloat pasCS, bool sw_PC, bool dib_TFrenet,
 	COBJModel* objecteOBJ,
 	//glm::mat4 MatriuVista, 
-	glm::mat4 MatriuTG)
+	glm::mat4 MatriuTG,
+	Escenari* escenariActual)
 {
 	float altfar = 0;
 	GLint npunts = 0, nvertexs = 0;
@@ -387,7 +390,8 @@ void dibuixa_EscenaGL(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D rei
 		break;
 
 	case SISTEMA_SOLAR:
-		sistema_solar(sh_programID, MatriuTG, sw_mat, texturID, textur_map);
+		escenariActual->dibuixaEscenari(sh_programID, eix, axis_Id, reixa, hreixa, objecte, col_object, sw_mat, textur, texturID, textur_map, flagInvertY, nptsU, PC_u, pasCS, sw_PC, dib_TFrenet, objecteOBJ, /*glm::mat4 MatriuVista,*/ MatriuTG);
+		sistema_solar(sh_programID, MatriuTG, sw_mat, texturID, textur_map); //Cuando dibuixaEscenari() funcione lo quitamos (lo de dentro de dibuixaEscenari es sistema_solar() pero comentado pq no se poner bien los includes)
 		break;
 
 		// Dibuix de la resta d'objectes
