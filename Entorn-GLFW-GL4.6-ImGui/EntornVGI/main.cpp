@@ -4013,7 +4013,7 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 		else if ((mods == 2) && (action == GLFW_PRESS)) Teclat_Ctrl(key);	// Shortcuts Ctrl Key
 		else if ((objecte == C_BEZIER || objecte == C_BSPLINE || objecte == C_LEMNISCATA || objecte == C_HERMITTE
 			|| objecte == C_CATMULL_ROM) && (action == GLFW_PRESS)) Teclat_PasCorbes(key, action);
-		//NOA
+		//(NOA)
 		else if (camera == CAM_ESFERICA &&
 			(action == GLFW_PRESS || action == GLFW_REPEAT) &&
 			(key == GLFW_KEY_LEFT ||
@@ -4041,6 +4041,8 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 			// Evitem que la càmera travessi el centre
 			if (OPV.R < 42)
 				OPV.R = 42;
+			if (OPV.R > 412)
+				OPV.R = 412;
 
 			// Mantenim l'angle horitzontal entre 0 i 360 graus
 			while (OPV.beta >= 360.0)
@@ -6406,6 +6408,8 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 				//(NOA)
 				if (OPV.R < 42.0) 
 					OPV.R = 42.0;
+				if (OPV.R > 412)
+					OPV.R = 412;
 				//InvalidateRect(NULL, false);
 			}
 			else if (camera == CAM_GEODE)
