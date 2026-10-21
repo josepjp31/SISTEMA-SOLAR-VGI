@@ -1229,6 +1229,7 @@ void sistema_solar(GLuint sh_programID, glm::mat4 MatriuTG, bool sw_mat[5], GLui
 
 	// 2. Cossos: esfera amb la seva textura, situada sobre la seva òrbita
 	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_TRUE);
+	glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_TRUE);
 	SeleccionaColorMaterial(sh_programID, col_blanc, sw_mat);
 	for (i = 0; i < 9; i++)
 	{
@@ -1240,11 +1241,26 @@ void sistema_solar(GLuint sh_programID, glm::mat4 MatriuTG, bool sw_mat[5], GLui
 		ModelMatrix = glm::scale(ModelMatrix, vec3(radiCos[i], radiCos[i], radiCos[i]));
 		glUniformMatrix4fv(glGetUniformLocation(sh_programID, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
 
-		// El Sol brilla amb llum pròpia (emissió)
-		glUniform1i(glGetUniformLocation(sh_programID, "sw_intensity[0]"), (i == 0));
+		// Al terminar de dibujar los cuerpos, restauramos el valor que tenía
+		// el interruptor antes de entrar en esta función.
+		// Así la emisión especial del Sol no se filtra a los siguientes objetos.
+		glUniform4i(
+			glGetUniformLocation(sh_programID, "sw_intensity"),
+			(i == 0 && sw_mat[0]),  // Emisión: únicamente el Sol
+			sw_mat[1],              // Reflexión ambiental
+			sw_mat[2],              // Reflexión difusa
+			sw_mat[3]               // Reflexión especular
+		);
 		draw_TriEBO_Object(GLU_SPHERE);
 	}
-	glUniform1i(glGetUniformLocation(sh_programID, "sw_intensity[0]"), sw_mat[0]);
+	// Restauramos las opciones originales del menú al terminar el sistema solar.
+	glUniform4i(
+		glGetUniformLocation(sh_programID, "sw_intensity"),
+		sw_mat[0],
+		sw_mat[1],
+		sw_mat[2],
+		sw_mat[3]
+	);
 }
 
 // FI OBJECTE TIE: FETS PER ALUMNES -----------------------------------------------------------------

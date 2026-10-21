@@ -2031,7 +2031,14 @@ void ShowEntornVGIWindow(bool* p_open)
 
 		if (ImGui::BeginTable("split", 2))
 		{
-			ImGui::TableNextColumn(); ImGui::Checkbox("Emissio? (<Ctrl>+F6)", &sw_material[0]);
+			ImGui::TableNextColumn(); if (ImGui::Checkbox("Emissio? (<Ctrl>+F6)", &sw_material[0])
+				&& objecte == SISTEMA_SOLAR)
+			{
+				// En el sistema solar, apagar la emisión del Sol también apaga
+				// la luz que ilumina a los planetas.
+				llumGL[0].encesa = sw_material[0];
+				OnLlumsLlum0();
+			}
 			ImGui::TableNextColumn(); ImGui::Checkbox("Ambient? (<Ctrl>+F7)", &sw_material[1]);
 			ImGui::TableNextColumn(); ImGui::Checkbox("Difusa? (<Ctrl>+F8)", &sw_material[2]);
 			ImGui::TableNextColumn(); ImGui::Checkbox("Especular? (<Ctrl>+F9)", &sw_material[3]);
@@ -2072,15 +2079,49 @@ void ShowEntornVGIWindow(bool* p_open)
 	// DESPLEGABLE LLUMS
 	//IMGUI_DEMO_MARKER("Help");
 	if (ImGui::CollapsingHeader("LLUMS"))
-	{
-		ImGui::Checkbox("Llum Ambient? (<Ctrl>+A)", &llum_ambient);
+	{	
+		if (objecte==SISTEMA_SOLAR)
+		{
+			if (ImGui::Checkbox("Vista clara (llum ambient)", &llum_ambient))
+			{
+				// La luz ambiente y la reflexión ambiental del material
+				// se activan o desactivan juntas.
+				sw_material[1] = llum_ambient;
+
+				// Actualizamos las cuatro componentes del vector de iluminación:
+				// emisión, ambiente, difusa y especular.
+				glUniform4i(
+					glGetUniformLocation(shader_programID, "sw_intensity"),
+					sw_material[0],
+					sw_material[1],
+					sw_material[2],
+					sw_material[3]
+				);
+
+				OnLlumsLlumAmbient();
+			}
+		}
+		else
+		{
+			ImGui::Checkbox("Llum Ambient? (<Ctrl>+A)", &llum_ambient);
+		}
 		ImGui::Separator();
 		ImGui::Spacing();
 
 		if (ImGui::BeginTable("split", 2))
 		{
 			ImGui::TableNextColumn();
-			ImGui::Checkbox("Llum #0 (+Z) (<Ctrl>+0)?", &llumGL[0].encesa);
+			if (ImGui::Checkbox("Llum #0 (+Z) (<Ctrl>+0)?", &llumGL[0].encesa))
+			{
+				if (objecte == SISTEMA_SOLAR)
+				{
+					// En el sistema solar, Llum #0 es la luz del Sol:
+					// su estado debe coincidir con la emisión del Sol.
+					sw_material[0] = llumGL[0].encesa;
+				}
+
+				OnLlumsLlum0();
+			}
 			ImGui::TableNextColumn();
 			ImGui::Checkbox("Llum #1 (+X) (<Ctrl>+1)?", &llumGL[1].encesa);
 			ImGui::TableNextColumn();
@@ -2992,12 +3033,69 @@ void OnSistemaTots() //#€#€#€# Va a
 	};
 
 	OnProjeccioPerspectiva();	oProjeccio = shortCut_Projeccio();
-	OnIluminacioSuau();			oIlumina = shortCut_Iluminacio();
+	// Usamos Phong para calcular la iluminación en cada fragmento de la esfera.
+	// Así la transición entre la zona iluminada y la zona oscura queda suave.
+	OnShaderPhong();
 
-	objecte = SISTEMA_SOLAR;	cosSolar = -1;
-	camera = CAM_ESFERICA;		Vis_Polar = POLARZ;
-	t_textura = TEXTURA_FITXERIMA;	tFlag_invert_Y = true;	textura = true;
-	sw_material[0] = false;
+	// Sincronizamos el control del menú de iluminación con el modo SUAU.
+	// La palabra "suau" aquí se refiere al modo de dibujo sólido y sombreado
+	// suave que usa el entorno; el cálculo de luz lo hace el shader Phong.
+	oIlumina = shortCut_Iluminacio();
+
+	// Esta selección hace que dibuixa_EscenaGL entre en el caso del sistema solar.
+	objecte = SISTEMA_SOLAR;
+	cosSolar = -1;
+
+	// La luz debe permanecer fija en coordenadas del mundo.
+	// En este caso, "fija" significa que no se mueve con la cámara.
+	ifixe = true;
+
+	// Activamos la luz número 0, que será la luz del Sol.
+	llumGL[0].encesa = true;
+
+	// La esfera del Sol está centrada en (0, 0, 0), así que colocamos
+	// la fuente puntual exactamente en el centro del sistema solar.
+	// El valor w = 1 indica que es una luz puntual, no direccional.
+	llumGL[0].posicio.x = 0.0f;
+	llumGL[0].posicio.y = 0.0f;
+	llumGL[0].posicio.z = 0.0f;
+	llumGL[0].posicio.w = 1.0f;
+
+	// Luz blanca: ilumina los colores de las texturas sin teñirlos.
+	llumGL[0].difusa.r = 1.0f;
+	llumGL[0].difusa.g = 1.0f;
+	llumGL[0].difusa.b = 1.0f;
+	llumGL[0].difusa.a = 1.0f;
+
+	// La componente especular produce reflejos en las superficies.
+	// La dejamos blanca para que los brillos sigan el color de la luz.
+	llumGL[0].especular.r = 1.0f;
+	llumGL[0].especular.g = 1.0f;
+	llumGL[0].especular.b = 1.0f;
+	llumGL[0].especular.a = 1.0f;
+
+	// Atenuación de la luz puntual:
+	//   a = término cuadrático,
+	//   b = término lineal,
+	//   c = término constante.
+	// Estos valores dan una caída gradual con la distancia en las unidades
+	// visuales actuales del sistema solar.
+	llumGL[0].atenuacio.a = 0.00004f;
+	llumGL[0].atenuacio.b = 0.0f;
+	llumGL[0].atenuacio.c = 1.0f;
+
+	// La luz del Sol no es un foco; ilumina en todas las direcciones.
+	llumGL[0].restringida = false;
+
+	// Evitamos que la luz ambiente ilumine demasiado la cara nocturna.
+	// Si preferís que las caras oscuras sigan visibles, podéis mantener true.
+	llum_ambient = false;
+	sw_material[1] = false;
+
+	// El Sol emite luz propia. El shader solo aplicará esta emisión al Sol
+	// cuando sistema_solar active sw_intensity[0] para el cuerpo i == 0.
+	sw_material[0] = true;
+	llumGL[0].encesa = true;
 
 	// Càmera allunyada i enlairada per veure les òrbites des de dalt
 	OPV.R = 100.0;/*també o cambió :p*/	OPV.alfa = 25.0;/*estava a 65 pero o he cambiat a 25 (noa)*/ OPV.beta = 0.0;
@@ -3490,6 +3588,14 @@ void OnMaterialEmissio()
 {
 	// TODO: Agregue aquí su código de controlador de comandos
 	sw_material[0] = !sw_material[0];
+
+	// Si se usa F6 en el sistema solar, emisión y luz directa
+	// cambian juntas.
+	if (objecte == SISTEMA_SOLAR)
+	{
+		llumGL[0].encesa = sw_material[0];
+		OnLlumsLlum0();
+	}
 
 	// Pas màscara llums
 	glUniform1i(glGetUniformLocation(shader_programID, "sw_intensity[0]"), sw_material[0]);

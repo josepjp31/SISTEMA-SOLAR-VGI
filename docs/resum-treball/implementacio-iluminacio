@@ -1,0 +1,97 @@
+# Informe tècnic: il·luminació del sistema solar
+
+**Projecte:** Simulador del sistema solar a EntornVGI  
+**Data:** 21 d’octubre de 2026
+
+## Objectiu
+
+Representar el Sol com una esfera emissiva i com la font de llum puntual que il·lumina els planetes. Les superfícies han de mostrar una zona diürna il·luminada i una zona nocturna fosca. També es vol disposar d’un mode de visualització ambiental per veure els cossos quan la llum solar directa està apagada.
+
+## Configuració de la llum solar
+
+La llum número 0 (`llumGL[0]`) s’utilitza com a llum del Sol. Es configura com una font puntual situada a l’origen:
+
+```cpp
+llumGL[0].posicio = { 0.0f, 0.0f, 0.0f, 1.0f };
+```
+
+El component `w = 1` indica que és una posició puntual. La llum es manté fixa en coordenades del món (`ifixe = true`) i té components difusa i especular blanques. No és un focus restringit.
+
+També es va configurar l’atenuació de la llum:
+
+```cpp
+llumGL[0].atenuacio.a = 0.00004f; // Terme quadràtic
+llumGL[0].atenuacio.b = 0.0f;     // Terme lineal
+llumGL[0].atenuacio.c = 1.0f;     // Terme constant
+```
+
+Aquests coeficients determinen com disminueix la contribució de la llum amb la distància. Els valors s’han triat per a les unitats visuals del sistema, que no són una representació directa de les distàncies astronòmiques reals.
+
+## Emissió del Sol i màscara de materials
+
+La variable `sw_material[0]` controla el filtre d’emissió. En dibuixar els cossos, el sistema activa l’emissió només per a l’índex 0, que correspon al Sol. Per als planetes, aquest component queda desactivat.
+
+Com que `sw_intensity` és un vector GLSL `bvec4`, actualitzar-ne una component amb una cerca com `"sw_intensity[0]"` pot no funcionar com s’espera. La solució aplicada és enviar el vector complet amb `glUniform4i`:
+
+```cpp
+glUniform4i(
+    glGetUniformLocation(sh_programID, "sw_intensity"),
+    (i == 0 && sw_mat[0]), // Emissió només per al Sol
+    sw_mat[1],              // Ambient del material
+    sw_mat[2],              // Difús
+    sw_mat[3]               // Especular
+);
+```
+
+Això evita que l’estat d’emissió del Sol quedi actiu quan es dibuixen els planetes. En acabar el bucle, es restaura la màscara original del menú.
+
+## Normals i càlcul Phong
+
+El shader Phong calcula la il·luminació per fragment. Perquè la llum es calculi correctament, les normals s’han de transformar al mateix espai de vista que les posicions i la llum. El shader utilitza la matriu normal, basada en la inversa transposada de la part lineal de la matriu model-vista:
+
+```glsl
+mat3 normalMatrixPV =
+    transpose(inverse(mat3(viewMatrix * modelMatrix)));
+
+vertexNormalPV = normalize(normalMatrixPV * in_Normal);
+```
+
+La normal transformada permet calcular el component difús segons l’orientació de la superfície respecte a la llum, mitjançant el producte escalar entre la normal `N` i la direcció de la llum `L`. Quan el producte és negatiu, el fragment no rep il·luminació difusa.
+
+## Textures i il·luminació
+
+Les textures dels planetes s’han de combinar amb el resultat del shader. Amb la modulació activada, el fragment final utilitza:
+
+```glsl
+FragColor = colorT * fragmentColor;
+```
+
+Així, la textura conserva els seus detalls a la cara il·luminada i es fa fosca a la cara que no rep llum. Sense modulació, el shader dibuixa només `colorT`; en aquest cas la textura no reflecteix l’absència de llum i la cara nocturna continua visible.
+
+## Controls i estats de visualització
+
+Els controls del menú s’han connectat amb aquestes variables:
+
+- **Emissió** (`sw_material[0]`): activa o desactiva l’emissió pròpia del Sol.
+- **Llum #0** (`llumGL[0].encesa`): activa o desactiva la llum directa que il·lumina els planetes.
+- En el sistema solar, els dos controls s’han sincronitzat: apagar l’emissió també apaga la llum directa, i encendre-la torna a activar totes dues.
+- La tecla **F6** aplica la mateixa sincronització que la casella d’emissió.
+- **Vista clara** activa o desactiva la llum ambiental i la reflexió ambiental dels materials. Aquest mode permet veure els planetes encara que la llum directa del Sol estigui apagada.
+
+En entrar al sistema solar, la configuració inicial desactiva la llum ambiental i la reflexió ambiental. Això evita que la cara nocturna rebi una llum de farciment no desitjada.
+
+## Resultat previst
+
+| Emissió i llum del Sol | Vista clara | Resultat |
+|---|---|---|
+| Activades | Desactivada | El Sol brilla; la llum directa il·lumina les cares diürnes i les cares nocturnes queden fosques. |
+| Desactivades | Desactivada | No hi ha emissió ni llum solar directa; els planetes queden negres. |
+| Qualsevol estat | Activada | La llum ambiental permet veure els cossos encara que el Sol no il·lumini el sistema. |
+
+## Interfície nova del company
+
+Es van revisar `InterficieUI.cpp`, `InterficieUI.h` i el resum d’implementació. L’opció **Il·luminació Solar Directa** apareixia al menú, però als fitxers revisats només modificava una variable de la interfície; no es va trobar connectada amb el renderitzat. Es va decidir deixar aquesta interfície de banda i conservar els controls d’EntornVGI per a aquesta implementació.
+
+## Estat i verificació
+
+Els canvis de codi es van proporcionar com a fragments perquè l’usuari els copiés manualment. L’usuari ha indicat que ja els ha incorporat. No s’ha comprovat aquí una compilació ni una execució posterior; per tant, aquest informe descriu el comportament previst segons els canvis, pendent de validació al programa.
