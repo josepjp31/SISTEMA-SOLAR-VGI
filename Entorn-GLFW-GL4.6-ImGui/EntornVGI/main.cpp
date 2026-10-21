@@ -6404,7 +6404,7 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 		{
 			if (camera == CAM_ESFERICA)
 			{	// Càmera Esfèrica
-				OPV.R = OPV.R + yoffset / 4.0;
+				OPV.R = OPV.R - yoffset * 5.0;
 				//(NOA)
 				if (OPV.R < 42.0) 
 					OPV.R = 42.0;
