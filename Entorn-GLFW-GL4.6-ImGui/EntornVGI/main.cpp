@@ -37,8 +37,14 @@ void InitGL()
 	mobil = true;			zzoom = true;		zzoomO = false;		satelit = false;
 
 	// Entorn VGI: Variables de control de l'opció CAMERA->ESFÈRICA?
-	cam_Esferica[0] = 15.0f;	cam_Esferica[1] = 0.0f;			cam_Esferica[2] = 0.0f;
-	OPV.R = cam_Esferica[0];	OPV.alfa = cam_Esferica[1];		OPV.beta = cam_Esferica[2];		// Origen PV en esfèriques
+	//(NOA)
+	cam_Esferica[0] = 100.0f;	
+	cam_Esferica[1] = 25.0f;			
+	cam_Esferica[2] = 0.0f;
+
+	OPV.R = cam_Esferica[0];	
+	OPV.alfa = cam_Esferica[1];		
+	OPV.beta = cam_Esferica[2];		// Origen PV en esfèriques
 	Vis_Polar = POLARZ;
 	ViewMatrix = glm::mat4(1.0);		// Inicialitzar a identitat
 	oPolars = -1;
@@ -2403,7 +2409,10 @@ void OnCameraEsferica()
 		camera = CAM_ESFERICA;
 
 		// Inicialitzar paràmetres Càmera Esfèrica
-		OPV.R = 15.0;		OPV.alfa = 0.0;		OPV.beta = 0.0;				// Origen PV en esfèriques
+		//(NOA)
+		OPV.R = 100.0;		
+		OPV.alfa = 25.0;		
+		OPV.beta = 0.0;				// Origen PV en esfèriques
 		mobil = true;		zzoom = true;		satelit = false;
 		Vis_Polar = POLARZ;
 	}
@@ -2415,7 +2424,10 @@ void OnCameraOrigenEsferica()
 	// TODO: Agregue aquí su código de controlador de comandos
 	if (camera == CAM_ESFERICA) {
 		// Inicialitzar paràmetres Càmera Esfèrica
-		OPV.R = 15.0;		OPV.alfa = 0.0;		OPV.beta = 0.0;				// Origen PV en esfèriques
+		//(NOA)
+		OPV.R = 100.0;		
+		OPV.alfa = 25.0;		
+		OPV.beta = 0.0;				// Origen PV en esfèriques
 		mobil = true;		zzoom = true;		satelit = false;
 		Vis_Polar = POLARZ;
 	}
@@ -2988,7 +3000,7 @@ void OnSistemaTots() //#€#€#€# Va a
 	sw_material[0] = false;
 
 	// Càmera allunyada i enlairada per veure les òrbites des de dalt
-	OPV.R = 550.0;	OPV.alfa = 65.0;	OPV.beta = 0.0;
+	OPV.R = 100.0;/*també o cambió :p*/	OPV.alfa = 25.0;/*estava a 65 pero o he cambiat a 25 (noa)*/ OPV.beta = 0.0;
 	cam_Esferica[0] = (float)OPV.R;	cam_Esferica[1] = (float)OPV.alfa;	cam_Esferica[2] = (float)OPV.beta;
 
 	glUseProgram(shader_programID);
@@ -4001,6 +4013,46 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 		else if ((mods == 2) && (action == GLFW_PRESS)) Teclat_Ctrl(key);	// Shortcuts Ctrl Key
 		else if ((objecte == C_BEZIER || objecte == C_BSPLINE || objecte == C_LEMNISCATA || objecte == C_HERMITTE
 			|| objecte == C_CATMULL_ROM) && (action == GLFW_PRESS)) Teclat_PasCorbes(key, action);
+		//NOA
+		else if (camera == CAM_ESFERICA &&
+			(action == GLFW_PRESS || action == GLFW_REPEAT) &&
+			(key == GLFW_KEY_LEFT ||
+				key == GLFW_KEY_RIGHT ||
+				key == GLFW_KEY_UP ||
+				key == GLFW_KEY_DOWN))
+		{
+			const double pasAngle = 5.0;
+			const double pasDistancia = 5.0;
+
+			// Gir horitzontal al voltant del Sol
+			if (key == GLFW_KEY_LEFT)
+				OPV.beta -= pasAngle;
+
+			else if (key == GLFW_KEY_RIGHT)
+				OPV.beta += pasAngle;
+
+			// Zoom: apropar-se o allunyar-se del Sol
+			else if (key == GLFW_KEY_UP)
+				OPV.R -= pasDistancia;
+
+			else if (key == GLFW_KEY_DOWN)
+				OPV.R += pasDistancia;
+
+			// Evitem que la càmera travessi el centre
+			if (OPV.R < 42)
+				OPV.R = 42;
+
+			// Mantenim l'angle horitzontal entre 0 i 360 graus
+			while (OPV.beta >= 360.0)
+				OPV.beta -= 360.0;
+
+			while (OPV.beta < 0.0)
+				OPV.beta += 360.0;
+		}
+
+		else if (camera == CAM_NAVEGA)
+			Teclat_Navega(key, action);
+
 		else if (camera == CAM_NAVEGA) Teclat_Navega(key, action);
 		else if ((sw_grid) && ((grid.x) || (grid.y) || (grid.z))) Teclat_Grid(key, action);
 		else if (((key == GLFW_KEY_G) && (action == GLFW_PRESS)) && ((grid.x) || (grid.y) || (grid.z))) sw_grid = !sw_grid;
@@ -6069,12 +6121,13 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 		m_PosEAvall.x = xpos;				m_PosEAvall.y = ypos;
 		if (camera == CAM_ESFERICA)
 		{	// Càmera Esfèrica
+			//(NOA)
 			OPV.beta = OPV.beta - gir.cx / 2.0;
-			OPV.alfa = OPV.alfa + gir.cy / 2.0;
+			OPV.alfa = 25; //angle vertical fix! (NOA)
 
 			// Entorn VGI: Control per evitar el creixement desmesurat dels angles.
-			while (OPV.alfa >= 360)		OPV.alfa = OPV.alfa - 360.0;
-			while (OPV.alfa < 0)		OPV.alfa = OPV.alfa + 360.0;
+			//while (OPV.alfa >= 360)		OPV.alfa = OPV.alfa - 360.0; //no ens fan falta (NOA)
+			//while (OPV.alfa < 0)		OPV.alfa = OPV.alfa + 360.0;
 			while (OPV.beta >= 360)		OPV.beta = OPV.beta - 360.0;
 			while (OPV.beta < 0)		OPV.beta = OPV.beta + 360.0;
 		}
@@ -6350,7 +6403,9 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 			if (camera == CAM_ESFERICA)
 			{	// Càmera Esfèrica
 				OPV.R = OPV.R + yoffset / 4.0;
-				if (OPV.R < 0.25) OPV.R = 0.25;
+				//(NOA)
+				if (OPV.R < 42.0) 
+					OPV.R = 42.0;
 				//InvalidateRect(NULL, false);
 			}
 			else if (camera == CAM_GEODE)
