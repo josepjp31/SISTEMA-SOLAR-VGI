@@ -4,6 +4,10 @@
 // necessita els tipus d'OpenGL (GLuint, GLint, uint), CVAO (constants.h) i GLM.
 #include "framework.h"
 #include "objLoader.h"
+#include "material.h"
+#include "visualitzacio.h"
+//#include "shader.h"
+//#include "main.h"
 
 // Nombre maxim d'objectes per escenari
 #define MAX_OBJECTES_ESCENARI 10
@@ -12,7 +16,7 @@
 class Object
 {
 public:
-	Object() : m_mMatrix(glm::mat4(1.0f)), m_modelCarregat(false) {}	//Usar InitObject de COBJModel en el constructor
+	Object() : m_mMatrix(glm::mat4(1.0f)), m_modelCarregat(false), m_radiCos(0.0f), m_radiOrbita(0.0f), m_angleOrbita(0.0f), m_velAngular(0.0f) {}	//Usar InitObject de COBJModel en el constructor
 	~Object() {}	//Usar UnInitObject de COBJModel en el destructor (COBJModel ja allibera els seus VAO)
 
 	// Carrega un fitxer .OBJ al model. Retorna true si s'ha carregat correctament
@@ -20,6 +24,10 @@ public:
 	bool carregaModel(char* fitxer) { m_modelCarregat = (m_model.LoadModel(fitxer) == 0); return m_modelCarregat; }
 	bool teModel() const { return m_modelCarregat; }
 
+	float m_radiCos;
+	float m_radiOrbita;
+	float m_angleOrbita;
+	float m_velAngular;
 	//Vector4D m_position;
 	//Vector4D m_rotation;
 	//Vector4D m_scale;
@@ -41,16 +49,23 @@ public:
 	Escenari& operator=(const Escenari&) = delete;
 
 	void creaEscenari();
-	void dibuixaEscenari(GLuint sh_programID);
+	void dibuixaEscenari(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D reixa, CPunt3D hreixa, char objecte,
+		CColor col_object, bool sw_mat[5],
+		bool textur, GLuint texturID[NUM_MAX_TEXTURES], bool textur_map, bool flagInvertY,
+		int nptsU, CPunt3D PC_u[MAX_PATCH_CORBA], GLfloat pasCS, bool sw_PC, bool dib_TFrenet,
+		COBJModel* objecteOBJ,
+		//glm::mat4 MatriuVista, 
+		glm::mat4 MatriuTG);
 	void updateVariables();
 
 	// Allibera els objectes (i els seus VAO). Cal cridar-la ABANS de destruir el context OpenGL.
 	void alliberaEscenari() { delete[] m_objectList; m_objectList = nullptr; }
 
+	Object* m_objectList;
+
 private:
 
 	//camera
-	Object* m_objectList;
 
 };
 

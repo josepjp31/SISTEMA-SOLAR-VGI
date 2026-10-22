@@ -54,6 +54,8 @@
 #define VAIXELL 'v'
 #define OBJ3DS '3'		// Objecte format 3DS
 #define OBJOBJ '4'		// Objecte format OBJ
+//now obj sistema solar
+#define SISTEMA_SOLAR '$'
 
 //-------------- VGI: Tipus d'Iluminacio
 #define PUNTS 'P'
@@ -63,8 +65,8 @@
 
 
 // -------------- VGI: Definició dels valors del pla near i far del Volum de Visualització en Perspectiva
-const double p_near=0.01;
-const double p_far=50000.0;
+const double p_near = 0.01;
+const double p_far = 50000.0;
 
 //-------------- VGI: Tipus d'Objectes Picking
 #define PICKCAP 0
@@ -101,7 +103,7 @@ const int NUM_MAX_LLUMS = 8;
 #define PROG_BINARY_SHADERW 'W'
 
 //--------------- VGI: Valor constant de pi
-const double PI=3.14159;
+const double PI = 3.14159;
 const double TWOPI = 2 * PI;
 const double PID2 = PI / 2;
 //const double pi=3.14159265358979323846264338327950288419716939937510f;
@@ -115,27 +117,31 @@ const double PID2 = PI / 2;
 
 // --------------- VGI: Estructura tamany 2D (Pre-definida en Visual Studio 2019)
 struct CSize
-{	GLint cx;
+{
+	GLint cx;
 	GLint cy;
 };
 
 // --------------- VGI: Estructura coordenada 2D (Ja definida en Visual Studio 2010)
 struct CPoint
-{   GLint x;
-    GLint y;
+{
+	GLint x;
+	GLint y;
 };
 
 // --------------- VGI: Estructura coordenada 3D
 struct CPunt3D
-{   GLdouble x;
-    GLdouble y;
+{
+	GLdouble x;
+	GLdouble y;
 	GLdouble z;
 	GLdouble w;
 };
 
 // --------------- GMS: 3Màscara booleana sobre coordenades 3D
 struct CMask3D
-{	bool x;
+{
+	bool x;
 	bool y;
 	bool z;
 	bool w;
@@ -143,22 +149,25 @@ struct CMask3D
 
 // --------------- VGI: Estructura de color R,G,B,A
 struct CColor
-{   GLdouble r;
-    GLdouble g;
+{
+	GLdouble r;
+	GLdouble g;
 	GLdouble b;
 	GLdouble a;
 };
 
 // --------------- VGI: Estructura coordenada Esfèrica 3D
 struct CEsfe3D
-{   GLdouble R;
-    GLdouble alfa;
+{
+	GLdouble R;
+	GLdouble alfa;
 	GLdouble beta;
 };
 
 // --------------- VGI: Estructura LLista VAO
 struct CVAO
-{	GLuint vaoId;
+{
+	GLuint vaoId;
 	GLuint vboId;
 	GLuint eboId;
 	GLint nVertexs;
@@ -167,15 +176,17 @@ struct CVAO
 
 // --------------- VGI: INSTANCIA (TG d'instanciació d'un objecte)
 struct INSTANCIA
-{	CPunt3D VTras;	// Vector de Traslació
+{
+	CPunt3D VTras;	// Vector de Traslació
 	CPunt3D VScal;	// Vector d'Escalatge
 	CPunt3D VRota;	// Vector de Rotació
 };
 
 // --------------- VGI: Coeficients equació d'atenuació de la llum fatt=1/(ad2+bd+c)
 struct CAtenua
-{   GLdouble a;
-    GLdouble b;
+{
+	GLdouble a;
+	GLdouble b;
 	GLdouble c;
 };
 
@@ -191,7 +202,8 @@ struct MATERIAL
 
 // --------------- VGI: Estructura font de llum
 struct LLUM
-{	bool encesa;				// Booleana que controla si la llum és encesa [TRUE] o no [FALSE]
+{
+	bool encesa;				// Booleana que controla si la llum és encesa [TRUE] o no [FALSE]
 	CPunt3D posicio;		// Posició (x,y,z) de la font de llum en coordenades esfèriques.
 	CColor difusa;			// Intensitat difusa de la font de llum (r,g,b,a)
 	CColor especular;		// Intensitat especular de la font de llum (r,g,b,a)
