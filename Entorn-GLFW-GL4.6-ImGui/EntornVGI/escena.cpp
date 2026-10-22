@@ -390,8 +390,9 @@ void dibuixa_EscenaGL(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D rei
 		break;
 
 	case SISTEMA_SOLAR:
-		escenariActual->dibuixaEscenari(sh_programID, eix, axis_Id, reixa, hreixa, objecte, col_object, sw_mat, textur, texturID, textur_map, flagInvertY, nptsU, PC_u, pasCS, sw_PC, dib_TFrenet, objecteOBJ, /*glm::mat4 MatriuVista,*/ MatriuTG);
-		sistema_solar(sh_programID, MatriuTG, sw_mat, texturID, textur_map, escenariActual/*€~€~€~€~€ */ ); //Cuando dibuixaEscenari() funcione lo quitamos (lo de dentro de dibuixaEscenari es sistema_solar() pero comentado pq no se poner bien los includes)
+		if (escenariActual != nullptr)
+			escenariActual->dibuixaEscenari(sh_programID, eix, axis_Id, reixa, hreixa, objecte, col_object, sw_mat, textur, texturID, textur_map, flagInvertY, nptsU, PC_u, pasCS, sw_PC, dib_TFrenet, objecteOBJ, /*glm::mat4 MatriuVista,*/ MatriuTG);
+		sistema_solar(sh_programID, MatriuTG, sw_mat, texturID, textur_map, escenariActual);
 		break;
 
 		// Dibuix de la resta d'objectes
@@ -1222,33 +1223,50 @@ void sistema_solar(GLuint sh_programID, glm::mat4 MatriuTG, bool sw_mat[5], GLui
 	SeleccionaColorMaterial(sh_programID, col_orbita, sw_mat);
 	for (i = 1; i < 9; i++)
 	{
-		//ModelMatrix = glm::scale(MatriuTG, vec3(radiOrbita[i], radiOrbita[i], radiOrbita[i]));
-		ModelMatrix = glm::scale(MatriuTG, vec3(escenariActual->m_objectList[i].m_radiOrbita, escenariActual->m_objectList[i].m_radiOrbita, escenariActual->m_objectList[i].m_radiOrbita)); //€~€~€~€~€
+		float rOrb = (escenariActual && escenariActual->m_objectList) ? escenariActual->m_objectList[i].m_radiOrbita : radiOrbita[i];
+		ModelMatrix = glm::scale(MatriuTG, vec3(rOrb, rOrb, rOrb));
 		glUniformMatrix4fv(glGetUniformLocation(sh_programID, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
 		draw_TriEBO_Object(GLUT_TORUS);
 	}
 
 	// 2. Cossos: esfera amb la seva textura, situada sobre la seva òrbita
 	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_TRUE);
+	glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_TRUE);
 	SeleccionaColorMaterial(sh_programID, col_blanc, sw_mat);
 	for (i = 0; i < 9; i++)
 	{
 		if (texturID[i] != 0) SetTextureParameters(0, texturID[i], true, true, textur_map, false);
 
-		//float x = radiOrbita[i] * (float)cos(angleOrbita[i] * PI / 180.0);
-		//float y = radiOrbita[i] * (float)sin(angleOrbita[i] * PI / 180.0);
-		float x = radiOrbita[i] * (float)cos(escenariActual->m_objectList[i].m_angleOrbita * PI / 180.0); //€~€~€~€~€
-		float y = radiOrbita[i] * (float)sin(escenariActual->m_objectList[i].m_angleOrbita * PI / 180.0); //€~€~€~€~€
+		float rOrb = (escenariActual && escenariActual->m_objectList) ? escenariActual->m_objectList[i].m_radiOrbita : radiOrbita[i];
+		float angOrb = (escenariActual && escenariActual->m_objectList) ? escenariActual->m_objectList[i].m_angleOrbita : angleOrbita[i];
+		float rCos = (escenariActual && escenariActual->m_objectList) ? escenariActual->m_objectList[i].m_radiCos : radiCos[i];
+
+		float x = rOrb * (float)cos(angOrb * PI / 180.0);
+		float y = rOrb * (float)sin(angOrb * PI / 180.0);
 		ModelMatrix = glm::translate(MatriuTG, vec3(x, y, 0.0f));
-		//ModelMatrix = glm::scale(ModelMatrix, vec3(radiCos[i], radiCos[i], radiCos[i]));
-		ModelMatrix = glm::scale(ModelMatrix, vec3(escenariActual->m_objectList[i].m_radiCos, escenariActual->m_objectList[i].m_radiCos, escenariActual->m_objectList[i].m_radiCos)); //€~€~€~€~€
+		ModelMatrix = glm::scale(ModelMatrix, vec3(rCos, rCos, rCos));
 		glUniformMatrix4fv(glGetUniformLocation(sh_programID, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
 
-		// El Sol brilla amb llum pròpia (emissió)
-		glUniform1i(glGetUniformLocation(sh_programID, "sw_intensity[0]"), (i == 0));
+		// Al terminar de dibujar los cuerpos, restauramos el valor que tenía
+		// el interruptor antes de entrar en esta función.
+		// Así la emisión especial del Sol no se filtra a los siguientes objetos.
+		glUniform4i(
+			glGetUniformLocation(sh_programID, "sw_intensity"),
+			(i == 0 && sw_mat[0]),  // Emisión: únicamente el Sol
+			sw_mat[1],              // Reflexión ambiental
+			sw_mat[2],              // Reflexión difusa
+			sw_mat[3]               // Reflexión especular
+		);
 		draw_TriEBO_Object(GLU_SPHERE);
 	}
-	glUniform1i(glGetUniformLocation(sh_programID, "sw_intensity[0]"), sw_mat[0]);
+	// Restauramos las opciones originales del menú al terminar el sistema solar.
+	glUniform4i(
+		glGetUniformLocation(sh_programID, "sw_intensity"),
+		sw_mat[0],
+		sw_mat[1],
+		sw_mat[2],
+		sw_mat[3]
+	);
 }
 
 // FI OBJECTE TIE: FETS PER ALUMNES -----------------------------------------------------------------

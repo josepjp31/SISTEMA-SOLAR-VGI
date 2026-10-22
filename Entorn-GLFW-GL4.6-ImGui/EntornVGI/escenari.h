@@ -16,7 +16,7 @@
 class Object
 {
 public:
-	Object() : m_mMatrix(glm::mat4(1.0f)), m_modelCarregat(false) {}	//Usar InitObject de COBJModel en el constructor
+	Object() : m_mMatrix(glm::mat4(1.0f)), m_modelCarregat(false), m_radiCos(0.0f), m_radiOrbita(0.0f), m_angleOrbita(0.0f), m_velAngular(0.0f) {}	//Usar InitObject de COBJModel en el constructor
 	~Object() {}	//Usar UnInitObject de COBJModel en el destructor (COBJModel ja allibera els seus VAO)
 
 	// Carrega un fitxer .OBJ al model. Retorna true si s'ha carregat correctament

@@ -49,6 +49,17 @@ void Escenari::creaEscenari()
 	//glUniform1i(glGetUniformLocation(shader_programID, "texture0"), GLint(0));
 	//glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), tFlag_invert_Y);
 
+	const float radiCos[9] = { 20.0f,  3.0f,  5.0f,  5.0f,  4.0f, 12.0f, 10.0f,  7.0f,  7.0f };
+	const float radiOrbita[9] = { 0.0f, 40.0f, 60.0f, 80.0f,100.0f,135.0f,175.0f,210.0f,240.0f };
+	const float angleOrbita[9] = { 0.0f,  0.0f, 40.0f, 80.0f,120.0f,160.0f,200.0f,240.0f,280.0f };
+
+	for (int i = 0; i < 9; i++)
+	{
+		m_objectList[i].m_radiCos = radiCos[i];
+		m_objectList[i].m_radiOrbita = radiOrbita[i];
+		m_objectList[i].m_angleOrbita = angleOrbita[i];
+	}
+
 	m_objectList[0].m_velAngular = 1.0f;
 	m_objectList[1].m_velAngular = 0.8f;
 	m_objectList[2].m_velAngular = 0.2f;
@@ -123,6 +134,7 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, bool eix, GLuint axis_Id, CM
 
 void Escenari::updateVariables()
 {
+	if (m_objectList == nullptr) return;
 	for (int i = 0; i < 9; i++)
 	{
 		m_objectList[i].m_angleOrbita = m_objectList[i].m_angleOrbita + m_objectList[i].m_velAngular;
