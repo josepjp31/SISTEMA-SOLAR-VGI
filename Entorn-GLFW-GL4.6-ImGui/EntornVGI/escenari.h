@@ -6,7 +6,7 @@
 #include "objLoader.h"
 #include "material.h"
 #include "visualitzacio.h"
-#include "shader.h"
+//#include "shader.h"
 //#include "main.h"
 
 // Nombre maxim d'objectes per escenari
@@ -24,6 +24,10 @@ public:
 	bool carregaModel(char* fitxer) { m_modelCarregat = (m_model.LoadModel(fitxer) == 0); return m_modelCarregat; }
 	bool teModel() const { return m_modelCarregat; }
 
+	float m_radiCos;
+	float m_radiOrbita;
+	float m_angleOrbita;
+	float m_velAngular;
 	//Vector4D m_position;
 	//Vector4D m_rotation;
 	//Vector4D m_scale;
@@ -57,11 +61,11 @@ public:
 	// Allibera els objectes (i els seus VAO). Cal cridar-la ABANS de destruir el context OpenGL.
 	void alliberaEscenari() { delete[] m_objectList; m_objectList = nullptr; }
 
+	Object* m_objectList;
 
 private:
 
 	//camera
-	Object* m_objectList;
 
 };
 

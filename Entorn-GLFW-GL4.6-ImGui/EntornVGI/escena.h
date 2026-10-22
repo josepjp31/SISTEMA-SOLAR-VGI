@@ -34,7 +34,7 @@ void arc(GLuint sh_programID, glm::mat4 MatriuTG, bool sw_mat[5]);
 //oid sea(GLint shaderId, glm::mat4 MatriuVista, glm::mat4 MatriuTG, CColor colorM);
 CVAO loadSea_VAO(CColor colorM);
 //sistema solar
-void sistema_solar(GLuint sh_programID, glm::mat4 MatriuTG, bool sw_mat[5], GLuint texturID[NUM_MAX_TEXTURES], bool textur_map);
+void sistema_solar(GLuint sh_programID, glm::mat4 MatriuTG, bool sw_mat[5], GLuint texturID[NUM_MAX_TEXTURES], bool textur_map, Escenari* escenariActual);
 
 // Entorn VGI: Tie (Nau enemiga Star Wars) - Objecte fet per alumnes.
 void tie(GLint shaderId, glm::mat4 MatriuTG, bool sw_mat[4]);

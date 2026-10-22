@@ -3021,6 +3021,19 @@ void OnSistemaTots() //#€#€#€# Va a
 
 	glUniform1i(glGetUniformLocation(shader_programID, "texture0"), GLint(0));
 	glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), tFlag_invert_Y);
+
+
+	//€~€~€~€~€
+	const float radiCos[9] = { 20.0f,  3.0f,  5.0f,  5.0f,  4.0f, 12.0f, 10.0f,  7.0f,  7.0f };
+	const float radiOrbita[9] = { 0.0f, 40.0f, 60.0f, 80.0f,100.0f,135.0f,175.0f,210.0f,240.0f };
+	const float angleOrbita[9] = { 0.0f,  0.0f, 40.0f, 80.0f,120.0f,160.0f,200.0f,240.0f,280.0f };
+
+	for (int i = 0; i < 9; i++)
+	{
+		escenariActual->m_objectList[i].m_radiCos = radiCos[i];
+		escenariActual->m_objectList[i].m_radiOrbita = radiOrbita[i];
+		escenariActual->m_objectList[i].m_angleOrbita = angleOrbita[i];
+	}
 }
 
 // ----------------- OBJECTES CORBES BEZIER, LEMNISCATA i B-SPLINE
@@ -6742,6 +6755,8 @@ void OnTimer()
 		// Crida a OnPaint() per redibuixar l'escena
 		//InvalidateRect(NULL, false);
 	}
+
+	escenariActual->updateVariables();
 }
 
 // ---------------- Entorn VGI: Funcions locals a main.cpp
@@ -7069,7 +7084,7 @@ int main()
 
 		// Entorn VGI. Timer: for each timer do this
 		time -= delta;
-		if ((time <= 0.0) && (satelit || anima)) OnTimer();
+		if ((time <= 0.0) /* && (satelit || anima) */ ) OnTimer();
 
 		/*
 				// Entorn VGI: GAMEPAD. Variable que retorna si el joystick està connectat (GLFW_CONNECTED) o desconnectat (GLFW_DISCONECTED)

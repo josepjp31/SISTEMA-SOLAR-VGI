@@ -48,6 +48,16 @@ void Escenari::creaEscenari()
 
 	//glUniform1i(glGetUniformLocation(shader_programID, "texture0"), GLint(0));
 	//glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), tFlag_invert_Y);
+
+	m_objectList[0].m_velAngular = 1.0f;
+	m_objectList[1].m_velAngular = 0.8f;
+	m_objectList[2].m_velAngular = 0.2f;
+	m_objectList[3].m_velAngular = 1.1f;
+	m_objectList[4].m_velAngular = 1.0f;
+	m_objectList[5].m_velAngular = 1.2f;
+	m_objectList[6].m_velAngular = 0.5f;
+	m_objectList[7].m_velAngular = 0.1f;
+	m_objectList[8].m_velAngular = 2.0f;
 }
 
 void Escenari::dibuixaEscenari(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D reixa, CPunt3D hreixa, char objecte,
@@ -74,14 +84,14 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, bool eix, GLuint axis_Id, CM
 	const float radiOrbita[9] = { 0.0f, 40.0f, 60.0f, 80.0f,100.0f,135.0f,175.0f,210.0f,240.0f };
 	const float angleOrbita[9] = { 0.0f,  0.0f, 40.0f, 80.0f,120.0f,160.0f,200.0f,240.0f,280.0f };
 
-	//CColor col_blanc, col_orbita;
-	//col_blanc.r = 1.0;	col_blanc.g = 1.0;	col_blanc.b = 1.0;	col_blanc.a = 1.0;
-	//col_orbita.r = 0.7;	col_orbita.g = 0.7;	col_orbita.b = 0.7;	col_orbita.a = 1.0;
+	CColor col_blanc, col_orbita;
+	col_blanc.r = 1.0;	col_blanc.g = 1.0;	col_blanc.b = 1.0;	col_blanc.a = 1.0;
+	col_orbita.r = 0.7;	col_orbita.g = 0.7;	col_orbita.b = 0.7;	col_orbita.a = 1.0;
 
-	//glm::mat4 ModelMatrix(1.0);
-	//int i;
+	glm::mat4 ModelMatrix(1.0);
+	int i;
 
-	// 1. Òrbites: anell fi sense textura, escalat al radi de cada òrbita
+	//// 1. Òrbites: anell fi sense textura, escalat al radi de cada òrbita
 	//glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_FALSE);
 	//SeleccionaColorMaterial(sh_programID, col_orbita, sw_mat);
 	//for (i = 1; i < 9; i++)
@@ -113,5 +123,9 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, bool eix, GLuint axis_Id, CM
 
 void Escenari::updateVariables()
 {
-
+	for (int i = 0; i < 9; i++)
+	{
+		m_objectList[i].m_angleOrbita = m_objectList[i].m_angleOrbita + m_objectList[i].m_velAngular;
+		if (m_objectList[i].m_angleOrbita > 360) m_objectList[i].m_angleOrbita -= 360;
+	}
 }

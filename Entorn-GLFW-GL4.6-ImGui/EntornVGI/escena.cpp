@@ -391,7 +391,7 @@ void dibuixa_EscenaGL(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D rei
 
 	case SISTEMA_SOLAR:
 		escenariActual->dibuixaEscenari(sh_programID, eix, axis_Id, reixa, hreixa, objecte, col_object, sw_mat, textur, texturID, textur_map, flagInvertY, nptsU, PC_u, pasCS, sw_PC, dib_TFrenet, objecteOBJ, /*glm::mat4 MatriuVista,*/ MatriuTG);
-		sistema_solar(sh_programID, MatriuTG, sw_mat, texturID, textur_map); //Cuando dibuixaEscenari() funcione lo quitamos (lo de dentro de dibuixaEscenari es sistema_solar() pero comentado pq no se poner bien los includes)
+		sistema_solar(sh_programID, MatriuTG, sw_mat, texturID, textur_map, escenariActual/*€~€~€~€~€ */ ); //Cuando dibuixaEscenari() funcione lo quitamos (lo de dentro de dibuixaEscenari es sistema_solar() pero comentado pq no se poner bien los includes)
 		break;
 
 		// Dibuix de la resta d'objectes
@@ -1203,7 +1203,7 @@ void Cabina(GLint shaderId, glm::mat4 MatriuTG, bool sw_mat[4])
 }
 
 //sistema solar
-void sistema_solar(GLuint sh_programID, glm::mat4 MatriuTG, bool sw_mat[5], GLuint texturID[NUM_MAX_TEXTURES], bool textur_map)
+void sistema_solar(GLuint sh_programID, glm::mat4 MatriuTG, bool sw_mat[5], GLuint texturID[NUM_MAX_TEXTURES], bool textur_map, Escenari* escenariActual)
 {
 	//                              Sol    Merc   Venus  Terra  Mart   Júpit  Saturn Urà    Neptú
 	const float radiCos[9] = { 20.0f,  3.0f,  5.0f,  5.0f,  4.0f, 12.0f, 10.0f,  7.0f,  7.0f };
@@ -1222,7 +1222,8 @@ void sistema_solar(GLuint sh_programID, glm::mat4 MatriuTG, bool sw_mat[5], GLui
 	SeleccionaColorMaterial(sh_programID, col_orbita, sw_mat);
 	for (i = 1; i < 9; i++)
 	{
-		ModelMatrix = glm::scale(MatriuTG, vec3(radiOrbita[i], radiOrbita[i], radiOrbita[i]));
+		//ModelMatrix = glm::scale(MatriuTG, vec3(radiOrbita[i], radiOrbita[i], radiOrbita[i]));
+		ModelMatrix = glm::scale(MatriuTG, vec3(escenariActual->m_objectList[i].m_radiOrbita, escenariActual->m_objectList[i].m_radiOrbita, escenariActual->m_objectList[i].m_radiOrbita)); //€~€~€~€~€
 		glUniformMatrix4fv(glGetUniformLocation(sh_programID, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
 		draw_TriEBO_Object(GLUT_TORUS);
 	}
@@ -1234,10 +1235,13 @@ void sistema_solar(GLuint sh_programID, glm::mat4 MatriuTG, bool sw_mat[5], GLui
 	{
 		if (texturID[i] != 0) SetTextureParameters(0, texturID[i], true, true, textur_map, false);
 
-		float x = radiOrbita[i] * (float)cos(angleOrbita[i] * PI / 180.0);
-		float y = radiOrbita[i] * (float)sin(angleOrbita[i] * PI / 180.0);
+		//float x = radiOrbita[i] * (float)cos(angleOrbita[i] * PI / 180.0);
+		//float y = radiOrbita[i] * (float)sin(angleOrbita[i] * PI / 180.0);
+		float x = radiOrbita[i] * (float)cos(escenariActual->m_objectList[i].m_angleOrbita * PI / 180.0); //€~€~€~€~€
+		float y = radiOrbita[i] * (float)sin(escenariActual->m_objectList[i].m_angleOrbita * PI / 180.0); //€~€~€~€~€
 		ModelMatrix = glm::translate(MatriuTG, vec3(x, y, 0.0f));
-		ModelMatrix = glm::scale(ModelMatrix, vec3(radiCos[i], radiCos[i], radiCos[i]));
+		//ModelMatrix = glm::scale(ModelMatrix, vec3(radiCos[i], radiCos[i], radiCos[i]));
+		ModelMatrix = glm::scale(ModelMatrix, vec3(escenariActual->m_objectList[i].m_radiCos, escenariActual->m_objectList[i].m_radiCos, escenariActual->m_objectList[i].m_radiCos)); //€~€~€~€~€
 		glUniformMatrix4fv(glGetUniformLocation(sh_programID, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
 
 		// El Sol brilla amb llum pròpia (emissió)
