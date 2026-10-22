@@ -48,21 +48,23 @@ public:
 	Escenari(const Escenari&) = delete;
 	Escenari& operator=(const Escenari&) = delete;
 
-	void creaEscenari();
-	void dibuixaEscenari(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D reixa, CPunt3D hreixa, char objecte,
-		CColor col_object, bool sw_mat[5],
-		bool textur, GLuint texturID[NUM_MAX_TEXTURES], bool textur_map, bool flagInvertY,
-		int nptsU, CPunt3D PC_u[MAX_PATCH_CORBA], GLfloat pasCS, bool sw_PC, bool dib_TFrenet,
+	void creaEscenari(GLuint& shader_programID);
+	void dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id, CMask3D& reixa, CPunt3D& hreixa, char& objecte,
+		CColor& col_object, bool sw_mat[5],
+		bool& textur, bool& textur_map, bool& flagInvertY,
+		int& nptsU, CPunt3D PC_u[MAX_PATCH_CORBA], GLfloat& pasCS, bool& sw_PC, bool& dib_TFrenet,
 		COBJModel* objecteOBJ,
 		//glm::mat4 MatriuVista, 
-		glm::mat4 MatriuTG);
+		glm::mat4& MatriuTG);
 	void updateVariables();
 
 	// Allibera els objectes (i els seus VAO). Cal cridar-la ABANS de destruir el context OpenGL.
 	void alliberaEscenari() { delete[] m_objectList; m_objectList = nullptr; }
 
 	Object* m_objectList;
-
+	GLuint m_texturesID[NUM_MAX_TEXTURES];
+	char* m_fitxers[NUM_MAX_TEXTURES];
+	CColor m_colObj;
 private:
 
 	//camera

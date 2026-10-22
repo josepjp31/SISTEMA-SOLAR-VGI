@@ -391,8 +391,7 @@ void dibuixa_EscenaGL(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D rei
 
 	case SISTEMA_SOLAR:
 		if (escenariActual != nullptr)
-			escenariActual->dibuixaEscenari(sh_programID, eix, axis_Id, reixa, hreixa, objecte, col_object, sw_mat, textur, texturID, textur_map, flagInvertY, nptsU, PC_u, pasCS, sw_PC, dib_TFrenet, objecteOBJ, /*glm::mat4 MatriuVista,*/ MatriuTG);
-		sistema_solar(sh_programID, MatriuTG, sw_mat, texturID, textur_map, escenariActual);
+			escenariActual->dibuixaEscenari(sh_programID, eix, axis_Id, reixa, hreixa, objecte, col_object, sw_mat, textur, textur_map, flagInvertY, nptsU, PC_u, pasCS, sw_PC, dib_TFrenet, objecteOBJ, /*glm::mat4 MatriuVista,*/ MatriuTG);
 		break;
 
 		// Dibuix de la resta d'objectes

@@ -3123,7 +3123,6 @@ void OnSistemaTots() //#€#€#€# Va a
 	glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), tFlag_invert_Y);
 
 
-	//€~€~€~€~€
 	const float radiCos[9] = { 20.0f,  3.0f,  5.0f,  5.0f,  4.0f, 12.0f, 10.0f,  7.0f,  7.0f };
 	const float radiOrbita[9] = { 0.0f, 40.0f, 60.0f, 80.0f,100.0f,135.0f,175.0f,210.0f,240.0f };
 	const float angleOrbita[9] = { 0.0f,  0.0f, 40.0f, 80.0f,120.0f,160.0f,200.0f,240.0f,280.0f };
@@ -7186,9 +7185,22 @@ int main()
 	ImGui_ImplOpenGL3_Init("#version 130");
 	// Entorn VGI.ImGui: End Setup Dear ImGui context
 
+	//Inicializa
+	OnProjeccioPerspectiva();	oProjeccio = shortCut_Projeccio();
+	OnIluminacioSuau();			oIlumina = shortCut_Iluminacio();
+
+	objecte = SISTEMA_SOLAR;	cosSolar = -1;
+	camera = CAM_ESFERICA;		Vis_Polar = POLARZ;
+	t_textura = TEXTURA_FITXERIMA;	tFlag_invert_Y = true;	textura = true;
+	sw_material[0] = false;
+
+	// Càmera allunyada i enlairada per veure les òrbites des de dalt
+	OPV.R = 550.0;	OPV.alfa = 65.0;	OPV.beta = 0.0;
+	cam_Esferica[0] = (float)OPV.R;	cam_Esferica[1] = (float)OPV.alfa;	cam_Esferica[2] = (float)OPV.beta;
+
+
 	escenariActual = new Escenari();
-	escenariActual->creaEscenari();
-	OnSistemaTots();//Cuando creaEscenari() funcione lo quitamos (lo de dentro de creaEscenari es OnSistemaTots() pero comentado pq no se poner bien los includes)
+	escenariActual->creaEscenari(shader_programID);
 // Loop until the user closes the window
 	while (!glfwWindowShouldClose(window))
 	{	// Poll for and process events */
