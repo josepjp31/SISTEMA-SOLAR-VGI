@@ -87,11 +87,3 @@ En entrar al sistema solar, la configuració inicial desactiva la llum ambiental
 | Activades | Desactivada | El Sol brilla; la llum directa il·lumina les cares diürnes i les cares nocturnes queden fosques. |
 | Desactivades | Desactivada | No hi ha emissió ni llum solar directa; els planetes queden negres. |
 | Qualsevol estat | Activada | La llum ambiental permet veure els cossos encara que el Sol no il·lumini el sistema. |
-
-## Interfície nova del company
-
-Es van revisar `InterficieUI.cpp`, `InterficieUI.h` i el resum d’implementació. L’opció **Il·luminació Solar Directa** apareixia al menú, però als fitxers revisats només modificava una variable de la interfície; no es va trobar connectada amb el renderitzat. Es va decidir deixar aquesta interfície de banda i conservar els controls d’EntornVGI per a aquesta implementació.
-
-## Estat i verificació
-
-Els canvis de codi es van proporcionar com a fragments perquè l’usuari els copiés manualment. L’usuari ha indicat que ja els ha incorporat. No s’ha comprovat aquí una compilació ni una execució posterior; per tant, aquest informe descriu el comportament previst segons els canvis, pendent de validació al programa.
