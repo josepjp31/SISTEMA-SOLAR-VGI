@@ -23,7 +23,9 @@ void Escenari::creaEscenari(GLuint& shader_programID)
 
 	glUseProgram(shader_programID);
 
-	netejaVAOList();
+	deleteVAOList(GLU_SPHERE);
+	deleteVAOList(GLU_DISK);
+	deleteVAOList(GLUT_TORUS);
 	SetColor4d(m_colObj.r, m_colObj.g, m_colObj.b, m_colObj.a);
 	Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(1.0, 40, 40));				// Esfera de radi 1 (cossos)
 	Set_VAOList(GLU_DISK, loadgluDisk_EBO(8.0f, 12.0f, 80, 5)); //anell saturn
@@ -33,12 +35,22 @@ void Escenari::creaEscenari(GLuint& shader_programID)
 	for (int i = 0; i < NUM_MAX_TEXTURES; i++)
 		if (m_texturesID[i]) { glDeleteTextures(1, &m_texturesID[i]); m_texturesID[i] = 0; }
 
-	//canviar al añadir una textura
+	// Carregar textures i configurar parametres de filtratge i repeticio un sol cop
 	for (int i = 0; i < 10; i++)
 	{
 		m_texturesID[i] = loadIMA_SOIL(m_fitxers[i]);
-		if (m_texturesID[i] == 0) fprintf(stderr, "No s'ha pogut carregar: %s\n", m_fitxers[i]);
+		if (m_texturesID[i] == 0) {
+			fprintf(stderr, "No s'ha pogut carregar: %s\n", m_fitxers[i]);
+		}
+		else {
+			glBindTexture(GL_TEXTURE_2D, m_texturesID[i]);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		}
 	}
+	glBindTexture(GL_TEXTURE_2D, 0);
 
 	glUniform1i(glGetUniformLocation(shader_programID, "texture0"), GLint(0));
 	glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), GL_TRUE);
@@ -136,19 +148,21 @@ void Escenari::dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id,
 
 	// 1. Orbites: anell fi sense textura, escalat al radi de cada orbita (condicionat a mostrarOrbites)
 	if (mostrarOrbites) {
-		for (i = 0; i < 9; i++)
+		glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_FALSE);
+		SeleccionaColorMaterial(sh_programID, col_orbita, sw_mat);
+		GLint locModelMatOrb = glGetUniformLocation(sh_programID, "modelMatrix");
+		for (i = 1; i < 9; i++)
 		{
-			ModelMatrix = glm::scale(MatriuTG, vec3(m_objectList[i].m_radiOrbita, m_objectList[i].m_radiOrbita, m_objectList[i].m_radiOrbita)); //€~€~€~€~€
-			glUniformMatrix4fv(glGetUniformLocation(sh_programID, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
+			ModelMatrix = glm::scale(MatriuTG, vec3(m_objectList[i].m_radiOrbita, m_objectList[i].m_radiOrbita, m_objectList[i].m_radiOrbita));
+			glUniformMatrix4fv(locModelMatOrb, 1, GL_FALSE, &ModelMatrix[0][0]);
 			CVAO& orbita = m_orbitVAO[i - 1];
 			if (orbita.vaoId != 0)
 			{
 				glBindVertexArray(orbita.vaoId);
 				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, orbita.eboId);
-				glDrawElements(GL_TRIANGLES,orbita.nIndices,GL_UNSIGNED_INT,nullptr);
+				glDrawElements(GL_TRIANGLES, orbita.nIndices, GL_UNSIGNED_INT, nullptr);
 				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 				glBindVertexArray(0);
-
 			}
 		}
 	}
@@ -156,7 +170,10 @@ void Escenari::dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id,
 		glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_TRUE);
 		SeleccionaColorMaterial(sh_programID, col_blanc, sw_mat);
 
-		if (m_texturesID[9] != 0) SetTextureParameters(0, m_texturesID[9], true, true, textur_map, false);
+		if (m_texturesID[9] != 0) {
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, m_texturesID[9]);
+		}
 
 		float x = m_objectList[6].m_radiOrbita * (float)cos(m_objectList[6].m_angleOrbita * PI / 180.0f);
 
@@ -181,25 +198,28 @@ void Escenari::dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id,
 	glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), flagInvertY);
 	SeleccionaColorMaterial(sh_programID, col_blanc, sw_mat);
 
+	GLint locModelMatCos = glGetUniformLocation(sh_programID, "modelMatrix");
+	GLint locSwInt = glGetUniformLocation(sh_programID, "sw_intensity");
+
 	for (i = 0; i < 9; i++)
 	{
-		if (m_texturesID[i] != 0) SetTextureParameters(0, m_texturesID[i], true, true, textur_map, false);
+		if (m_texturesID[i] != 0) {
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, m_texturesID[i]);
+		}
 
-		float x = m_objectList[i].m_radiOrbita * (float)cos(m_objectList[i].m_angleOrbita * PI / 180.0); //€~€~€~€~€
-		float y = m_objectList[i].m_radiOrbita * (float)sin(m_objectList[i].m_angleOrbita * PI / 180.0); //€~€~€~€~€
+		float x = m_objectList[i].m_radiOrbita * (float)cos(m_objectList[i].m_angleOrbita * PI / 180.0);
+		float y = m_objectList[i].m_radiOrbita * (float)sin(m_objectList[i].m_angleOrbita * PI / 180.0);
 
 		ModelMatrix = glm::translate(MatriuTG, vec3(x, y, 0.0f));
-
 		ModelMatrix = glm::rotate(ModelMatrix, glm::radians(m_objectList[i].m_angleRotacio), vec3(0.0f, 0.0f, 1.0f));
+		ModelMatrix = glm::scale(ModelMatrix, vec3(m_objectList[i].m_radiCos, m_objectList[i].m_radiCos, m_objectList[i].m_radiCos));
 
-		ModelMatrix = glm::scale(ModelMatrix, vec3(m_objectList[i].m_radiCos, m_objectList[i].m_radiCos, m_objectList[i].m_radiCos)); //€~€~€~€~€
-
-
-		glUniformMatrix4fv(glGetUniformLocation(sh_programID, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
+		glUniformMatrix4fv(locModelMatCos, 1, GL_FALSE, &ModelMatrix[0][0]);
 
 		// El Sol (i == 0) brilla amb llum propia (emissio activa si sw_mat[0] es true);
 		// els planetes (i > 0) no emeten llum propia i reben nomes la llum difusa/ambient del Sol.
-		glUniform4i(glGetUniformLocation(sh_programID, "sw_intensity"), (i == 0 && sw_mat[0]), sw_mat[1], sw_mat[2], sw_mat[3]);
+		glUniform4i(locSwInt, (i == 0 && sw_mat[0]), sw_mat[1], sw_mat[2], sw_mat[3]);
 		draw_TriEBO_Object(GLU_SPHERE);
 	}
 
@@ -233,7 +253,7 @@ void Escenari::updateVariables(double dt, bool enPausa, int direccioTemps, bool 
 			while (m_objectList[i].m_angleOrbita < 0.0f) m_objectList[i].m_angleOrbita += 360.0f;
 		}
 
-		m_objectList[i].m_angleRotacio += m_objectList[i].m_velRotacio * (float)direccioTemps;
+		m_objectList[i].m_angleRotacio += m_objectList[i].m_velRotacio * (float)dt * (float)direccioTemps;
 		while (m_objectList[i].m_angleRotacio >= 360.0f) m_objectList[i].m_angleRotacio -= 360.0f;
 		while (m_objectList[i].m_angleRotacio < 0.0f) m_objectList[i].m_angleRotacio += 360.0f;
 	}

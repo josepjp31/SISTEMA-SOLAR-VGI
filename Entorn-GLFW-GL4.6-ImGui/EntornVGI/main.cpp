@@ -618,7 +618,8 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 
 		// Assegurar que el Skybox i els Eixos estan carregats
 		if (!eixos_Id) eixos_Id = deixos();
-		OnVistaSkyBox();
+		SkyBoxCube = g_EstatSimulador.opcionsVisualitzacio.mostrarSkybox;
+		if (SkyBoxCube) OnVistaSkyBox();
 
 		g_EstatSimulador.configuracioInicialPendent = false;
 	}
@@ -2810,8 +2811,8 @@ void OnVistaSkyBox()
 	// Càrrega Shader Skybox
 	if (!skC_programID) skC_programID = shader_SkyBoxC.loadFileShaders(".\\shaders\\skybox.VERT", ".\\shaders\\skybox.FRAG");
 
-	// Càrrega VAO Skybox Cube
-	if (skC_VAOID.vaoId == 0) skC_VAOID = loadCubeSkybox_VAO();
+	// Càrrega VAO Skybox Cube (verificant si el VAO es valid en OpenGL)
+	if (skC_VAOID.vaoId == 0 || !glIsVertexArray(skC_VAOID.vaoId)) skC_VAOID = loadCubeSkybox_VAO();
 	Set_VAOList(CUBE_SKYBOX, skC_VAOID);
 
 	if (!cubemapTexture)
@@ -7325,7 +7326,7 @@ int main()
 	objecte = SISTEMA_SOLAR;	cosSolar = -1;
 	camera = CAM_ESFERICA;		Vis_Polar = POLARZ;
 	t_textura = TEXTURA_FITXERIMA;	tFlag_invert_Y = true;	textura = true;
-	sw_material[0] = false;		SkyBoxCube = true;
+	sw_material[0] = false;		SkyBoxCube = false;
 
 	// Càmera allunyada i enlairada per veure les òrbites des de dalt
 	OPV.R = 550.0;	OPV.alfa = 65.0;	OPV.beta = 0.0;

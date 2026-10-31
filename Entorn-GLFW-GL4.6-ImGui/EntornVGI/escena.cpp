@@ -43,24 +43,27 @@ void dibuixa_Eixos(GLuint ax_programID, bool eix, GLuint axis_Id, CMask3D reixa,
 // Dibuixa Skybox en forma de Cub, activant un shader propi.
 void dibuixa_Skybox(GLuint sk_programID, GLuint cmTexture, char eix_Polar, glm::mat4 MatriuProjeccio, glm::mat4 MatriuVista)
 {
+	if (!sk_programID || !cmTexture || Get_VAOId(CUBE_SKYBOX) == 0) return;
+
 	glm::mat4 ModelMatrix(1.0);
 
-	glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
+	glDepthFunc(GL_LEQUAL);
+	glDepthMask(GL_FALSE); // Optimitzacio: no escriure al buffer de profunditat
 
-	// Activació shader per a cub skybox
+	// Activacio shader per a cub skybox
 	glUseProgram(sk_programID);
 
-	// Pas Matrius Projecció i Vista a shader
+	// Pas Matrius Projeccio i Vista a shader
 	glUniformMatrix4fv(glGetUniformLocation(sk_programID, "projectionMatrix"), 1, GL_FALSE, &MatriuProjeccio[0][0]);
 	glm::mat4 viewSenseTranslacio = glm::mat4(glm::mat3(MatriuVista));
 	glUniformMatrix4fv(glGetUniformLocation(sk_programID, "viewMatrix"), 1, GL_FALSE, &viewSenseTranslacio[0][0]);
 
-	// Rotar skyBox per a orientar sobre eix superior Z o X en Vista Esfèrica (POLARX, POLARY, POLARZ)
+	// Rotar skyBox per a orientar sobre eix superior Z o X en Vista Esferica (POLARX, POLARY, POLARZ)
 	if (eix_Polar == POLARZ) ModelMatrix = glm::rotate(ModelMatrix, radians(90.0f), vec3(1.0f, 0.0f, 0.0f));
 	else if (eix_Polar == POLARX) ModelMatrix = glm::rotate(ModelMatrix, radians(-90.0f), vec3(0.0f, 0.0f, 1.0f));
 
 	// Escalar Cub Skybox a 5000 per encabir objectes escena a l'interior
-	ModelMatrix = glm::scale(ModelMatrix, vec3(5000.0f, 5000.0f, 5000.0f));		//glScaled(5000.0, 5000.0, 5000.0);
+	ModelMatrix = glm::scale(ModelMatrix, vec3(5000.0f, 5000.0f, 5000.0f));
 	glUniformMatrix4fv(glGetUniformLocation(sk_programID, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
 
 	// Activar textura cubemaps del Skybox per encabir objectes escena
@@ -68,12 +71,10 @@ void dibuixa_Skybox(GLuint sk_programID, GLuint cmTexture, char eix_Polar, glm::
 	glBindTexture(GL_TEXTURE_CUBE_MAP, cmTexture);
 	glUniform1i(glGetUniformLocation(sk_programID, "skybox"), 0);
 
-	// Attribute Locations must be setup before calling glLinkProgram()
-	glBindAttribLocation(sk_programID, 0, "in_Vertex"); // Vèrtexs
-
 	//  Dibuix del Skybox
 	drawCubeSkybox();
 
+	glDepthMask(GL_TRUE); // Restaurar escriptura de profunditat
 	glDepthFunc(GL_LESS); // set depth function back to default
 }
 

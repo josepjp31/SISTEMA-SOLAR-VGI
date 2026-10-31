@@ -72,7 +72,25 @@ public:
 	void updateVariables(double dt = 0.016, bool enPausa = false, int direccioTemps = 1, bool escalaReal = false, double factorVelocitat = 60.0);
 	void updateVariables2();
 	// Allibera els objectes (i els seus VAO). Cal cridar-la ABANS de destruir el context OpenGL.
-	void alliberaEscenari() { delete[] m_objectList; m_objectList = nullptr; }
+	void alliberaEscenari() {
+		deleteVAOList(GLU_SPHERE);
+		deleteVAOList(GLU_DISK);
+		deleteVAOList(GLUT_TORUS);
+		for (int i = 0; i < 8; i++) {
+			if (m_orbitVAO[i].vaoId != 0) {
+				glDeleteVertexArrays(1, &m_orbitVAO[i].vaoId);
+				glDeleteBuffers(1, &m_orbitVAO[i].vboId);
+				glDeleteBuffers(1, &m_orbitVAO[i].eboId);
+				m_orbitVAO[i].vaoId = 0;
+				m_orbitVAO[i].vboId = 0;
+				m_orbitVAO[i].eboId = 0;
+			}
+		}
+		for (int i = 0; i < NUM_MAX_TEXTURES; i++) {
+			if (m_texturesID[i]) { glDeleteTextures(1, &m_texturesID[i]); m_texturesID[i] = 0; }
+		}
+		delete[] m_objectList; m_objectList = nullptr;
+	}
 
 	void iluminacio();
 
