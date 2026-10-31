@@ -5011,7 +5011,7 @@ CVAO loadgluPartialDisk_EBO(GLdouble innerRadius, GLdouble outerRadius, GLint sl
 			//glVertex3f(radiusLow * sinCache[i], radiusLow * cosCache[i], 0.0);
 			colors.push_back(cColor[0]);	colors.push_back(cColor[1]);	colors.push_back(cColor[2]);		colors.push_back(cColor[3]); // Vector Colors
 			normals.push_back(0.0);			normals.push_back(0.0);			normals.push_back(1.0);				// Vector Normals
-			textures.push_back(texLow * sinCache[i] + 0.5);					textures.push_back(texLow * cosCache[i] + 0.5);	// Vector Textures
+			textures.push_back((radiusLow - innerRadius) / deltaRadius);	textures.push_back((float)i / slices);			
 			vertices.push_back(radiusLow * sinCache[i]);					vertices.push_back(radiusLow * cosCache[i]);		vertices.push_back(0.0);	// Vector Vèrtexs
 
 			// Vèrtex 1
@@ -5019,7 +5019,7 @@ CVAO loadgluPartialDisk_EBO(GLdouble innerRadius, GLdouble outerRadius, GLint sl
 			//glVertex3f(radiusHigh * sinCache[i], radiusHigh * cosCache[i], 0.0);
 			colors.push_back(cColor[0]);	colors.push_back(cColor[1]);	colors.push_back(cColor[2]);				colors.push_back(cColor[3]); // Vector Colors
 			normals.push_back(0.0);			normals.push_back(0.0);			normals.push_back(1.0);						// Vector Normals
-			textures.push_back(texHigh * sinCache[i] + 0.5);				textures.push_back(texHigh * cosCache[i] + 0.5);	// Vector Textures
+			textures.push_back((radiusHigh - innerRadius) / deltaRadius);	textures.push_back((float)i / slices);
 			vertices.push_back(radiusHigh * sinCache[i]);					vertices.push_back(radiusHigh * cosCache[i]);		vertices.push_back(0.0);// Vector Vèrtexs
 
 			// Vèrtex 2
@@ -5027,7 +5027,7 @@ CVAO loadgluPartialDisk_EBO(GLdouble innerRadius, GLdouble outerRadius, GLint sl
 			//glVertex3f(radiusLow * sinCache[i+1], radiusLow * cosCache[i+1], 0.0);
 			colors.push_back(cColor[0]);	colors.push_back(cColor[1]);	colors.push_back(cColor[2]);		colors.push_back(cColor[3]); // Vector Colors
 			normals.push_back(0.0);			normals.push_back(0.0);			normals.push_back(1.0);				// Vector Normals
-			textures.push_back(texLow * sinCache[i + 1] + 0.5);				textures.push_back(texLow * cosCache[i + 1] + 0.5);	// Vector Textures
+			textures.push_back((radiusLow - innerRadius) / deltaRadius);	textures.push_back((float)(i + 1) / slices);
 			vertices.push_back(radiusLow * sinCache[i + 1]);					vertices.push_back(radiusLow * cosCache[i + 1]);		vertices.push_back(0.0);	// Vector Vèrtexs
 
 			// Vèrtex 3
@@ -5035,7 +5035,7 @@ CVAO loadgluPartialDisk_EBO(GLdouble innerRadius, GLdouble outerRadius, GLint sl
 			//glVertex3f(radiusHigh * sinCache[i+1], radiusHigh * cosCache[i+1], 0.0);
 			colors.push_back(cColor[0]);	colors.push_back(cColor[1]);	colors.push_back(cColor[2]);				colors.push_back(cColor[3]); // Vector Colors
 			normals.push_back(0.0);			normals.push_back(0.0);			normals.push_back(1.0);						// Vector Normals
-			textures.push_back(texHigh * sinCache[i + 1] + 0.5);				textures.push_back(texHigh * cosCache[i + 1] + 0.5);	// Vector Textures
+			textures.push_back((radiusHigh - innerRadius) / deltaRadius);	textures.push_back((float)(i + 1) / slices);
 			vertices.push_back(radiusHigh * sinCache[i + 1]);					vertices.push_back(radiusHigh * cosCache[i + 1]);		vertices.push_back(0.0);// Vector Vèrtexs
 		
 			// Vector indices CARA i

@@ -7201,6 +7201,8 @@ int main()
 
 	escenariActual = new Escenari();
 	escenariActual->creaEscenari(shader_programID);
+
+
 // Loop until the user closes the window
 	while (!glfwWindowShouldClose(window))
 	{	// Poll for and process events */

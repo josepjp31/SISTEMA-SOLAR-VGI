@@ -28,6 +28,10 @@ public:
 	float m_radiOrbita;
 	float m_angleOrbita;
 	float m_velAngular;
+
+	float m_angleRotacio;
+	float m_velRotacio;
+
 	//Vector4D m_position;
 	//Vector4D m_rotation;
 	//Vector4D m_scale;
@@ -61,10 +65,14 @@ public:
 	// Allibera els objectes (i els seus VAO). Cal cridar-la ABANS de destruir el context OpenGL.
 	void alliberaEscenari() { delete[] m_objectList; m_objectList = nullptr; }
 
+	void iluminacio();
+
 	Object* m_objectList;
 	GLuint m_texturesID[NUM_MAX_TEXTURES];
 	char* m_fitxers[NUM_MAX_TEXTURES];
 	CColor m_colObj;
+	//torus
+	CVAO m_orbitVAO[8];
 private:
 
 	//camera
