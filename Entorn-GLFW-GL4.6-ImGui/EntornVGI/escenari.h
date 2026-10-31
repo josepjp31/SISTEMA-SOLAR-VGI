@@ -6,8 +6,6 @@
 #include "objLoader.h"
 #include "material.h"
 #include "visualitzacio.h"
-//#include "shader.h"
-//#include "main.h"
 
 // Nombre maxim d'objectes per escenari
 #define MAX_OBJECTES_ESCENARI 10
@@ -16,8 +14,8 @@
 class Object
 {
 public:
-	Object() : m_mMatrix(glm::mat4(1.0f)), m_modelCarregat(false), m_radiCos(0.0f), m_radiOrbita(0.0f), m_angleOrbita(0.0f), m_velAngular(0.0f) {}	//Usar InitObject de COBJModel en el constructor
-	~Object() {}	//Usar UnInitObject de COBJModel en el destructor (COBJModel ja allibera els seus VAO)
+	Object() : m_mMatrix(glm::mat4(1.0f)), m_modelCarregat(false), m_radiCos(0.0f), m_radiOrbita(0.0f), m_angleOrbita(0.0f), m_velAngular(0.0f) {}
+	~Object() {}
 
 	// Carrega un fitxer .OBJ al model. Retorna true si s'ha carregat correctament
 	// (COBJModel::LoadModel retorna 0 si tot va be, o el codi errno si falla).
@@ -35,6 +33,7 @@ public:
 	//Vector4D m_position;
 	//Vector4D m_rotation;
 	//Vector4D m_scale;
+
 	glm::mat4 m_mMatrix;
 	COBJModel m_model;
 private:
@@ -45,7 +44,16 @@ private:
 class Escenari
 {
 public:
-	Escenari() { m_objectList = new Object[MAX_OBJECTES_ESCENARI]; }
+	Escenari()
+	{
+		m_objectList = new Object[MAX_OBJECTES_ESCENARI];
+		m_colObj.r = 1.0; m_colObj.g = 1.0; m_colObj.b = 1.0; m_colObj.a = 1.0;
+		for (int i = 0; i < NUM_MAX_TEXTURES; i++)
+		{
+			m_texturesID[i] = 0;
+			m_fitxers[i] = nullptr;
+		}
+	}
 	~Escenari() { alliberaEscenari(); }
 
 	// No es permet copiar un Escenari (gestiona memoria dinamica i recursos OpenGL)
@@ -58,10 +66,11 @@ public:
 		bool& textur, bool& textur_map, bool& flagInvertY,
 		int& nptsU, CPunt3D PC_u[MAX_PATCH_CORBA], GLfloat& pasCS, bool& sw_PC, bool& dib_TFrenet,
 		COBJModel* objecteOBJ,
-		//glm::mat4 MatriuVista, 
-		glm::mat4& MatriuTG);
-	void updateVariables();
+		glm::mat4& MatriuTG,
+		bool mostrarOrbites = true);
 
+	void updateVariables(double dt = 0.016, bool enPausa = false, int direccioTemps = 1, bool escalaReal = false, double factorVelocitat = 60.0);
+	void updateVariables2();
 	// Allibera els objectes (i els seus VAO). Cal cridar-la ABANS de destruir el context OpenGL.
 	void alliberaEscenari() { delete[] m_objectList; m_objectList = nullptr; }
 
@@ -73,10 +82,5 @@ public:
 	CColor m_colObj;
 	//torus
 	CVAO m_orbitVAO[8];
-private:
-
-	//camera
 
 };
-
-//#~#~#~# Ponemos el OnPaint() en el while en el OnTimer()???
