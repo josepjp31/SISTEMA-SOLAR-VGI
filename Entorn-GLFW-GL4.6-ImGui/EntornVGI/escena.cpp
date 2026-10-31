@@ -52,7 +52,8 @@ void dibuixa_Skybox(GLuint sk_programID, GLuint cmTexture, char eix_Polar, glm::
 
 	// Pas Matrius Projecció i Vista a shader
 	glUniformMatrix4fv(glGetUniformLocation(sk_programID, "projectionMatrix"), 1, GL_FALSE, &MatriuProjeccio[0][0]);
-	glUniformMatrix4fv(glGetUniformLocation(sk_programID, "viewMatrix"), 1, GL_FALSE, &MatriuVista[0][0]);
+	glm::mat4 viewSenseTranslacio = glm::mat4(glm::mat3(MatriuVista));
+	glUniformMatrix4fv(glGetUniformLocation(sk_programID, "viewMatrix"), 1, GL_FALSE, &viewSenseTranslacio[0][0]);
 
 	// Rotar skyBox per a orientar sobre eix superior Z o X en Vista Esfèrica (POLARX, POLARY, POLARZ)
 	if (eix_Polar == POLARZ) ModelMatrix = glm::rotate(ModelMatrix, radians(90.0f), vec3(1.0f, 0.0f, 0.0f));
@@ -65,6 +66,7 @@ void dibuixa_Skybox(GLuint sk_programID, GLuint cmTexture, char eix_Polar, glm::
 	// Activar textura cubemaps del Skybox per encabir objectes escena
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, cmTexture);
+	glUniform1i(glGetUniformLocation(sk_programID, "skybox"), 0);
 
 	// Attribute Locations must be setup before calling glLinkProgram()
 	glBindAttribLocation(sk_programID, 0, "in_Vertex"); // Vèrtexs
@@ -84,7 +86,7 @@ void dibuixa_EscenaGL(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D rei
 	COBJModel* objecteOBJ,
 	//glm::mat4 MatriuVista, 
 	glm::mat4 MatriuTG,
-	Escenari* escenariActual)
+	Escenari* escenariActual, bool mostrarOrbites)
 {
 	float altfar = 0;
 	GLint npunts = 0, nvertexs = 0;
@@ -391,7 +393,7 @@ void dibuixa_EscenaGL(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D rei
 
 	case SISTEMA_SOLAR:
 		if (escenariActual != nullptr)
-			escenariActual->dibuixaEscenari(sh_programID, eix, axis_Id, reixa, hreixa, objecte, col_object, sw_mat, textur, textur_map, flagInvertY, nptsU, PC_u, pasCS, sw_PC, dib_TFrenet, objecteOBJ, /*glm::mat4 MatriuVista,*/ MatriuTG);
+			escenariActual->dibuixaEscenari(sh_programID, eix, axis_Id, reixa, hreixa, objecte, col_object, sw_mat, textur, textur_map, flagInvertY, nptsU, PC_u, pasCS, sw_PC, dib_TFrenet, objecteOBJ, /*glm::mat4 MatriuVista,*/ MatriuTG, mostrarOrbites);
 		break;
 
 		// Dibuix de la resta d'objectes
@@ -1203,7 +1205,7 @@ void Cabina(GLint shaderId, glm::mat4 MatriuTG, bool sw_mat[4])
 }
 
 //sistema solar
-void sistema_solar(GLuint sh_programID, glm::mat4 MatriuTG, bool sw_mat[5], GLuint texturID[NUM_MAX_TEXTURES], bool textur_map, Escenari* escenariActual)
+void sistema_solar(GLuint sh_programID, glm::mat4 MatriuTG, bool sw_mat[5], GLuint texturID[NUM_MAX_TEXTURES], bool textur_map, Escenari* escenariActual, bool mostrarOrbites)
 {
 	//                              Sol    Merc   Venus  Terra  Mart   Júpit  Saturn Urà    Neptú
 	const float radiCos[9] = { 20.0f,  3.0f,  5.0f,  5.0f,  4.0f, 12.0f, 10.0f,  7.0f,  7.0f };
