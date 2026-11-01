@@ -18,9 +18,15 @@
 #include "visualitzacio.h"
 #include "escena.h"
 #include "main.h"
-//#include <iostream>
- #include "escenari.h"
-static Escenari* escenariActual;
+#include "escenari.h"
+#include "InterficieUI.h"
+
+// Escenari actiu i llista d'escenaris (0: Mode Didactic, 1: Mode a Escala Real)
+Escenari* escenariActual = nullptr;
+Escenari* escenaris = nullptr;
+
+// Estat global de la interficie d'usuari del simulador
+EstatSimulacio g_EstatSimulador;
 
 void InitGL()
 {
@@ -282,6 +288,9 @@ void InitGL()
 	shader_programID = 0;
 	shaderLighting.releaseAllShaders();
 
+	// Entorn VGI: Inicialitzar llista de VAO's ABANS de carregar el VAO del Skybox per no esborrar-lo
+	initVAOList();
+
 	// Entorn VGI: Càrrega SHADERS ---------------------------------------------------
 	// Càrrega Shader Eixos
 	fprintf(stderr, "Eixos: \n");
@@ -323,9 +332,9 @@ void InitGL()
 	m_EsfeIncEAvall.R = 0.0;	m_EsfeIncEAvall.alfa = 0.0;	m_EsfeIncEAvall.beta = 0.0;
 
 	// Entorn VGI: Variables que controlen paràmetres visualització: Mides finestra Windows i PV (càmera)
-	w = 640;			h = 480;			// Mides de la finestra Windows (w-amplada,h-alçada)
-	width_old = 640;	height_old = 480;	// Mides de la resolució actual de la pantalla (finestra Windows)
-	w_old = 640;		h_old = 480;		// Mides de la finestra Windows (w-amplada,h-alçada) per restaurar Finestra des de fullscreen
+	w = 1280;			h = 720;			// Mides de la finestra Windows (w-amplada,h-alçada)
+	width_old = 1280;	height_old = 720;	// Mides de la resolució actual de la pantalla (finestra Windows)
+	w_old = 1280;		h_old = 720;		// Mides de la finestra Windows (w-amplada,h-alçada) per restaurar Finestra des de fullscreen
 
 	// Entorn VGI: Color de fons i de l'objecte
 	fonsR = true;		fonsG = true;		fonsB = true;
@@ -421,9 +430,6 @@ void InitGL()
 
 	// Entorn VGI: Altres variables
 	mida = 1.0;			nom = "";		buffer = "";
-
-	// Entorn VGI: // Inicialtzar llista de VAO's.
-	initVAOList();
 }
 
 
@@ -551,16 +557,169 @@ void OnSize(GLFWwindow* window, int width, int height)
 }
 
 
+// SincronitzarEstatSimuladorAmbOpenGL: Sincronitza les opcions del menu ImGui (InterficieUI)
+// amb les variables internes d'OpenGL (il-luminacio del Sol, Skybox, eixos, camera i focus).
+void SincronitzarEstatSimuladorAmbOpenGL()
+{
+	if (g_EstatSimulador.mostrarSelectorModes) return;
+
+	// 1. Configuracio inicial d'escena, il-luminacio i shaders quan s'inicia o es commuta de mode
+	if (g_EstatSimulador.configuracioInicialPendent)
+	{
+		OnProjeccioPerspectiva();
+		oProjeccio = shortCut_Projeccio();
+
+		// Carregar i activar Shader Phong amb il-luminacio Suau
+		OnShaderPhong();
+		oShader = shortCut_Shader();
+		ilumina = SUAU;
+		oIlumina = shortCut_Iluminacio();
+
+		objecte = SISTEMA_SOLAR;
+		cosSolar = -1;
+		oObjecte = shortCut_Objecte();
+
+		// Configuracio dels parametres d'il-luminacio del sistema solar:
+		// - Font de llum fixa (#0) situada a l'origen (centre del Sol).
+		// - Model de reflexio Phong: emissio propia per al Sol i reflexio difusa per als planetes.
+		// - Texturat individual per a cada astre amb inversio d'eix vertical (tFlag_invert_Y).
+		// - Vista clara (llum ambient) desactivada per defecte.
+		ifixe = true;
+		sw_material[4] = true;
+		sw_material[0] = g_EstatSimulador.opcionsVisualitzacio.iluminacioSolarDirecta;
+		sw_material[1] = g_EstatSimulador.opcionsVisualitzacio.vistaClaraAmbient;
+		sw_material[2] = true;
+		sw_material[3] = false;
+		for (int k = 0; k < 5; k++) sw_material_old[k] = sw_material[k];
+
+		textura = false;
+		t_textura = TEXTURA_FITXERIMA;
+		tFlag_invert_Y = true;
+
+		llum_ambient = g_EstatSimulador.opcionsVisualitzacio.vistaClaraAmbient;
+
+		llumGL[0].encesa = g_EstatSimulador.opcionsVisualitzacio.iluminacioSolarDirecta;
+		llumGL[0].posicio.x = 0.0;		llumGL[0].posicio.y = 0.0;		llumGL[0].posicio.z = 0.0;		llumGL[0].posicio.w = 1.0;
+		llumGL[0].difusa.r = 1.0f;		llumGL[0].difusa.g = 1.0f;		llumGL[0].difusa.b = 1.0f;		llumGL[0].difusa.a = 1.0f;
+		llumGL[0].especular.r = 1.0f;	llumGL[0].especular.g = 1.0f;	llumGL[0].especular.b = 1.0f;	llumGL[0].especular.a = 1.0f;
+		llumGL[0].atenuacio.a = 0.00004; llumGL[0].atenuacio.b = 0.0;	llumGL[0].atenuacio.c = 1.0;
+		llumGL[0].restringida = false;
+		for (int i = 1; i < NUM_MAX_LLUMS; i++) llumGL[i].encesa = false;
+
+		glUseProgram(shader_programID);
+		glUniform1i(glGetUniformLocation(shader_programID, "texture0"), GLint(0));
+		glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), tFlag_invert_Y);
+
+		// Assegurar que l'escenari te els VAOs i textures vinculats al shader Phong actual
+		if (escenariActual != nullptr)
+		{
+			escenariActual->creaEscenari(shader_programID);
+		}
+
+		// Assegurar que el Skybox i els Eixos estan carregats
+		if (!eixos_Id) eixos_Id = deixos();
+		SkyBoxCube = g_EstatSimulador.opcionsVisualitzacio.mostrarSkybox;
+		if (SkyBoxCube) OnVistaSkyBox();
+
+		g_EstatSimulador.configuracioInicialPendent = false;
+	}
+
+	// 2. Sincronitzacio continua de les opcions de Visualitzacio del menu superior
+	if (objecte == SISTEMA_SOLAR)
+	{
+		SkyBoxCube = g_EstatSimulador.opcionsVisualitzacio.mostrarSkybox;
+		if (SkyBoxCube && skC_VAOID.vaoId == 0) OnVistaSkyBox();
+
+		eixos = g_EstatSimulador.opcionsVisualitzacio.mostrarEixos;
+
+		sw_material[0] = g_EstatSimulador.opcionsVisualitzacio.iluminacioSolarDirecta;
+		llumGL[0].encesa = g_EstatSimulador.opcionsVisualitzacio.iluminacioSolarDirecta;
+
+		llum_ambient = g_EstatSimulador.opcionsVisualitzacio.vistaClaraAmbient;
+		sw_material[1] = g_EstatSimulador.opcionsVisualitzacio.vistaClaraAmbient;
+	}
+
+	// 3. Aplicacio dels canvis de mode de camera o d'astre enfocat des del menu
+	if (g_EstatSimulador.canviCameraPendent)
+	{
+		int cid = g_EstatSimulador.cosEnfocatId;
+		if (cid < 0 || cid >= 9) cid = 0;
+
+		float distPerDefecte = 140.0f;
+		if (cid > 0 && escenariActual != nullptr)
+		{
+			distPerDefecte = escenariActual->m_objectList[cid].m_radiCos * 4.5f;
+			if (distPerDefecte < 14.0f) distPerDefecte = 14.0f;
+		}
+
+		if (g_EstatSimulador.cameraConfig.mode == ModeCamera::FIXA_INCLINADA_25)
+		{
+			camera = CAM_ESFERICA;
+			oCamera = 0;
+			mobil = true;	zzoom = true;	satelit = false;	pan = false;
+			Vis_Polar = POLARZ;
+			OPV.alfa = 25.0;
+			OPV.R = distPerDefecte;
+		}
+		else if (g_EstatSimulador.cameraConfig.mode == ModeCamera::ORBITAL_CENTRADOR)
+		{
+			camera = CAM_ESFERICA;
+			oCamera = 0;
+			mobil = true;	zzoom = true;	satelit = false;	pan = false;
+			Vis_Polar = POLARZ;
+			if (OPV.alfa == 0.0) OPV.alfa = 25.0;
+			OPV.R = distPerDefecte;
+		}
+		else if (g_EstatSimulador.cameraConfig.mode == ModeCamera::GLOBAL_SISTEMA)
+		{
+			camera = CAM_ESFERICA;
+			oCamera = 0;
+			mobil = true;	zzoom = true;	satelit = false;	pan = false;
+			Vis_Polar = POLARZ;
+			g_EstatSimulador.cosEnfocatId = 0;
+			OPV.R = 550.0;
+			OPV.alfa = 65.0;
+			OPV.beta = 0.0;
+		}
+		else if (g_EstatSimulador.cameraConfig.mode == ModeCamera::COET_PRIMERA_PERSONA)
+		{
+			// Camera Lliure implementada a l'opcio Navega (CAM_NAVEGA)
+			OnCameraNavega();
+			oCamera = 1;
+			Vis_Polar = POLARZ;
+			fact_pan = 2.5;
+			// Situar la camera lliure en una posicio inicial privilegiada mirant cap al centre del Sistema Solar
+			opvN.x = 110.0;	opvN.y = -110.0;	opvN.z = 30.0;
+			n[0] = 0.0;		n[1] = 0.0;			n[2] = 0.0;
+			angleZ = 0.0;
+		}
+
+		cam_Esferica[0] = (float)OPV.R;
+		cam_Esferica[1] = (float)OPV.alfa;
+		cam_Esferica[2] = (float)OPV.beta;
+		g_EstatSimulador.canviCameraPendent = false;
+	}
+}
+
 // OnPaint: Funció de dibuix i visualització en frame buffer del frame
 void OnPaint(GLFWwindow* window)
 {
 	// TODO: Agregue aquí su código de controlador de mensajes
 	GLdouble vpv[3] = { 0.0, 0.0, 1.0 };
 
-	// Entorn VGI.ImGui: Menú ImGui condicionat al color de fons
-	if ((c_fons.r < 0.5) || (c_fons.g < 0.5) || (c_fons.b < 0.5))
-		ImGui::StyleColorsLight();
-	else ImGui::StyleColorsDark();
+	// Neteja del framebuffer durant la visualitzacio del Selector Inicial de Modes (per no mostrar el sistema)
+	if (g_EstatSimulador.mostrarSelectorModes)
+	{
+		glDisable(GL_SCISSOR_TEST);
+		glViewport(0, 0, w, h);
+		glClearColor(0.03f, 0.04f, 0.08f, 1.0f);
+		glClearDepth(1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		return;
+	}
+
+	// Sincronitzar les opcions de la interficie ImGui amb l'estat d'OpenGL
+	SincronitzarEstatSimuladorAmbOpenGL();
 
 	// Entorn VGI: Cridem a les funcions de l'escena i la projecció segons s'hagi 
 	// seleccionat una projecció o un altra
@@ -613,41 +772,6 @@ void OnPaint(GLFWwindow* window)
 		// Dibuix de l'Objecte o l'Escena
 		configura_Escena();     // Aplicar Transformacions Geometriques segons persiana Transformacio i configurar objectes
 		dibuixa_Escena();		// Dibuix geometria de l'escena amb comandes GL.
-		/*
-		// ISOMÈTRICA (Inferior Dreta)
-				// Definició de Viewport, Projecció i Càmara
-				ProjectionMatrix = Projeccio_Orto();
-				ViewMatrix = Vista_Ortografica(shader_programID, 3, OPV.R, c_fons, col_obj, objecte, mida, pas, front_faces, oculta,
-					test_vis, back_line, ilumina, llum_ambient, llumGL, ifixe, ilum2sides,
-					eixos, grid, hgrid);
-				// Dibuix de l'Objecte o l'Escena
-				configura_Escena();     // Aplicar Transformacions Geometriques segons persiana Transformacio i configurar objectes
-				dibuixa_Escena();		// Dibuix geometria de l'escena amb comandes GL.
-
-		// ALÇAT (Superior Esquerra)
-				// Definició de Viewport, Projecció i Càmara
-				ProjectionMatrix = Projeccio_Orto();
-				ViewMatrix = Vista_Ortografica(shader_programID, 1, OPV.R, c_fons, col_obj, objecte, mida, pas, front_faces, oculta,
-					test_vis, back_line, ilumina, llum_ambient, llumGL, ifixe, ilum2sides,
-					eixos, grid, hgrid);
-				// Dibuix de l'Objecte o l'Escena
-				  configura_Escena();     // Aplicar Transformacions Geom?triques segons persiana Transformacio i configurar objectes
-				  dibuixa_Escena();		// Dibuix geometria de l'escena amb comandes GL.
-
-		// PERFIL (Superior Dreta)
-				// Definició de Viewport, Projecció i Càmara
-				ProjectionMatrix = Projeccio_Orto();
-				ViewMatrix = Vista_Ortografica(shader_programID, 2, OPV.R, c_fons, col_obj, objecte, mida, pas, front_faces, oculta,
-					test_vis, back_line, ilumina, llum_ambient, llumGL, ifixe, ilum2sides,
-					eixos, grid, hgrid);
-				// Dibuix de l'Objecte o l'Escena
-				configura_Escena();     // Aplicar Transformacions Geom?triques segons persiana Transformacio i configurar objectes
-				  // glScalef();			// Escalat d'objectes, per adequar-los a les vistes ortogràfiques (Pràctica 2)
-				dibuixa_Escena();		// Dibuix geometria de l'escena amb comandes GL.
-		*/
-		// Entorn VGI: Transferència del buffer OpenGL a buffer de pantalla
-				//glfwSwapBuffers(window);
-
 		break;
 
 	case PERSPECT:
@@ -668,6 +792,20 @@ void OnPaint(GLFWwindow* window)
 				front_faces, oculta, test_vis, back_line,
 				ilumina, llum_ambient, llumGL, ifixe, ilum2sides,
 				eixos, grid, hgrid);
+
+			// Quan hi ha un planeta enfocat (cosEnfocatId > 0), centrar la camera sobre la posicio orbital (x, y, 0) de l'astre
+			if (objecte == SISTEMA_SOLAR && escenariActual != nullptr && g_EstatSimulador.cosEnfocatId > 0 && g_EstatSimulador.cosEnfocatId < 9)
+			{
+				int cid = g_EstatSimulador.cosEnfocatId;
+				float ang = escenariActual->m_objectList[cid].m_angleOrbita * (float)PI / 180.0f;
+				float rOrb = escenariActual->m_objectList[cid].m_radiOrbita;
+				float px = rOrb * cos(ang);
+				float py = rOrb * sin(ang);
+
+				ViewMatrix = glm::translate(ViewMatrix, glm::vec3(-px, -py, 0.0f));
+				glUseProgram(shader_programID);
+				glUniformMatrix4fv(glGetUniformLocation(shader_programID, "viewMatrix"), 1, GL_FALSE, &ViewMatrix[0][0]);
+			}
 		}
 		else if (camera == CAM_NAVEGA) {
 			if (Vis_Polar == POLARZ) {
@@ -751,7 +889,8 @@ void dibuixa_Escena() {
 		npts_T, PC_t, pas_CS, sw_Punts_Control, dibuixa_TriedreFrenet,
 		ObOBJ,				// Classe de l'objecte OBJ que conté els VAO's
 		GTMatrix,
-		escenariActual);
+		escenariActual,
+		g_EstatSimulador.opcionsVisualitzacio.mostrarOrbites);
 }
 
 
@@ -996,103 +1135,45 @@ void draw_Menu_ImGui()
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+	// Renderitzar la interficie principal del Simulador del Sistema Solar (Selector inicial, barra superior, panell de temps, HUD)
+	InterficieUI::Renderitzar(g_EstatSimulador, escenariActual, escenaris, shader_programID);
+
+	// Projeccio de les etiquetes 2D dels astres sobre la pantalla quan la simulacio esta activa
+	if (!g_EstatSimulador.mostrarSelectorModes &&
+		g_EstatSimulador.opcionsVisualitzacio.mostrarEtiquetes &&
+		objecte == SISTEMA_SOLAR &&
+		escenariActual != nullptr &&
+		escenariActual->m_objectList != nullptr)
+	{
+		static const char* nomsEtiquetes[9] = {
+			"Sol", "Mercuri", "Venus", "Terra", "Mart", "Jupiter", "Saturn", "Ura", "Neptu"
+		};
+		glm::vec4 viewport(0.0f, 0.0f, (float)w, (float)h);
+		for (int i = 0; i < 9; i++)
+		{
+			float ang = escenariActual->m_objectList[i].m_angleOrbita * (float)PI / 180.0f;
+			float rOrb = escenariActual->m_objectList[i].m_radiOrbita;
+			float rCos = escenariActual->m_objectList[i].m_radiCos;
+			glm::vec3 posMon(rOrb * cos(ang), rOrb * sin(ang), rCos * 1.15f);
+			InterficieUI::DibuixarEtiquetaPlaneta(nomsEtiquetes[i], posMon, ViewMatrix, ProjectionMatrix, viewport);
+		}
+	}
+
+	// Finestres opcionals d'EntornVGI (desactivades per defecte)
 	if (show_demo_window)
 		ImGui::ShowDemoWindow(&show_demo_window);
 
-	// 2.a. Show another simple window.
 	if (show_another_window)
 	{
-		ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+		ImGui::Begin("Another Window", &show_another_window);
 		ImGui::Text("Hello from another window!");
 		if (ImGui::Button("Close Me"))
 			show_another_window = false;
 		ImGui::End();
 	}
 
-	// 2.b. Show the EntornVGI window. Finestra amb totes les opcions de l'aplicació.
 	if (show_EntornVGI_window)
-		ShowEntornVGIWindow(&show_EntornVGI_window); //ShowEntornVGIWindow(&show_EntornVGI_window);
-
-	// 3. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
-	{
-		static float f = 0.0f;
-		static int counter = 0;
-		static float PV[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-
-		ImGui::Begin("Status Menu");                          // Create a window called "Status Menu" and append into it.
-
-		ImGui::Text("Finestres EntornVGI:");               // Display some text (you can use a format strings too)
-		ImGui::SameLine();
-		ImGui::Checkbox("EntornVGI Window", &show_EntornVGI_window);
-		ImGui::Separator();
-		ImGui::Spacing();
-
-		// Transformació PV de Coord. esfèriques (R,anglev,angleh) --> Coord. cartesianes (PVx,PVy,PVz)
-		if (camera == CAM_NAVEGA) { PV[0] = opvN.x; PV[1] = opvN.y; PV[2] = opvN.z; }
-		else {
-			cam_Esferica[0] = OPV.R;	cam_Esferica[1] = OPV.alfa; cam_Esferica[2] = OPV.beta;
-			if (Vis_Polar == POLARZ)
-			{
-				PV[0] = OPV.R * cos(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-				PV[1] = OPV.R * sin(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-				PV[2] = OPV.R * sin(OPV.alfa * PI / 180);
-			}
-			else if (Vis_Polar == POLARY)
-			{
-				PV[0] = OPV.R * sin(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-				PV[1] = OPV.R * sin(OPV.alfa * PI / 180);
-				PV[2] = OPV.R * cos(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-			}
-			else {
-				PV[0] = OPV.R * sin(OPV.alfa * PI / 180);
-				PV[1] = OPV.R * cos(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-				PV[2] = OPV.R * sin(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-			}
-		}
-
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
-		ImGui::SeparatorText("CAMERA:");
-		ImGui::PopStyleColor();
-
-		ImGui::InputFloat3("Esferiques (R,alfa,beta)", cam_Esferica);
-		ImGui::InputFloat3("Cartesianes (PVx,PVy,PVz)", PV);
-		//ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
-		ImGui::SeparatorText("COLORS:");
-		ImGui::PopStyleColor();
-		ImGui::ColorEdit3("Color de Fons", (float*)&clear_colorB); // Edit 3 floats representing a background color
-		ImGui::ColorEdit3("Color d'Objecte", (float*)&clear_colorO); // Edit 3 floats representing a object color
-		c_fons.r = clear_colorB.x;	c_fons.g = clear_colorB.y;	c_fons.b = clear_colorB.z;	c_fons.a = clear_colorB.w;
-		col_obj.r = clear_colorO.x;	col_obj.g = clear_colorO.y;	col_obj.b = clear_colorO.z;		col_obj.a = clear_colorO.w;
-		ImGui::Separator();
-
-
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
-		ImGui::SeparatorText("TRANSFORMA:");
-		ImGui::PopStyleColor();
-		float tras_ImGui[3] = { (float)TG.VTras.x,(float)TG.VTras.y,(float)TG.VTras.z };
-		ImGui::InputFloat3("Traslacio (Tx,Ty,Tz)", tras_ImGui);
-		float rota_ImGui[3] = { (float)TG.VRota.x,(float)TG.VRota.y,(float)TG.VRota.z };
-		ImGui::InputFloat3("Rotacio (Rx,Ry,Rz)", rota_ImGui);
-		float scal_ImGui[3] = { (float)TG.VScal.x,(float)TG.VScal.y,(float)TG.VScal.z };
-		ImGui::InputFloat3("Escala (Sx, Sy, Sz)", scal_ImGui);
-
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
-		ImGui::SeparatorText("ImGui:");               // Display some text (you can use a format strings too)
-		ImGui::PopStyleColor();
-		ImGui::Checkbox("Demo ImGui Window", &show_demo_window);      // Edit bools storing our window open/close state
-		ImGui::SameLine();
-		ImGui::Checkbox("Another ImGui Window", &show_another_window);
-		ImGui::Spacing();
-
-		ImGui::Text("imgui versions: (%s) (%d)", IMGUI_VERSION, IMGUI_VERSION_NUM);
-		ImGui::Spacing();
-
-		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-		ImGui::End();
-	}
+		ShowEntornVGIWindow(&show_EntornVGI_window);
 
 	// Rendering ImGui Menus
 	ImGui::Render();
@@ -2730,8 +2811,8 @@ void OnVistaSkyBox()
 	// Càrrega Shader Skybox
 	if (!skC_programID) skC_programID = shader_SkyBoxC.loadFileShaders(".\\shaders\\skybox.VERT", ".\\shaders\\skybox.FRAG");
 
-	// Càrrega VAO Skybox Cube
-	if (skC_VAOID.vaoId == 0) skC_VAOID = loadCubeSkybox_VAO();
+	// Càrrega VAO Skybox Cube (verificant si el VAO es valid en OpenGL)
+	if (skC_VAOID.vaoId == 0 || !glIsVertexArray(skC_VAOID.vaoId)) skC_VAOID = loadCubeSkybox_VAO();
 	Set_VAOList(CUBE_SKYBOX, skC_VAOID);
 
 	if (!cubemapTexture)
@@ -3123,7 +3204,6 @@ void OnSistemaTots() //#€#€#€# Va a
 	glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), tFlag_invert_Y);
 
 
-	//€~€~€~€~€
 	const float radiCos[9] = { 20.0f,  3.0f,  5.0f,  5.0f,  4.0f, 12.0f, 10.0f,  7.0f,  7.0f };
 	const float radiOrbita[9] = { 0.0f, 40.0f, 60.0f, 80.0f,100.0f,135.0f,175.0f,210.0f,240.0f };
 	const float angleOrbita[9] = { 0.0f,  0.0f, 40.0f, 80.0f,120.0f,160.0f,200.0f,240.0f,280.0f };
@@ -4137,8 +4217,37 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 // (2) ONLY forward mouse data to your underlying app/game.
 	if (!io.WantCaptureKeyboard) { //<Tractament mouse de l'aplicació>}
 		// EntornVGI: Si tecla pulsada és ESCAPE, tancar finestres i aplicació.
-		if (mods == 0 && key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) glfwSetWindowShouldClose(window, GL_TRUE);
-		else if (mods == 0 && key == GLFW_KEY_PRINT_SCREEN && action == GLFW_PRESS) statusB = !statusB;
+		if (mods == 0 && key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+			glfwSetWindowShouldClose(window, GL_TRUE);
+			return;
+		}
+		// Bloquejar teclat si el selector inicial de modes està obert
+		if (g_EstatSimulador.mostrarSelectorModes) return;
+
+		// Dreceres de control del simulador (Pausa, Invertir temps, Reenquadrar vista, Vista Global)
+		if (mods == 0 && action == GLFW_PRESS) {
+			if (key == GLFW_KEY_SPACE) {
+				g_EstatSimulador.tempsSimulacio.enPausa = !g_EstatSimulador.tempsSimulacio.enPausa;
+				return;
+			}
+			else if (key == GLFW_KEY_BACKSPACE) {
+				g_EstatSimulador.tempsSimulacio.direccioTemps = -g_EstatSimulador.tempsSimulacio.direccioTemps;
+				return;
+			}
+			else if (key == GLFW_KEY_R) {
+				g_EstatSimulador.canviCameraPendent = true;
+				return;
+			}
+			else if (key == GLFW_KEY_HOME) {
+				g_EstatSimulador.cameraConfig.mode = ModeCamera::GLOBAL_SISTEMA;
+				g_EstatSimulador.cosEnfocatId = 0;
+				InterficieUI::ActualitzarDadesCosActiu(g_EstatSimulador);
+				g_EstatSimulador.canviCameraPendent = true;
+				return;
+			}
+		}
+
+		if (mods == 0 && key == GLFW_KEY_PRINT_SCREEN && action == GLFW_PRESS) statusB = !statusB;
 		else if ((mods == 1) && (action == GLFW_PRESS)) Teclat_Shift(key, window);	// Shorcuts Shift Key
 		else if ((mods == 2) && (action == GLFW_PRESS)) Teclat_Ctrl(key);	// Shortcuts Ctrl Key
 		else if ((objecte == C_BEZIER || objecte == C_BSPLINE || objecte == C_LEMNISCATA || objecte == C_HERMITTE
@@ -4152,27 +4261,34 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 				key == GLFW_KEY_DOWN))
 		{
 			const double pasAngle = 5.0;
-			const double pasDistancia = 5.0;
+			int cosId = g_EstatSimulador.cosEnfocatId;
+			double radiCos = 35.0;
+			if (escenariActual != nullptr && cosId >= 0 && cosId < 9) {
+				radiCos = escenariActual->m_objectList[cosId].m_radiCos;
+			}
+			double minR = (cosId == 0) ? 42.0 : std::max(2.5, radiCos * 2.2);
+			double maxR = 800.0;
+			const double pasDistancia = (cosId == 0) ? 5.0 : std::max(1.0, radiCos * 0.5);
 
-			// Gir horitzontal al voltant del Sol
+			// Gir horitzontal al voltant del cos enfocat
 			if (key == GLFW_KEY_LEFT)
 				OPV.beta -= pasAngle;
 
 			else if (key == GLFW_KEY_RIGHT)
 				OPV.beta += pasAngle;
 
-			// Zoom: apropar-se o allunyar-se del Sol
+			// Zoom: apropar-se o allunyar-se
 			else if (key == GLFW_KEY_UP)
 				OPV.R -= pasDistancia;
 
 			else if (key == GLFW_KEY_DOWN)
 				OPV.R += pasDistancia;
 
-			// Evitem que la càmera travessi el centre
-			if (OPV.R < 42)
-				OPV.R = 42;
-			if (OPV.R > 412)
-				OPV.R = 412;
+			// Evitem que la càmera travessi el cos
+			if (OPV.R < minR)
+				OPV.R = minR;
+			if (OPV.R > maxR)
+				OPV.R = maxR;
 
 			// Mantenim l'angle horitzontal entre 0 i 360 graus
 			while (OPV.beta >= 360.0)
@@ -4180,12 +4296,14 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 
 			while (OPV.beta < 0.0)
 				OPV.beta += 360.0;
+
+			cam_Esferica[0] = (float)OPV.R;
+			cam_Esferica[1] = (float)OPV.alfa;
+			cam_Esferica[2] = (float)OPV.beta;
 		}
 
 		else if (camera == CAM_NAVEGA)
 			Teclat_Navega(key, action);
-
-		else if (camera == CAM_NAVEGA) Teclat_Navega(key, action);
 		else if ((sw_grid) && ((grid.x) || (grid.y) || (grid.z))) Teclat_Grid(key, action);
 		else if (((key == GLFW_KEY_G) && (action == GLFW_PRESS)) && ((grid.x) || (grid.y) || (grid.z))) sw_grid = !sw_grid;
 		else if ((key == GLFW_KEY_O) && (action == GLFW_PRESS)) sw_color = true; // Activació color objecte
@@ -5264,11 +5382,13 @@ void Teclat_Navega(int key, int action)
 	vdir[1] = vdir[1] / modul;
 	vdir[2] = vdir[2] / modul;
 
-	if (action == GLFW_PRESS)
+	if (action == GLFW_PRESS || action == GLFW_REPEAT)
 	{
+		double nx = 0.0, ny = 0.0, nz = 0.0;
 		switch (key)
-		{	// Tecla cursor amunt
+		{	// Tecla cursor amunt o W
 		case GLFW_KEY_UP:
+		case GLFW_KEY_W:
 			if (Vis_Polar == POLARZ)
 			{  // (X,Y,Z)
 				opvN.x += fact_pan * vdir[0];
@@ -5292,8 +5412,9 @@ void Teclat_Navega(int key, int action)
 			}
 			break;
 
-			// Tecla cursor avall
+			// Tecla cursor avall o S
 		case GLFW_KEY_DOWN:
+		case GLFW_KEY_S:
 			if (Vis_Polar == POLARZ)
 			{ // (X,Y,Z)
 				opvN.x -= fact_pan * vdir[0];
@@ -5317,73 +5438,63 @@ void Teclat_Navega(int key, int action)
 			}
 			break;
 
-			// Tecla cursor esquerra
+			// Tecla cursor esquerra o A
 		case GLFW_KEY_LEFT:
-			angleZ += fact_pan;
+		case GLFW_KEY_A:
+			angleZ = fact_pan;
 			if (Vis_Polar == POLARZ)
 			{ // (X,Y,Z)
-				n[0] = vdir[0]; // n[0] - opvN.x;
-				n[1] = vdir[1]; // n[1] - opvN.y;
-				n[0] = n[0] * cos(angleZ * PI / 180) - n[1] * sin(angleZ * PI / 180.0);
-				n[1] = n[0] * sin(angleZ * PI / 180) + n[1] * cos(angleZ * PI / 180.0);
-				n[0] = n[0] + opvN.x;
-				n[1] = n[1] + opvN.y;
+				nx = vdir[0] * cos(angleZ * PI / 180.0) - vdir[1] * sin(angleZ * PI / 180.0);
+				ny = vdir[0] * sin(angleZ * PI / 180.0) + vdir[1] * cos(angleZ * PI / 180.0);
+				n[0] = nx + opvN.x;
+				n[1] = ny + opvN.y;
 			}
 			else if (Vis_Polar == POLARY)
 			{ //(X,Y,Z) --> (Z,X,Y)
-				n[2] = vdir[2]; // n[2] - opvN.z;
-				n[0] = vdir[0]; // n[0] - opvN.x;
-				n[2] = n[2] * cos(angleZ * PI / 180.0) - n[0] * sin(angleZ * PI / 180.0);
-				n[0] = n[2] * sin(angleZ * PI / 180.0) + n[0] * cos(angleZ * PI / 180.0);
-				n[2] = n[2] + opvN.z;
-				n[0] = n[0] + opvN.x;
+				nz = vdir[2] * cos(angleZ * PI / 180.0) - vdir[0] * sin(angleZ * PI / 180.0);
+				nx = vdir[2] * sin(angleZ * PI / 180.0) + vdir[0] * cos(angleZ * PI / 180.0);
+				n[2] = nz + opvN.z;
+				n[0] = nx + opvN.x;
 			}
 			else if (Vis_Polar == POLARX)
 			{ //(X,Y,Z) --> (Y,Z,X)
-				n[1] = vdir[1]; // n[1] - opvN.y;
-				n[2] = vdir[2]; // n[2] - opvN.z;
-				n[1] = n[1] * cos(angleZ * PI / 180.0) - n[2] * sin(angleZ * PI / 180.0);
-				n[2] = n[1] * sin(angleZ * PI / 180.0) + n[2] * cos(angleZ * PI / 180.0);
-				n[1] = n[1] + opvN.y;
-				n[2] = n[2] + opvN.z;
+				ny = vdir[1] * cos(angleZ * PI / 180.0) - vdir[2] * sin(angleZ * PI / 180.0);
+				nz = vdir[1] * sin(angleZ * PI / 180.0) + vdir[2] * cos(angleZ * PI / 180.0);
+				n[1] = ny + opvN.y;
+				n[2] = nz + opvN.z;
 			}
 			break;
 
-			// Tecla cursor dret
+			// Tecla cursor dret o D
 		case GLFW_KEY_RIGHT:
-			angleZ = 360 - fact_pan;
+		case GLFW_KEY_D:
+			angleZ = 360.0 - fact_pan;
 			if (Vis_Polar == POLARZ)
 			{ // (X,Y,Z)
-				n[0] = vdir[0]; // n[0] - opvN.x;
-				n[1] = vdir[1]; // n[1] - opvN.y;
-				n[0] = n[0] * cos(angleZ * PI / 180.0) - n[1] * sin(angleZ * PI / 180.0);
-				n[1] = n[0] * sin(angleZ * PI / 180.0) + n[1] * cos(angleZ * PI / 180.0);
-				n[0] = n[0] + opvN.x;
-				n[1] = n[1] + opvN.y;
+				nx = vdir[0] * cos(angleZ * PI / 180.0) - vdir[1] * sin(angleZ * PI / 180.0);
+				ny = vdir[0] * sin(angleZ * PI / 180.0) + vdir[1] * cos(angleZ * PI / 180.0);
+				n[0] = nx + opvN.x;
+				n[1] = ny + opvN.y;
 			}
 			else if (Vis_Polar == POLARY)
 			{ //(X,Y,Z) --> (Z,X,Y)
-				n[2] = vdir[2]; // n[2] - opvN.z;
-				n[0] = vdir[0]; // n[0] - opvN.x;
-				n[2] = n[2] * cos(angleZ * PI
-					/ 180.0) - n[0] * sin(angleZ * PI / 180.0);
-				n[0] = n[2] * sin(angleZ * PI / 180.0) + n[0] * cos(angleZ * PI / 180.0);
-				n[2] = n[2] + opvN.z;
-				n[0] = n[0] + opvN.x;
+				nz = vdir[2] * cos(angleZ * PI / 180.0) - vdir[0] * sin(angleZ * PI / 180.0);
+				nx = vdir[2] * sin(angleZ * PI / 180.0) + vdir[0] * cos(angleZ * PI / 180.0);
+				n[2] = nz + opvN.z;
+				n[0] = nx + opvN.x;
 			}
 			else if (Vis_Polar == POLARX)
 			{ //(X,Y,Z) --> (Y,Z,X)
-				n[1] = vdir[1]; // n[1] - opvN.y;
-				n[2] = vdir[2]; // n[2] - opvN.z;
-				n[1] = n[1] * cos(angleZ * PI / 180.0) - n[2] * sin(angleZ * PI / 180.0);
-				n[2] = n[1] * sin(angleZ * PI / 180.0) + n[2] * cos(angleZ * PI / 180.0);
-				n[1] = n[1] + opvN.y;
-				n[2] = n[2] + opvN.z;
+				ny = vdir[1] * cos(angleZ * PI / 180.0) - vdir[2] * sin(angleZ * PI / 180.0);
+				nz = vdir[1] * sin(angleZ * PI / 180.0) + vdir[2] * cos(angleZ * PI / 180.0);
+				n[1] = ny + opvN.y;
+				n[2] = nz + opvN.z;
 			}
 			break;
 
-			// Tecla Inicio ('7')
+			// Tecla Inicio ('7') o Q (Pujar)
 		case GLFW_KEY_KP_7: //GLFW_KEY_HOME:
+		case GLFW_KEY_Q:
 			if (Vis_Polar == POLARZ) {
 				opvN.z += fact_pan;
 				n[2] += fact_pan;
@@ -5398,8 +5509,9 @@ void Teclat_Navega(int key, int action)
 			}
 			break;
 
-			// Tecla Fin
+			// Tecla Fin o E (Baixar)
 		case GLFW_KEY_END:
+		case GLFW_KEY_E:
 			if (Vis_Polar == POLARZ) {
 				opvN.z -= fact_pan;
 				n[2] -= fact_pan;
@@ -6187,7 +6299,7 @@ void OnMouseButton(GLFWwindow* window, int button, int action, int mods)
 	io.AddMouseButtonEvent(button, action);
 
 	// (2) ONLY forward mouse data to your underlying app/game.
-	if (!io.WantCaptureMouse) { //<Tractament mouse de l'aplicació>}
+	if (!io.WantCaptureMouse && !g_EstatSimulador.mostrarSelectorModes) { //<Tractament mouse de l'aplicació>}
 		// OnLButtonDown
 		if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
 		{	// Entorn VGI: Detectem en quina posició s'ha apretat el botó esquerra del
@@ -6240,6 +6352,8 @@ void OnMouseButton(GLFWwindow* window, int button, int action, int mods)
 //					- ypos: Posició Y del cursor del mouse(coord.pantalla) quan el botó s'ha apretat.
 void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 {
+	if (g_EstatSimulador.mostrarSelectorModes) return;
+
 	// TODO: Agregue aquí su código de controlador de mensajes o llame al valor predeterminado
 	double modul = 0;
 	GLdouble vdir[3] = { 0, 0, 0 };
@@ -6253,15 +6367,25 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 		m_PosEAvall.x = xpos;				m_PosEAvall.y = ypos;
 		if (camera == CAM_ESFERICA)
 		{	// Càmera Esfèrica
-			//(NOA)
 			OPV.beta = OPV.beta - gir.cx / 2.0;
-			OPV.alfa = 25; //angle vertical fix! (NOA)
 
-			// Entorn VGI: Control per evitar el creixement desmesurat dels angles.
-			//while (OPV.alfa >= 360)		OPV.alfa = OPV.alfa - 360.0; //no ens fan falta (NOA)
-			//while (OPV.alfa < 0)		OPV.alfa = OPV.alfa + 360.0;
-			while (OPV.beta >= 360)		OPV.beta = OPV.beta - 360.0;
-			while (OPV.beta < 0)		OPV.beta = OPV.beta + 360.0;
+			// Si estem en mode Càmera Fixa (25º), mantenim alfa fix a 25.0.
+			// En la resta de modes de càmera orbital/global, permetem variar l'angle vertical alfa.
+			if (g_EstatSimulador.cameraConfig.mode == ModeCamera::FIXA_INCLINADA_25) {
+				OPV.alfa = 25.0;
+			}
+			else {
+				OPV.alfa = OPV.alfa + gir.cy / 2.0;
+				while (OPV.alfa >= 360.0)	OPV.alfa = OPV.alfa - 360.0;
+				while (OPV.alfa < 0.0)		OPV.alfa = OPV.alfa + 360.0;
+			}
+
+			while (OPV.beta >= 360.0)		OPV.beta = OPV.beta - 360.0;
+			while (OPV.beta < 0.0)			OPV.beta = OPV.beta + 360.0;
+
+			cam_Esferica[0] = (float)OPV.R;
+			cam_Esferica[1] = (float)OPV.alfa;
+			cam_Esferica[2] = (float)OPV.beta;
 		}
 		else { // Càmera Geode
 			OPV_G.beta = OPV_G.beta + gir.cx / 2.0;
@@ -6280,36 +6404,33 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 		girn.cx = m_PosEAvall.x - xpos;		girn.cy = m_PosEAvall.y - ypos;
 		angleZ = girn.cx / 2.0;
 		// Entorn VGI: Control per evitar el creixement desmesurat dels angles.
-		while (angleZ >= 360, 0) angleZ = angleZ - 360;
-		while (angleZ < 0.0)	angleZ = angleZ + 360;
+		while (angleZ >= 360.0) angleZ = angleZ - 360.0;
+		while (angleZ < 0.0)	angleZ = angleZ + 360.0;
 
 		// Entorn VGI: Segons orientació dels eixos Polars (Vis_Polar)
 		if (Vis_Polar == POLARZ)
 		{ // (X,Y,Z)
-			n[0] = n[0] - opvN.x;
-			n[1] = n[1] - opvN.y;
-			n[0] = n[0] * cos(angleZ * PI / 180.0) - n[1] * sin(angleZ * PI / 180.0);
-			n[1] = n[0] * sin(angleZ * PI / 180.0) + n[1] * cos(angleZ * PI / 180.0);
-			n[0] = n[0] + opvN.x;
-			n[1] = n[1] + opvN.y;
+			double dx = n[0] - opvN.x;
+			double dy = n[1] - opvN.y;
+			n[0] = (dx * cos(angleZ * PI / 180.0) - dy * sin(angleZ * PI / 180.0)) + opvN.x;
+			n[1] = (dx * sin(angleZ * PI / 180.0) + dy * cos(angleZ * PI / 180.0)) + opvN.y;
+			n[2] = n[2] + girn.cy * 0.01;
 		}
 		else if (Vis_Polar == POLARY)
 		{ //(X,Y,Z) --> (Z,X,Y)
-			n[2] = n[2] - opvN.z;
-			n[0] = n[0] - opvN.x;
-			n[2] = n[2] * cos(angleZ * PI / 180.0) - n[0] * sin(angleZ * PI / 180.0);
-			n[0] = n[2] * sin(angleZ * PI / 180.0) + n[0] * cos(angleZ * PI / 180.0);
-			n[2] = n[2] + opvN.z;
-			n[0] = n[0] + opvN.x;
+			double dz = n[2] - opvN.z;
+			double dx = n[0] - opvN.x;
+			n[2] = (dz * cos(angleZ * PI / 180.0) - dx * sin(angleZ * PI / 180.0)) + opvN.z;
+			n[0] = (dz * sin(angleZ * PI / 180.0) + dx * cos(angleZ * PI / 180.0)) + opvN.x;
+			n[1] = n[1] + girn.cy * 0.01;
 		}
 		else if (Vis_Polar == POLARX)
 		{ //(X,Y,Z) --> (Y,Z,X)
-			n[1] = n[1] - opvN.y;
-			n[2] = n[2] - opvN.z;
-			n[1] = n[1] * cos(angleZ * PI / 180.0) - n[2] * sin(angleZ * PI / 180.0);
-			n[2] = n[1] * sin(angleZ * PI / 180.0) + n[2] * cos(angleZ * PI / 180.0);
-			n[1] = n[1] + opvN.y;
-			n[2] = n[2] + opvN.z;
+			double dy = n[1] - opvN.y;
+			double dz = n[2] - opvN.z;
+			n[1] = (dy * cos(angleZ * PI / 180.0) - dz * sin(angleZ * PI / 180.0)) + opvN.y;
+			n[2] = (dy * sin(angleZ * PI / 180.0) + dz * cos(angleZ * PI / 180.0)) + opvN.z;
+			n[0] = n[0] + girn.cy * 0.01;
 		}
 
 		m_PosEAvall.x = xpos;		m_PosEAvall.y = ypos;
@@ -6528,18 +6649,30 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 	//io.AddMouseButtonEvent(button, true);
 
 // (2) ONLY forward mouse data to your underlying app/game.
-	if (!io.WantCaptureMouse) { // <Tractament mouse de l'aplicació>}
+	if (!io.WantCaptureMouse && !g_EstatSimulador.mostrarSelectorModes) { // <Tractament mouse de l'aplicació>}
 		// Funció de zoom quan està activada la funció pan o les T. Geomètriques
 		if ((zzoom || zzoomO) || (transX) || (transY) || (transZ))
 		{
 			if (camera == CAM_ESFERICA)
 			{	// Càmera Esfèrica
-				OPV.R = OPV.R - yoffset * 5.0;
-				//(NOA)
-				if (OPV.R < 42.0) 
-					OPV.R = 42.0;
-				if (OPV.R > 412)
-					OPV.R = 412;
+				int cosId = g_EstatSimulador.cosEnfocatId;
+				double radiCos = 35.0;
+				if (escenariActual != nullptr && cosId >= 0 && cosId < 9) {
+					radiCos = escenariActual->m_objectList[cosId].m_radiCos;
+				}
+				double minR = (cosId == 0) ? 42.0 : std::max(2.5, radiCos * 2.2);
+				double maxR = 800.0;
+				double pasZoom = (cosId == 0) ? 5.0 : std::max(1.0, radiCos * 0.5);
+
+				OPV.R = OPV.R - yoffset * pasZoom;
+				if (OPV.R < minR)
+					OPV.R = minR;
+				if (OPV.R > maxR)
+					OPV.R = maxR;
+
+				cam_Esferica[0] = (float)OPV.R;
+				cam_Esferica[1] = (float)OPV.alfa;
+				cam_Esferica[2] = (float)OPV.beta;
 				//InvalidateRect(NULL, false);
 			}
 			else if (camera == CAM_GEODE)
@@ -6560,26 +6693,27 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 			vdir[2] = vdir[2] / modul;
 
 			// Entorn VGI: Segons orientació dels eixos Polars (Vis_Polar)
+			double pasNav = yoffset * 2.5;
 			if (Vis_Polar == POLARZ)
 			{ // (X,Y,Z)
-				opvN.x += (yoffset / 4.0) * vdir[0];
-				opvN.y += (yoffset / 4.0) * vdir[1];
-				n[0] += (yoffset / 4.0) * vdir[0];
-				n[1] += (yoffset / 4.0) * vdir[1];
+				opvN.x += pasNav * vdir[0];
+				opvN.y += pasNav * vdir[1];
+				n[0] += pasNav * vdir[0];
+				n[1] += pasNav * vdir[1];
 			}
 			else if (Vis_Polar == POLARY)
 			{ //(X,Y,Z) --> (Z,X,Y)
-				opvN.z += (yoffset / 4.0) * vdir[2];
-				opvN.x += (yoffset / 4.0) * vdir[0];
-				n[2] += (yoffset / 4.0) * vdir[2];
-				n[0] += (yoffset / 4.0) * vdir[0];
+				opvN.z += pasNav * vdir[2];
+				opvN.x += pasNav * vdir[0];
+				n[2] += pasNav * vdir[2];
+				n[0] += pasNav * vdir[0];
 			}
 			else if (Vis_Polar == POLARX)
 			{ //(X,Y,Z) --> (Y,Z,X)
-				opvN.y += (yoffset / 4.0) * vdir[1];
-				opvN.z += (yoffset / 4.0) * vdir[2];
-				n[1] += (yoffset / 4.0) * vdir[1];
-				n[2] += (yoffset / 4.0) * vdir[2];
+				opvN.y += pasNav * vdir[1];
+				opvN.z += pasNav * vdir[2];
+				n[1] += pasNav * vdir[1];
+				n[2] += pasNav * vdir[2];
 			}
 		}
 	}
@@ -6872,8 +7006,6 @@ void OnTimer()
 		// Crida a OnPaint() per redibuixar l'escena
 		//InvalidateRect(NULL, false);
 	}
-
-	if (escenariActual != nullptr) escenariActual->updateVariables();
 }
 
 // ---------------- Entorn VGI: Funcions locals a main.cpp
@@ -7090,7 +7222,7 @@ int main()
 #endif
 
 	// Create a windowed mode window and its OpenGL context */
-	window = glfwCreateWindow(640, 480, "Entorn Grafic VS2022 amb GLFW i OpenGL 4.6 (Visualitzacio Grafica Interactiva - Grau en Enginyeria Informatica - Escola Enginyeria - UAB)", NULL, NULL);
+	window = glfwCreateWindow(1280, 720, "Entorn Grafic VS2022 amb GLFW i OpenGL 4.6 (Visualitzacio Grafica Interactiva - Grau en Enginyeria Informatica - Escola Enginyeria - UAB)", NULL, NULL);
 	if (!window)
 	{
 		fprintf(stderr, "Failed to open GLFW window. If you have an Intel GPU, they are not 4.6 compatible. Try the 2.1 version of the tutorials.\n");
@@ -7178,17 +7310,33 @@ int main()
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
 // Entorn VGI.ImGui: Setup Dear ImGui style
-	//ImGui::StyleColorsDark();
-	ImGui::StyleColorsLight();
+	InterficieUI::InicialitzarEstil();
 
 	// Entorn VGI.ImGui: Setup Platform/Renderer backends
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
 	ImGui_ImplOpenGL3_Init("#version 130");
 	// Entorn VGI.ImGui: End Setup Dear ImGui context
 
+	// Reserva dels 5 escenaris disponibles.
+	// L'escena del sistema solar NO es carrega ni es dibuixa mentre el selector inicial de modes estigui obert.
+	escenaris = new Escenari[5];
+	escenariActual = &escenaris[0];
+	objecte = CAP;
+
+	objecte = SISTEMA_SOLAR;	cosSolar = -1;
+	camera = CAM_ESFERICA;		Vis_Polar = POLARZ;
+	t_textura = TEXTURA_FITXERIMA;	tFlag_invert_Y = true;	textura = true;
+	sw_material[0] = false;		SkyBoxCube = false;
+
+	// Càmera allunyada i enlairada per veure les òrbites des de dalt
+	OPV.R = 550.0;	OPV.alfa = 65.0;	OPV.beta = 0.0;
+	cam_Esferica[0] = (float)OPV.R;	cam_Esferica[1] = (float)OPV.alfa;	cam_Esferica[2] = (float)OPV.beta;
+
+
 	escenariActual = new Escenari();
-	escenariActual->creaEscenari();
-	OnSistemaTots();//Cuando creaEscenari() funcione lo quitamos (lo de dentro de creaEscenari es OnSistemaTots() pero comentado pq no se poner bien los includes)
+	escenariActual->creaEscenari(shader_programID);
+
+
 // Loop until the user closes the window
 	while (!glfwWindowShouldClose(window))
 	{	// Poll for and process events */
@@ -7201,17 +7349,28 @@ int main()
 
 		// Entorn VGI. Timer: for each timer do this
 		time -= delta;
-		if ((time <= 0.0) /* && (satelit || anima) */ ) OnTimer();
+		if ((time <= 0.0) && (satelit || anima)) OnTimer();
 
-		/*
-				// Entorn VGI: GAMEPAD. Variable que retorna si el joystick està connectat (GLFW_CONNECTED) o desconnectat (GLFW_DISCONECTED)
-				int event = 0;
+		// Actualització del temps de simulació i moviment orbital dels planetes
+		// (només quan s'ha tancat el selector inicial d'escenaris)
+		if (!g_EstatSimulador.mostrarSelectorModes) {
+			bool escalaReal = (g_EstatSimulador.modeActual == ModeSimulacio::ESCALA_REAL);
+			if (!g_EstatSimulador.tempsSimulacio.enPausa) {
+				// En mode didàctic el rellotge avança a ritme moderat; en escala real segons el timelapse
+				double deltaRellotge = escalaReal ? (double)delta : ((double)delta * 0.25);
+				g_EstatSimulador.tempsSimulacio.AvancarSegons(deltaRellotge);
+			}
 
-				// Entorn VGI: GAMEPAD. Comprovació si tenim un Joystick / Gamepad connectat per anar a la funció de callback.
-				//	if (glfwJoystickPresent(GLFW_JOYSTICK_1)) OnJoystickMove(GLFW_JOYSTICK_1,event);		// - Directly redirect GLFW joystick events
-				if (glfwJoystickIsGamepad(GLFW_JOYSTICK_1)) OnGamepadMove(GLFW_JOYSTICK_1, event);	// - Directly redirect GLFW gamepad events (equivalent)
-					else fprintf(stderr, "%s \n", "No hi ha Gamepad");
-		*/
+			if (escenariActual != nullptr && objecte == SISTEMA_SOLAR) {
+				escenariActual->updateVariables(
+					(double)delta,
+					g_EstatSimulador.tempsSimulacio.enPausa,
+					g_EstatSimulador.tempsSimulacio.direccioTemps,
+					escalaReal,
+					g_EstatSimulador.tempsSimulacio.factorVelocitatSegonsPerSegon
+				);
+			}
+		}
 
 		// Poll for and process events
 		glfwPollEvents();
@@ -7240,6 +7399,10 @@ int main()
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
+
+	delete[] escenaris;
+	escenaris = nullptr;
+	escenariActual = nullptr;
 
 	glfwDestroyWindow(window);
 

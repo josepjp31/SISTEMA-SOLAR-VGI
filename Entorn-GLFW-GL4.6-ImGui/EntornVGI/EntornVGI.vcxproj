@@ -156,6 +156,7 @@
     <ClCompile Include="escena.cpp" />
     <ClCompile Include="escenari.cpp" />
     <ClCompile Include="glut_geometry.cpp" />
+    <ClCompile Include="InterficieUI.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="material.cpp" />
     <ClCompile Include="objLoader.cpp" />
@@ -196,6 +197,7 @@
     <ClInclude Include="escenari.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="glut_geometry.h" />
+    <ClInclude Include="InterficieUI.h" />
     <ClInclude Include="main.h" />
     <ClInclude Include="material.h" />
     <ClInclude Include="objLoader.h" />
