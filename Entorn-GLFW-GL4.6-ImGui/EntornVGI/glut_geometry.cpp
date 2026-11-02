@@ -7293,6 +7293,13 @@ void draw_Hermitte_Curve(int nptsCorba, CPunt3D ctr_points[MAX_PATCH_CORBA], flo
 	deleteVAOList(CRV_HERMITTE);
 }
 
+void draw_Hermitte_Curve(int nptsCorba, CState3D ctr_points[MAX_PATCH_CORBA], float pas)
+{
+	Set_VAOList(CRV_HERMITTE, load_Hermitte_Curve_VAO(nptsCorba, ctr_points, pas));
+	draw_LinVAO_Object(CRV_HERMITTE); //drawCRVBSpline(npunts);
+	deleteVAOList(CRV_HERMITTE);
+}
+
 // load_Hermitte_Curve_VAO: Càrrega de la corba de Hermitte donada per nptsCorba punts de control definits en ctr_points, 
 //							 amb increment pas com a VAO.
 CVAO load_Hermitte_Curve_VAO(int nptsCorba, CPunt3D ctr_points[MAX_PATCH_CORBA], float pas)
@@ -7390,6 +7397,115 @@ CVAO load_Hermitte_Curve_VAO(int nptsCorba, CPunt3D ctr_points[MAX_PATCH_CORBA],
 
 	return HermitVAO;
 }
+
+CVAO load_Hermitte_Curve_VAO(int nptsCorba, CState3D ctr_points[MAX_PATCH_CORBA], float pas)
+{
+	CPunt3D vertexL1, vertexL2;
+	CPunt3D ctr[4];		// Punts control del patch de la corba Hermitte.
+	CColor pColor = { 1.0, 1.0, 1.0, 1.0 };	// Vector de color pel Patch
+	int patch = 0;		// Patch actual.
+	GLfloat t = 0.0;
+
+	// VAO
+	CVAO HermitVAO;
+	HermitVAO.vaoId = 0;		HermitVAO.vboId = 0;		HermitVAO.eboId = 0;
+	HermitVAO.nVertexs = 0;		HermitVAO.nIndices = 0;
+
+	std::vector <double> vertices, colors;			// Definició vectors dinàmics per a vertexs, normals i textures 
+	//vertices.resize(0);		colors.resize(0);	// Reinicialitzar vectors
+	vertices.clear();			colors.clear();		// Reinicialitzar vectors
+
+	// Obtenir color actual definit en OpenGL amb glColor();
+		//GLfloat cColor[4];
+		//glGetFloatv(GL_CURRENT_COLOR, cColor);
+
+		//t = t - pas;
+	// Càrrega primers punts de control.
+	for (int i = 0; i < 2; i++)
+	{
+		ctr[i].x = ctr_points[i].x;
+		ctr[i].y = ctr_points[i].y;
+		ctr[i].z = ctr_points[i].z;
+		ctr[i].w = 1.0;
+		ctr[i + 2].x = ctr_points[i].vx;
+		ctr[i + 2].y = ctr_points[i].vy;
+		ctr[i + 2].z = ctr_points[i].vz;
+		ctr[i + 2].w = 1.0;
+	}
+
+	//glBegin(GL_LINES);
+// Definició del primer vèrtex de la corba.
+	vertexL1 = Punt_Corba_Hermitte(t, ctr);
+	t = t + pas;
+	while (patch <= nptsCorba - 2) {
+		if (t >= 1.0) {
+			// Dibuixa Darrera aresta del patch.(t-pas, 1.0)
+			//glVertex3f(vertexL1.x, vertexL1.y, vertexL1.z);	// Vertex 1 de la línia
+			vertices.push_back(vertexL1.x);		vertices.push_back(vertexL1.y);		vertices.push_back(vertexL1.z);	// Vector Vèrtexs
+			// Donar color a cada patch de la corba (passant el color pel shader)
+			pColor = SetColorPatch(patch);
+			colors.push_back(pColor.r);		colors.push_back(pColor.g);		colors.push_back(pColor.b);	colors.push_back(pColor.a); // Vector Colors
+			//colors.push_back(cColor[0]);		colors.push_back(cColor[1]);		colors.push_back(cColor[2]);	colors.push_back(cColor[3]); // Vector Colors
+
+			vertexL2 = Punt_Corba_Hermitte(1.0, ctr);
+			//glVertex3f(vertexL2.x, vertexL2.y, vertexL2.z);	// Vertex 2 de la línia
+			vertices.push_back(vertexL2.x);		vertices.push_back(vertexL2.y);		vertices.push_back(vertexL2.z);	// Vector Vèrtexs
+			// Donar color a cada patch de la corba (passant el color pel shader)
+			pColor = SetColorPatch(patch);
+			colors.push_back(pColor.r);		colors.push_back(pColor.g);		colors.push_back(pColor.b);	colors.push_back(pColor.a); // Vector Colors
+			//colors.push_back(cColor[0]);		colors.push_back(cColor[1]);		colors.push_back(cColor[2]);	colors.push_back(cColor[3]); // Vector Colors
+			vertexL1 = vertexL2;
+
+			t = pas;
+			patch++;
+			if (patch <= nptsCorba - 2)
+			{
+				for (int i = 0; i < 2; i++)
+				{
+					ctr[i].x = ctr_points[patch + i].x;
+					ctr[i].y = ctr_points[patch + i].y;
+					ctr[i].z = ctr_points[patch + i].z;
+					ctr[i].w = 1.0;
+					ctr[i+2].x = ctr_points[patch + i].vx;
+					ctr[i+2].y = ctr_points[patch + i].vy;
+					ctr[i+2].z = ctr_points[patch + i].vz;
+					ctr[i+2].w = 1.0;
+				}
+			}
+		}
+		if (patch <= nptsCorba - 2) {
+
+			//glVertex3f(vertexL1.x, vertexL1.y, vertexL1.z);	// Vertex 1 de la línia
+			vertices.push_back(vertexL1.x);		vertices.push_back(vertexL1.y);		vertices.push_back(vertexL1.z);	// Vector Vèrtexs
+			// Donar color a cada patch de la corba (passant el color pel shader)
+			pColor = SetColorPatch(patch);
+			colors.push_back(pColor.r);		colors.push_back(pColor.g);		colors.push_back(pColor.b);	colors.push_back(pColor.a); // Vector Colors
+			//colors.push_back(cColor[0]);		colors.push_back(cColor[1]);		colors.push_back(cColor[2]);	colors.push_back(cColor[3]); // Vector Colors
+
+			vertexL2 = Punt_Corba_Hermitte(t, ctr);
+			//glVertex3f(vertexL2.x, vertexL2.y, vertexL2.z);	// Vertex 2 de la línia
+			vertices.push_back(vertexL2.x);		vertices.push_back(vertexL2.y);		vertices.push_back(vertexL2.z);	// Vector Vèrtexs
+			// Donar color a cada patch de la corba (passant el color pel shader)
+			pColor = SetColorPatch(patch);
+			colors.push_back(pColor.r);		colors.push_back(pColor.g);		colors.push_back(pColor.b);	colors.push_back(pColor.a); // Vector Colors
+			//colors.push_back(cColor[0]);		colors.push_back(cColor[1]);		colors.push_back(cColor[2]);	colors.push_back(cColor[3]); // Vector Colors
+			vertexL1 = vertexL2;
+
+			t = t + pas;
+		}
+	}
+	//glEnd();
+
+// ----------------------- VAO
+	std::vector <int>::size_type nv = vertices.size();	// Tamany del vector vertices en elements.
+
+	HermitVAO = load_LINES_VAO(vertices, colors);
+	HermitVAO.nVertexs = int(nv / 3);
+
+	return HermitVAO;
+}
+
+
 
 
 // load_Hermitte_Curve_EBO: Càrrega de la corba de Hermitte donada per nptsCorba punts de control definits en ctr_points, 
@@ -7496,6 +7612,117 @@ CVAO load_Hermitte_Curve_EBO(int nptsCorba, CPunt3D ctr_points[MAX_PATCH_CORBA],
 	return HermitVAO;
 }
 
+CVAO load_Hermitte_Curve_EBO(int nptsCorba, CState3D ctr_points[MAX_PATCH_CORBA], float pas)
+{
+	CPunt3D vertexL1, vertexL2;
+	CPunt3D ctr[4];		// Punts control del patch de la corba Hermitte.
+	CColor pColor = { 1.0, 1.0, 1.0, 1.0 };	// Vector de color pel Patch
+	int patch = 0;		// Patch actual.
+	GLfloat t = 0;
+	GLint index = 0;	// Apuntador a vèrtexs per a indices.
+
+	// VAO
+	CVAO HermitVAO;
+	HermitVAO.vaoId = 0;		HermitVAO.vboId = 0;		HermitVAO.eboId = 0;
+	HermitVAO.nVertexs = 0;		HermitVAO.nIndices = 0;
+
+	std::vector <double> vertices, colors;		// Definició vectors dinàmics per a vertexs i color 
+	std::vector <uint> indices;					// Vector dinàmic per a indexs EBO
+	//vertices.resize(0);		colors.resize(0);	// Reinicialitzar vectors
+	vertices.clear();			colors.clear();		indices.clear();		// Reinicialitzar vectors// Obtenir color actual definit en OpenGL amb glColor();
+
+	// Obtenir color actual definit en OpenGL amb glColor();
+		//GLfloat cColor[4];
+		//glGetFloatv(GL_CURRENT_COLOR, cColor);
+
+	// Càrrega primers punts de control.
+	for (int i = 0; i < 2; i++) {
+		ctr[i].x = ctr_points[i].x;
+		ctr[i].y = ctr_points[i].y;
+		ctr[i].z = ctr_points[i].z;
+		ctr[i+2].x = ctr_points[i].vx;
+		ctr[i+2].y = ctr_points[i].vy;
+		ctr[i+2].z = ctr_points[i].vz;
+	}
+
+	//glBegin(GL_LINES);
+	// Definició del primer vèrtex de la corba.
+	vertexL1 = Punt_Corba_Hermitte(t, ctr);
+	// Donar color a cada patch de la corba (passant el color pel shader)
+	pColor = SetColorPatch(patch);
+	colors.push_back(pColor.r);		colors.push_back(pColor.g);		colors.push_back(pColor.b);	colors.push_back(pColor.a); // Vector Colors
+	//colors.push_back(cColor[0]);		colors.push_back(cColor[1]);		colors.push_back(cColor[2]);	colors.push_back(cColor[3]); // Vector Colors
+	vertices.push_back(vertexL1.x);		vertices.push_back(vertexL1.y);		vertices.push_back(vertexL1.z);	// Vector Vèrtexs
+
+	t = t + pas;
+	while (patch <= nptsCorba - 2) {
+		if (t >= 1.0) {
+			// Dibuixa Darrera aresta del patch.(t-pas, 1.0)
+			//glVertex3f(vertexL1.x, vertexL1.y, vertexL1.z);	// Vertex 1 de la línia
+			//vertices.push_back(vertexL1.x);		vertices.push_back(vertexL1.y);		vertices.push_back(vertexL1.z);	// Vector Vèrtexs
+			// Donar color a cada patch de la corba (passant el color pel shader)
+			//pColor = SetColorPatch(patch);
+			//colors.push_back(pColor.r);		colors.push_back(pColor.g);		colors.push_back(pColor.b);	colors.push_back(pColor.a); // Vector Colors
+			indices.push_back(index);		// Vector indices Primer Vèrtex segment
+
+			vertexL2 = Punt_Corba_Hermitte(1.0, ctr);
+			//glVertex3f(vertexL2.x, vertexL2.y, vertexL2.z);	// Vertex 2 de la línia
+			vertices.push_back(vertexL2.x);		vertices.push_back(vertexL2.y);		vertices.push_back(vertexL2.z);	// Vector Vèrtexs
+			// Donar color a cada patch de la corba (passant el color pel shader)
+			pColor = SetColorPatch(patch);
+			colors.push_back(pColor.r);		colors.push_back(pColor.g);		colors.push_back(pColor.b);	colors.push_back(pColor.a); // Vector Colors
+			//colors.push_back(cColor[0]);		colors.push_back(cColor[1]);		colors.push_back(cColor[2]);	colors.push_back(cColor[3]); // Vector Colors
+
+			indices.push_back(index + 1);	// Vector indices Vèrtex segment
+			index = index + 1;
+
+			t = pas;
+			patch++;
+			if (patch <= nptsCorba - 2) {
+				for (int i = 0; i < 2; i++) {
+					ctr[i].x = ctr_points[patch + i].x;
+					ctr[i].y = ctr_points[patch + i].y;
+					ctr[i].z = ctr_points[patch + i].z;
+					ctr[i+2].x = ctr_points[patch + i].vx;
+					ctr[i+2].y = ctr_points[patch + i].vy;
+					ctr[i+2].z = ctr_points[patch + i].vz;
+				}
+			}
+		}
+		if (patch <= nptsCorba - 2) {
+			//glVertex3f(vertexL1.x, vertexL1.y, vertexL1.z);	// Vertex 1 de la línia
+			//vertices.push_back(vertexL1.x);		vertices.push_back(vertexL1.y);		vertices.push_back(vertexL1.z);	// Vector Vèrtexs
+			// Donar color a cada patch de la corba (passant el color pel shader)
+			//pColor = SetColorPatch(patch);
+			//colors.push_back(pColor.r);		colors.push_back(pColor.g);		colors.push_back(pColor.b);	colors.push_back(pColor.a); // Vector Colors
+			indices.push_back(index);		// Vector indices Primer Vèrtex segment
+
+			vertexL2 = Punt_Corba_Hermitte(t, ctr);
+			//glVertex3f(vertexL2.x, vertexL2.y, vertexL2.z);	// Vertex 2 de la línia
+			vertices.push_back(vertexL2.x);		vertices.push_back(vertexL2.y);		vertices.push_back(vertexL2.z);	// Vector Vèrtexs
+			// Donar color a cada patch de la corba (passant el color pel shader)
+			pColor = SetColorPatch(patch);
+			colors.push_back(pColor.r);		colors.push_back(pColor.g);		colors.push_back(pColor.b);	colors.push_back(pColor.a); // Vector Colors
+			//colors.push_back(cColor[0]);		colors.push_back(cColor[1]);		colors.push_back(cColor[2]);	colors.push_back(cColor[3]); // Vector Colors
+
+			indices.push_back(index + 1);	// Vector indices Vèrtex segment
+			index = index + 1;
+			//vertexL1 = vertexL2;
+			t = t + pas;
+		}
+	}
+	//glEnd();
+
+// ----------------------- VAO
+// Creació d'un VAO, VBO i EBO per a la càrrega de la geometria. Guardar identificador VAO, VBO, EBO nVertexs i nIndices a struct CVAO.
+	HermitVAO = load_LINES_EBO(vertices, colors, indices);
+
+	return HermitVAO;
+}
+
+
+
+
 
 // draw_TFHermitte_Curve: Visualització del Triedre de Frenet de la corba de Hermitte donada per nptsCorba 
 //							punts de control definits en ctr_points i vectors tangents vec_tangent, 
@@ -7577,7 +7804,7 @@ CPunt3D Punt_Corba_Hermitte(float t, CPunt3D* ctr)
 	{
 		coef[i] = 0;
 		for (j = 0; j < 4; j++)
-			coef[i] = coef[i] * t + H[i][j];
+			coef[i] = coef[i] * t + Ht[i][j];
 	}
 
 // Càlcul de la Posició
