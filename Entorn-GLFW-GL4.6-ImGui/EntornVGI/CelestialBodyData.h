@@ -52,9 +52,20 @@ struct CB {
     CelestialBodyId m_orbitedObject;
 };
 
-glm::mat4 getCB_posMat(CelestialBodyId body, CelestialBodyId origin, double et);
-glm::mat4 getCB_rotMat(CelestialBodyId body, double et);
+struct CState3D {
+	double x, y, z;
+	double vx, vy, vz;
+	CState3D() : x(0), y(0), z(0), vx(0), vy(0), vz(0) {}
+    CState3D(double* state) : x(state[0]), y(state[1]), z(state[2]), vx(state[3]), vy(state[4]), vz(state[5]) {}
+    CState3D(double x, double y, double z, double vx, double vy, double vz) : x(x), y(y), z(z), vx(vx), vy(vy), vz(vz) {}
+    CState3D(const CState3D& state) : x(state.x), y(state.y), z(state.z), vx(state.vx), vy(state.vy), vz(state.vz) {}
+};
+
+CState3D getCBstate(CelestialBodyId body, CelestialBodyId origin, double et);
+glm::mat4 getCBposMat(CelestialBodyId body, CelestialBodyId origin, double et);
+glm::mat4 getCBrotMat(CelestialBodyId body, double et);
 //glm::mat4 getCB_radii(CelestialBodyId body);
+std::vector <double> getVerticesHermiteTangents(std::vector<CState3D> states, int passes);
 
 void loadCspiceKernels();
 void unloadCspiceKernels();

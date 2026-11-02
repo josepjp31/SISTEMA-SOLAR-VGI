@@ -56,23 +56,27 @@ void unloadCspiceKernels()
     kclear_c();
 }
 
-glm::vec3 getCB_pos(CelestialBodyId body, CelestialBodyId origin, double et)
+CState3D getCBstate(CelestialBodyId body, CelestialBodyId origin, double et)
 {
-    double pos[3], lt;
-    spkpos_c(cbList[body].m_id.c_str(), et, "J2000", "NONE", cbList[origin].m_id.c_str(), pos, &lt);
+    double state[6] = {0,0,0,0,0,0}, lt;
+    spkpos_c(cbList[body].m_id.c_str(), et, "J2000", "NONE", cbList[origin].m_id.c_str(), state, &lt);
     if (failed_c()) {
         reset_c();
-        return glm::vec3(0.0f);
+        return state;
     }
-    return glm::vec3(pos[0] * KM_TO_AU, pos[1] * KM_TO_AU, pos[2] * KM_TO_AU);
+    state[0] *= KM_TO_AU; state[1] *= KM_TO_AU; state[2] *= KM_TO_AU;
+    state[3] *= KM_TO_AU; state[4] *= KM_TO_AU; state[5] *= KM_TO_AU;
+    return CState3D(state);
 }
 
-glm::mat4 getCB_posMat(CelestialBodyId body, CelestialBodyId origin, double et)
+glm::mat4 getCBposMat(CelestialBodyId body, CelestialBodyId origin, double et)
 {
-    return glm::translate(glm::mat4(1.0f), getCB_pos(body, origin, et));
+    CState3D state = getCBstate(body, origin, et);
+    glm::vec3 v(state.x, state.y, state.z);
+    return glm::translate(glm::mat4(1.0f), v);
 }
 
-glm::mat4 getCB_rotMat(CelestialBodyId body, double et)
+glm::mat4 getCBrotMat(CelestialBodyId body, double et)
 {
     double rot[3][3] = {};
     glm::mat4 rotationMatrix = glm::mat4(1.0f);
@@ -87,12 +91,33 @@ glm::mat4 getCB_rotMat(CelestialBodyId body, double et)
         return rotationMatrix;
     }
 
-    rotationMatrix = glm::mat4(glm::transpose(glm::make_mat3(&rot[0][0])));
+	rotationMatrix = glm::transpose(glm::make_mat4(&rot[0][0]));
 
     return rotationMatrix;
 }
 
+//double *getTrajectoryStates(CB &body, double et)
+//{
+//    if (body.m_orbitedObject != CB_NONE) {
+//
+//    } else {
+//
+//    }
+//}
 
+//glm::vec3 evalHermitte(glm::vec4 a)
+//{
+//    glm::mat4 MH = {
+//        {2.0, -3.0,  0.0,  1.0},
+//        {-2.0,  3.0,  0.0,  0.0},
+//        {1.0, -2.0,  1.0,  0.0},
+//        {1.0, -1.0,  0.0,  0.0}
+//    };
+//}
+//
+//void dibuixaTrajectoriaHermitte(std::vector<std::pair<double, double>> datapoints)
+//{
+//}
 
 //float getCB_radii(CelestialBodyId body) //Probably will get erased.
 //{
@@ -111,4 +136,35 @@ glm::mat4 getCB_rotMat(CelestialBodyId body, double et)
 //    return radiusInAU;
 //}
 
-
+//std::vector <double> getVerticesHermiteTangents(std::vector<CState3D> states, int passes)
+//{
+//	std::vector <double> vertices(states.size() * 3 * passes);
+//
+//    const double H[4][4] =
+//    {
+//        {  2.0, -3.0,  0.0, 1.0 },
+//        { -2.0,  3.0,  0.0, 0.0 },
+//        {  1.0, -2.0,  1.0, 0.0 },
+//        {  1.0, -2.0,  0.0, 0.0 }
+//    };
+//
+//	double step = 1.0 / (double)passes;
+//
+//    for (int i = 0; i < states.size() - 1; i++) {
+//        double t = 0.0;
+//        vertices.push_back(states[i].x); vertices.push_back(states[i].y); vertices.push_back(states[i].z);
+//
+//        t += step;
+//		while (t < 1.0) {
+//			glm::vec4 T(t * t * t, t * t, t, 1.0);
+//            double resultx = (2*T.x-3*T.y+1*T.w)*states[i].x + (-2*T.x+3*T.y)*states[i+1].x + (1*T.x-2*T.y+1*T.w)*states[i].vx + (1*T.x-1*T.y)*states[i+1].vx;
+//            double resulty = (2*T.x-3*T.y+1*T.w)*states[i].y + (-2*T.x+3*T.y)*states[i+1].y + (1*T.x-2*T.y+1*T.w)*states[i].vy + (1*T.x-1*T.y)*states[i+1].vy;
+//            double resultz = (2*T.x-3*T.y+1*T.w)*states[i].z + (-2*T.x+3*T.y)*states[i+1].z + (1*T.x-2*T.y+1*T.w)*states[i].vz + (1*T.x-1*T.y)*states[i+1].vz;
+//			vertices.push_back(resultx); vertices.push_back(resulty); vertices.push_back(resultz);
+//			t += step;
+//		}
+//	}
+//    vertices.push_back(states[states.size() - 1].x); vertices.push_back(states[states.size() - 1].y); vertices.push_back(states[states.size() - 1].z);
+//
+//	return vertices;
+//}
