@@ -1,3 +1,4 @@
+
 //******** PRACTICA VISUALITZACIÓ GRÀFICA INTERACTIVA (Escola Enginyeria - UAB)
 //******** Entorn bàsic VS2026 MONOFINESTRA amb OpenGL 4.6, interfície GLFW 3.4, ImGui i llibreries GLM
 //******** Ferran Poveda, Marc Vivet, Carme Julià, Débora Gil, Enric Martí (Setembre 2026)
@@ -5,7 +6,6 @@
 //    Versió 0.5:	- Interficie ImGui
 //					- Per a dialeg de cerca de fitxers, s'utilitza la llibreria NativeFileDialog
 //
-
 
 // Entorn VGI.ImGui: Includes llibreria ImGui
 #include "ImGui\imgui.h"
@@ -19,10 +19,14 @@
 #include "escena.h"
 #include "main.h"
 #include "escenari.h"
-//#include <iostream>
+#include "InterficieUI.h"
 
-// Escenari actiu (s'inicialitza a main()). Declarat aqui perque s'usa a dibuixa_Escena() i OnTimer().
-Escenari* currentEscenari = nullptr;
+// Escenari actiu i llista d'escenaris (0: Mode Didactic, 1: Mode a Escala Real)
+Escenari* escenariActual = nullptr;
+Escenari* escenaris = nullptr;
+
+// Estat global de la interficie d'usuari del simulador
+EstatSimulacio g_EstatSimulador;
 
 void InitGL()
 {
@@ -34,20 +38,32 @@ void InitGL()
 	// Entorn VGI: Variable de control per a Status Bar (consola) 
 	statusB = false;
 
-	// Entorn VGI: Variables de control per Menú Càmera: Esfèrica, Navega, Mòbil, Zoom, Satelit, Polars... 
-	camera = CAM_ESFERICA;
-	mobil = true;	zzoom = true;		zzoomO = false;		satelit = false;
+	// Entorn VGI: Variables de control per Menú CÀMERA: Esfèrica, Navega, Mòbil, Zoom, Satelit, Polars... 
+	camera = CAM_ESFERICA;	oCamera = 0;
+	mobil = true;			zzoom = true;		zzoomO = false;		satelit = false;
 
-	// Entorn VGI: Variables de control de l'opció Càmera->Navega?
+	// Entorn VGI: Variables de control de l'opció CAMERA->ESFÈRICA?
+	//(NOA)
+	cam_Esferica[0] = 100.0f;	
+	cam_Esferica[1] = 25.0f;			
+	cam_Esferica[2] = 0.0f;
+
+	OPV.R = cam_Esferica[0];	
+	OPV.alfa = cam_Esferica[1];		
+	OPV.beta = cam_Esferica[2];		// Origen PV en esfèriques
+	Vis_Polar = POLARZ;
+	ViewMatrix = glm::mat4(1.0);		// Inicialitzar a identitat
+	oPolars = -1;
+
+	// Entorn VGI: Variables de control de l'opció CÀMERA->NAVEGA?
 	n[0] = 0.0;		n[1] = 0.0;		n[2] = 0.0;
 	opvN.x = 10.0;	opvN.y = 0.0;		opvN.z = 0.0;
 	angleZ = 0.0;
-	ViewMatrix = glm::mat4(1.0);		// Inicialitzar a identitat
 
-	// Entorn VGI: Variables de control de l'opció Càmera->Geode?
+	// Entorn VGI: Variables de control de l'opció CÀMERA->GEODE?
 	OPV_G.R = 15.0;		OPV_G.alfa = 0.0;	OPV_G.beta = 0.0;	// Origen PV en esfèriques per a Vista_Geode
 
-	// Entorn VGI: Variables de control per Menú Vista: Pantalla Completa, Pan, dibuixar eixos i grids 
+	// Entorn VGI: Variables de control per Menú VISTA: Pantalla Completa, Pan, dibuixar eixos i grids 
 	fullscreen = false;
 	pan = false;
 	eixos = true;	eixos_programID = 0;  eixos_Id = 0;
@@ -55,35 +71,40 @@ void InitGL()
 	grid.x = false;	grid.y = false;		grid.z = false;		grid.w = false;
 	hgrid.x = 0.0;	hgrid.y = 0.0;		hgrid.z = 0.0;		hgrid.w = 0.0;
 
-	// Entorn VGI: Variables opció Vista->Pan
+	// Entorn VGI: Variables opció VISTA->PAN?
 	fact_pan = 1;
 	tr_cpv.x = 0;	tr_cpv.y = 0;	tr_cpv.z = 0;		tr_cpvF.x = 0;	tr_cpvF.y = 0;	tr_cpvF.z = 0;
 
 	// Entorn VGI: Variables de control per les opcions de menú Projecció, Objecte
 	projeccio = CAP;	// projeccio = PERSPECT;
-	ProjectionMatrix = glm::mat4(1.0);	// Inicialitzar a identitat
+	oProjeccio = 3;		// ImGui: Variable que controla desplegable TIPUS PROJECCIO d'ImGui (opció Perspectiva)
+	ProjectionMatrix = glm::mat4(1.0);	// Inicialitzar matriu a identitat
 	objecte = CAP;		// objecte = TETERA;
+	//cos solar
+	cosSolar = -1;
+	oObjecte = 0;		// ImGui: Variable que controla desplegable TIPUS OBJECTE d'ImGui (opció cap objecte)
 
 	// Entorn VGI: Variables de control Skybox Cube
-	SkyBoxCube = false;		skC_programID = 0;
+	SkyBoxCube = false;
+	skC_programID = 0;		//shader_SkyBoxC = NULL;
 	skC_VAOID.vaoId = 0;	skC_VAOID.vboId = 0;	skC_VAOID.nVertexs = 0;
-	cubemapTexture = 0;
+	cubemapTexture = 0;		//shaderSkyBox = NULL;
 
-	// Entorn VGI: Variables de control del menú Transforma
+	// Entorn VGI: Variables de control del menú TRANFORMA
 	transf = false;		trasl = false;		rota = false;		escal = false;
 	fact_Tras = 1;		fact_Rota = 90;
 	TG.VTras.x = 0.0;	TG.VTras.y = 0.0;	TG.VTras.z = 0;	TGF.VTras.x = 0.0;	TGF.VTras.y = 0.0;	TGF.VTras.z = 0;
 	TG.VRota.x = 0;		TG.VRota.y = 0;		TG.VRota.z = 0;	TGF.VRota.x = 0;	TGF.VRota.y = 0;	TGF.VRota.z = 0;
 	TG.VScal.x = 1;		TG.VScal.y = 1;		TG.VScal.z = 1;	TGF.VScal.x = 1;	TGF.VScal.y = 1;	TGF.VScal.z = 1;
-
 	transX = false;		transY = false;		transZ = false;
-	GTMatrix = glm::mat4(1.0);		// Inicialitzar a identitat
+	GTMatrix = glm::mat4(1.0);		// Inicialitzar matriu a identitat
 
-	// Entorn VGI: Variables de control per les opcions de menú Ocultacions
+	// Entorn VGI: Variables de control per les opcions de menú OCULTACIONS
 	front_faces = true;	test_vis = false;	oculta = false;		back_line = false;
 
-	// Entorn VGI: Variables de control del menú Iluminació		
-	ilumina = FILFERROS;			ifixe = false;					ilum2sides = false;
+	// Entorn VGI: Variables de control del menú ILUMINACIÓ
+	ifixe = false;					ilum2sides = false;				ilumina = FILFERROS;
+	oIlumina = 1;					// Variable que controla desplegable TIPUS ILUMINACIO d'ImGui (opció Filferros)
 	// Reflexions actives: Ambient [1], Difusa [2] i Especular [3]. No actives: Emission [0]. 
 	sw_material[0] = false;			sw_material[1] = true;			sw_material[2] = true;			sw_material[3] = true;	sw_material[4] = true;
 	sw_material_old[0] = false;		sw_material_old[1] = true;		sw_material_old[2] = true;		sw_material_old[3] = true;	sw_material_old[4] = true;
@@ -91,11 +112,12 @@ void InitGL()
 	for (i = 0; i < NUM_MAX_TEXTURES; i++) texturesID[i] = 0;
 	tFlag_invert_Y = false;
 
-	// Entorn VGI: Variables de control del menú Llums
-	// Entorn VGI: Inicialització variables Llums
+	// ----------------- Entorn VGI: Variables de control del menú LLUMS
+		// Entorn VGI: Inicialització variables Llums
 	llum_ambient = true;		llumGL[0].encesa = true;
 	for (i = 1; i < NUM_MAX_LLUMS; i++) llumGL[i].encesa = false;
-	for (i = 0; i < NUM_MAX_LLUMS; i++) {
+	for (i = 0; i < NUM_MAX_LLUMS; i++)
+	{
 		llumGL[i].posicio.x = 0.0;		llumGL[i].posicio.y = 0.0;		llumGL[i].posicio.z = 0.0;		llumGL[i].posicio.w = 1.0;
 		llumGL[i].difusa.r = 1.0f;		llumGL[i].difusa.g = 1.0f;		llumGL[i].difusa.b = 1.0f;		llumGL[i].difusa.a = 1.0f;
 		llumGL[i].especular.r = 1.0f;	llumGL[i].especular.g = 1.0f;	llumGL[i].especular.b = 1.0f;	llumGL[i].especular.a = 1.0f;
@@ -200,7 +222,7 @@ void InitGL()
 	// Activació font de llum: APAGADA
 	llumGL[4].encesa = false;
 
-	// ---------------- LLUM #5 - (-Z), direccional, no restringida, amb atenuació constant (a,b,c) = (0,0,1)
+	// ---------------- LLUM #5 - (-X,-Y,-Z), direccional, no restringida, amb atenuació constant (a,b,c) = (0,0,1)
 	// Vector de la font de llum direccional (x,y,z)=(-1,-1,-1):
 	llumGL[5].posicio.x = -1.0;			llumGL[5].posicio.y = -1.0;			llumGL[5].posicio.z = -1.0;		llumGL[5].posicio.w = 0.0;
 
@@ -232,51 +254,53 @@ void InitGL()
 
 	// Paràmetres font de llum restringida:
 	llumGL[6].restringida = false;
-	llumGL[6].spotdirection.x = 0.0;	llumGL[6].spotdirection.y = 0.0;	llumGL[6].spotdirection.z = 0.0;
-	llumGL[6].spotcoscutoff = 0.0;		llumGL[6].spotexponent = 0.0;
+	llumGL[6].spotdirection.x = 1.0;	llumGL[6].spotdirection.y = -1.0;	llumGL[6].spotdirection.z = -1.0;
+	llumGL[6].spotcoscutoff = sqrt(2.0) / 2.0;		llumGL[6].spotexponent = 10.0;
 
 	// Activació font de llum: APAGADA
 	llumGL[6].encesa = false;
 
 	// ---------------- LLUM #7 - Llum Far, configurada a la funció faro() en escena.cpp.
-	// Posició de la font de llum (x,y,z)=(75,75,-75). Cap posició definida, definida en funció faro() en escena.cpp:
-	llumGL[7].posicio.x = 75.0;			llumGL[7].posicio.y = 75.0;			llumGL[7].posicio.z = -75.0;	llumGL[7].posicio.w = 1.0;
+	// Posició de la font de llum (x,y,z)=(50,50,-50), però cap posició definida, definida en funció faro() en escena.cpp:
+	llumGL[7].posicio.x = 50.0;			llumGL[7].posicio.y = 50.0;			llumGL[7].posicio.z = -50.0;	llumGL[7].posicio.w = 1.0;
 
-	// Intensitats difusa i especular de la font de llum (r,g,b) = (1,1,1):
-	llumGL[7].difusa.r = 1.0f;			llumGL[7].difusa.g = 1.0f;			llumGL[7].difusa.b = 1.0f;		llumGL[7].difusa.a = 1.0f;
-	llumGL[7].especular.r = 1.0f;		llumGL[7].especular.g = 1.0f;		llumGL[7].especular.b = 1.0f;	llumGL[7].especular.a = 1;
+	// Intensitats difusa i especular de la font de llum (r,g,b) = (0,1,1):
+	llumGL[7].difusa.r = 0.0f;			llumGL[7].difusa.g = 1.0f;			llumGL[7].difusa.b = 1.0f;		llumGL[7].difusa.a = 1.0f;
+	llumGL[7].especular.r = 0.0f;		llumGL[7].especular.g = 1.0f;		llumGL[7].especular.b = 1.0f;	llumGL[7].especular.a = 1;
 
 	// Coeficients factor atenuació f_att=1/(ad2+bd+c). Llum sense atenuació per distància (a,b,c)=(0,0,1):
 	llumGL[7].atenuacio.a = 0.0;		llumGL[7].atenuacio.b = 0.0;		llumGL[7].atenuacio.c = 1.0;
 
 	// Paràmetres font de llum restringida:
-	llumGL[7].restringida = false;
-	llumGL[7].spotdirection.x = 0.0;	llumGL[7].spotdirection.y = 0.0;	llumGL[7].spotdirection.z = 0.0;
-	llumGL[7].spotcoscutoff = 0.0;		llumGL[7].spotexponent = 0.0;
+	llumGL[7].restringida = true;
+	llumGL[7].spotdirection.x = -1.0;	llumGL[7].spotdirection.y = -1.0;	llumGL[7].spotdirection.z = 1.0;
+	llumGL[7].spotcoscutoff = 0.5;		llumGL[7].spotexponent = 5.0;
 
 	// Activació font de llum: APAGADA
 	llumGL[7].encesa = false;
 	// ---------------- FI DEFINICIÓ LLUMS
+	sw_llambient = false;
+	col_llambient.r = 1.0;	col_llambient.g = 1.0;	col_llambient.b = 1.0; col_llambient.a = 1.0;
 
-	// Entorn VGI: Variables de control del menú Shaders
-	shader = CAP_SHADER;	shader_programID = 0;
-	shaderLighting.releaseAllShaders();
-	// Càrrega Shader de Gouraud
+	// Entorn VGI: Variables de control del menú SHADERS
+	shader = CAP_SHADER;
+	oShader = 1;				// Variable que controla desplegable SHADER d'ImGui (opció Gouraud)
 	shader_programID = 0;
-	fprintf(stderr, "Gouraud_shdrML: \n");
-	if (!shader_programID) shader_programID = shaderLighting.loadFileShaders(".\\shaders\\gouraud_shdrML.vert", ".\\shaders\\gouraud_shdrML.frag");
-	shader = GOURAUD_SHADER;
+	shaderLighting.releaseAllShaders();
 
-	// Càrrega SHADERS
+	// Entorn VGI: Inicialitzar llista de VAO's ABANS de carregar el VAO del Skybox per no esborrar-lo
+	initVAOList();
+
+	// Entorn VGI: Càrrega SHADERS ---------------------------------------------------
 	// Càrrega Shader Eixos
 	fprintf(stderr, "Eixos: \n");
 	if (!eixos_programID) eixos_programID = shaderEixos.loadFileShaders(".\\shaders\\eixos.VERT", ".\\shaders\\eixos.FRAG");
 
-	// Càrrega Shader Skybox
+	// Entorn VGI: Càrrega Shader Skybox
 	fprintf(stderr, "SkyBox: \n");
 	if (!skC_programID) skC_programID = shader_SkyBoxC.loadFileShaders(".\\shaders\\skybox.VERT", ".\\shaders\\skybox.FRAG");
 
-	// Càrrega VAO Skybox Cube
+	// Entorn VGI: Càrrega VAO Skybox Cube
 	if (skC_VAOID.vaoId == 0) skC_VAOID = loadCubeSkybox_VAO();
 	Set_VAOList(CUBE_SKYBOX, skC_VAOID);
 
@@ -284,15 +308,22 @@ void InitGL()
 	{	// load Skybox textures
 		// -------------
 		std::vector<std::string> faces =
-		{ ".\\textures\\skybox\\right.jpg",
-			".\\textures\\skybox\\left.jpg",
-			".\\textures\\skybox\\top.jpg",
-			".\\textures\\skybox\\bottom.jpg",
-			".\\textures\\skybox\\front.jpg",
-			".\\textures\\skybox\\back.jpg"
+		{ ".\\textures\\skybox\\right.png",
+			".\\textures\\skybox\\left.png",
+			".\\textures\\skybox\\top.png",
+			".\\textures\\skybox\\bottom.png",
+			".\\textures\\skybox\\front.png",
+			".\\textures\\skybox\\back.png"
 		};
 		cubemapTexture = loadCubemap(faces);
 	}
+
+	// Càrrega Shader de Gouraud
+	shader_programID = 0;
+	fprintf(stderr, "Gouraud_shdrML: \n");
+	if (!shader_programID) shader_programID = shaderLighting.loadFileShaders(".\\shaders\\gouraud_shdrML.vert", ".\\shaders\\gouraud_shdrML.frag");
+	shader = GOURAUD_SHADER;
+	// Entorn VGI: FI Càrrega SHADERS ---------------------------------------------------
 
 	// Entorn VGI: Variables de control dels botons de mouse
 	m_PosEAvall.x = 0;			m_PosEAvall.y = 0;			m_PosDAvall.x = 0;			m_PosDAvall.y = 0;
@@ -300,22 +331,22 @@ void InitGL()
 	m_EsfeEAvall.R = 0.0;		m_EsfeEAvall.alfa = 0.0;	m_EsfeEAvall.beta = 0.0;
 	m_EsfeIncEAvall.R = 0.0;	m_EsfeIncEAvall.alfa = 0.0;	m_EsfeIncEAvall.beta = 0.0;
 
-	// Entorn VGI: Variables que controlen paràmetres visualització: Mides finestra Windows i PV
-	w = 640;			h = 480;			// Mides de la finestra Windows (w-amplada,h-alçada)
-	width_old = 640;	height_old = 480;	// Mides de la resolució actual de la pantalla (finestra Windows)
-	w_old = 640;		h_old = 480;		// Mides de la finestra Windows (w-amplada,h-alçada) per restaurar Finestra des de fullscreen
-	OPV.R = cam_Esferica[0];	OPV.alfa = cam_Esferica[1];		OPV.beta = cam_Esferica[2];		// Origen PV en esfèriques
-	//OPV.R = 15.0;		OPV.alfa = 0.0;		OPV.beta = 0.0;										// Origen PV en esfèriques
-	Vis_Polar = POLARZ;	oPolars = -1;
+	// Entorn VGI: Variables que controlen paràmetres visualització: Mides finestra Windows i PV (càmera)
+	w = 1280;			h = 720;			// Mides de la finestra Windows (w-amplada,h-alçada)
+	width_old = 1280;	height_old = 720;	// Mides de la resolució actual de la pantalla (finestra Windows)
+	w_old = 1280;		h_old = 720;		// Mides de la finestra Windows (w-amplada,h-alçada) per restaurar Finestra des de fullscreen
 
 	// Entorn VGI: Color de fons i de l'objecte
 	fonsR = true;		fonsG = true;		fonsB = true;
 	c_fons.r = clear_colorB.x;		c_fons.g = clear_colorB.y;		c_fons.b = clear_colorB.z;			c_fons.b = clear_colorB.w;
 	sw_color = false;
+	clear_colorB = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);	// ImGui: Color de fons
+	clear_colorO = ImVec4(1.0f, 1.0f, 1.0f, 1.00f);	// ImGui: Color de l'objecte.
 	col_obj.r = clear_colorO.x;	col_obj.g = clear_colorO.y;	col_obj.b = clear_colorO.z;		col_obj.a = clear_colorO.w;
 
 	// Entorn VGI: Objecte OBJ
-	ObOBJ = NULL;		vao_OBJ.vaoId = 0;		vao_OBJ.vboId = 0;		vao_OBJ.nVertexs = 0;
+	ObOBJ = NULL;
+	vao_OBJ.vaoId = 0;		vao_OBJ.vboId = 0;		vao_OBJ.nVertexs = 0;
 
 	// Entorn VGI: OBJECTE --> Corba B-Spline i Bezier
 	npts_T = 0;
@@ -325,8 +356,7 @@ void InitGL()
 		PC_t[i].y = 0.0;
 		PC_t[i].z = 0.0;
 	}
-
-	pas_CS = PAS_BSPLINE;
+	pas_Corba = PAS_BSPLINE;	pas_CS = PAS_BSPLINE;
 	sw_Punts_Control = false;
 
 	// TRIEDRE DE FRENET / DARBOUX: VT: vector Tangent, VNP: Vector Normal Principal, VBN: vector BiNormal
@@ -336,14 +366,70 @@ void InitGL()
 	// Entorn VGI: Variables del Timer
 	t = 0;			anima = false;
 
+	// Entorn VGI : QUATERNIONS: Animació de cossos rígids per QUATERNIONS
+	animaQ = false;		rotaQ = false;
+	/*
+		for (i = 0; i < MAX_KEYFRAMES_Q; i++)
+			{	keyf_Rota[i].x = 0.0f;	keyf_Rota[i].y = 0.0f;	keyf_Rota[i].z = 0.0f;
+				//			keyf_Tras[i].x = 0.0f;	keyf_Tras[i].y = 0.0f;	keyf_Tras[i].z = 0.0f;
+				keyf_Scal[i].x = 1.0f;	keyf_Scal[i].y = 1.0f;	keyf_Scal[i].z = 1.0f;
+				keyf_Quat[i].w = 0.0f;	keyf_Quat[i].y = 0.0f;	keyf_Quat[i].y = 0.0f; keyf_Quat[i].z = 0.0f;
+			}
+		keyf_Tras[0].x = 10.0f;		keyf_Tras[0].y = -20.0f;	keyf_Tras[0].z = 30.0f;
+		keyf_Tras[1].x = 0.0f;		keyf_Tras[1].y = 0.0f;		keyf_Tras[1].z = 0.0f;
+		keyf_Tras[2].x = -10.0f;	keyf_Tras[2].y = 20.0f;		keyf_Tras[2].z = 30.0f;
+		eix_Rota.x = 0;		eix_Rota.y = 0;		eix_Rota.z = 0;		angle_Rota = 0;
+		for (i = 0; i < 16; i++) QMatrix[i] = 0;	QMatrix[0] = QMatrix[5] = QMatrix[10] = QMatrix[15] = 1.0;
+		int_Tras.x = 0;		int_Tras.y = 0;		int_Tras.z = 0;
+		int_Scal.x = 1;		int_Scal.y = 1;		int_Scal.z = 1;
+		np_InQ = 0;
+		keyf_RotaI.x = 0.0;	keyf_RotaI.y = 0.0; keyf_RotaI.z = 0.0;
+		keyf_RotaF.x = 0.0;	keyf_RotaF.y = 0.0; keyf_RotaF.z = 0.0;
+		keyf_RotaT.x = 0.0;	keyf_RotaT.y = 0.0; keyf_RotaT.z = 0.0;
+		qI.w = 1.0;			qI.x = 0.0;				qI.y = 0.0;				qI.z = 0.0;
+		qF.w = 1.0;			qF.x = 0.0;				qF.y = 0.0;				qF.z = 0.0;
+		qT.w = 1.0;			qT.x = 0.0;				qT.y = 0.0;				qT.z = 0.0;
+		qT_L.w = 1.0;		qT_L.x = 0.0;			qT_L.y = 0.0;			qT_L.z = 0.0;
+		qT_S.w = 1.0;		qT_S.x = 0.0;			qT_S.y = 0.0;			qT_S.z = 0.0;
+		qI_E.w = 1.0;		qI_E.x = 0.0;			qI_E.y = 0.0;			qI_E.z = 0.0;
+		qF_E.w = 1.0;		qF_E.x = 0.0;			qF_E.y = 0.0;			qF_E.z = 0.0;
+		qT_E.w = 1.0;		qT_E.x = 0.0;			qT_E.y = 0.0;			qT_E.z = 0.0;
+		lerp = false;		slerp = false;
+	*/
+
 	// Entorn VGI: Variables de l'objecte FRACTAL
 	t_fractal = CAP;	soroll = 'C';
 	pas = 64;			pas_ini = 64;
 	sw_il = true;		palcolFractal = false;
+	/*
+		zzoomF = false;		paletaFractal = CAP_PALETA;
+		vaoFractal.vaoId = 0;		vaoFractal.vboId = 0;		vaoFractal.nVertexs = 0;
+		vaoMar.vaoId = 0;			vaoMar.vboId = 0;			vaoMar.nVertexs = 0;
+	*/
+
+	// Entorn VGI: ROBOT ARTICULAT
+	animaR = false;		sw_robot = false;	sh_rmov = false;
+	/*
+		angles_R[0] = 0.0;	angles_R[1] = 0.0;
+		angles_R[2] = 0.0;	angles_R[3] = 0.0;	angles_R[4] = 0.0;
+		angles_R[5] = 0.0;
+		sh_rmov = true;
+
+		pos_RI[0] = 0.0;		pos_RI[1] = 0.0;
+		pos_RI[2] = 0.0;		pos_RI[3] = 0.0;		pos_RI[4] = 0.0;
+		pos_RI[5] = 0.0;
+
+		pos_RF[0] = 0.0;		pos_RF[1] = 0.0;
+		pos_RF[2] = 0.0;		pos_RF[3] = 0.0;		pos_RF[4] = 0.0;
+		pos_RF[5] = 0.0;
+
+		for (i = 0; i < MAX_KEYFRAMES; i = i++)
+			for (j = 0; j < 6; j = j++)		keyf_R[i][j] = 0.0f;
+		np_In = 0;				num_frame = 0;			incr_frame = 1.0;
+	*/
 
 	// Entorn VGI: Altres variables
 	mida = 1.0;			nom = "";		buffer = "";
-	initVAOList();	// Inicialtzar llista de VAO'S.
 }
 
 
@@ -471,16 +557,169 @@ void OnSize(GLFWwindow* window, int width, int height)
 }
 
 
+// SincronitzarEstatSimuladorAmbOpenGL: Sincronitza les opcions del menu ImGui (InterficieUI)
+// amb les variables internes d'OpenGL (il-luminacio del Sol, Skybox, eixos, camera i focus).
+void SincronitzarEstatSimuladorAmbOpenGL()
+{
+	if (g_EstatSimulador.mostrarSelectorModes) return;
+
+	// 1. Configuracio inicial d'escena, il-luminacio i shaders quan s'inicia o es commuta de mode
+	if (g_EstatSimulador.configuracioInicialPendent)
+	{
+		OnProjeccioPerspectiva();
+		oProjeccio = shortCut_Projeccio();
+
+		// Carregar i activar Shader Phong amb il-luminacio Suau
+		OnShaderPhong();
+		oShader = shortCut_Shader();
+		ilumina = SUAU;
+		oIlumina = shortCut_Iluminacio();
+
+		objecte = SISTEMA_SOLAR;
+		cosSolar = -1;
+		oObjecte = shortCut_Objecte();
+
+		// Configuracio dels parametres d'il-luminacio del sistema solar:
+		// - Font de llum fixa (#0) situada a l'origen (centre del Sol).
+		// - Model de reflexio Phong: emissio propia per al Sol i reflexio difusa per als planetes.
+		// - Texturat individual per a cada astre amb inversio d'eix vertical (tFlag_invert_Y).
+		// - Vista clara (llum ambient) desactivada per defecte.
+		ifixe = true;
+		sw_material[4] = true;
+		sw_material[0] = g_EstatSimulador.opcionsVisualitzacio.iluminacioSolarDirecta;
+		sw_material[1] = g_EstatSimulador.opcionsVisualitzacio.vistaClaraAmbient;
+		sw_material[2] = true;
+		sw_material[3] = false;
+		for (int k = 0; k < 5; k++) sw_material_old[k] = sw_material[k];
+
+		textura = false;
+		t_textura = TEXTURA_FITXERIMA;
+		tFlag_invert_Y = true;
+
+		llum_ambient = g_EstatSimulador.opcionsVisualitzacio.vistaClaraAmbient;
+
+		llumGL[0].encesa = g_EstatSimulador.opcionsVisualitzacio.iluminacioSolarDirecta;
+		llumGL[0].posicio.x = 0.0;		llumGL[0].posicio.y = 0.0;		llumGL[0].posicio.z = 0.0;		llumGL[0].posicio.w = 1.0;
+		llumGL[0].difusa.r = 1.0f;		llumGL[0].difusa.g = 1.0f;		llumGL[0].difusa.b = 1.0f;		llumGL[0].difusa.a = 1.0f;
+		llumGL[0].especular.r = 1.0f;	llumGL[0].especular.g = 1.0f;	llumGL[0].especular.b = 1.0f;	llumGL[0].especular.a = 1.0f;
+		llumGL[0].atenuacio.a = 0.00004; llumGL[0].atenuacio.b = 0.0;	llumGL[0].atenuacio.c = 1.0;
+		llumGL[0].restringida = false;
+		for (int i = 1; i < NUM_MAX_LLUMS; i++) llumGL[i].encesa = false;
+
+		glUseProgram(shader_programID);
+		glUniform1i(glGetUniformLocation(shader_programID, "texture0"), GLint(0));
+		glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), tFlag_invert_Y);
+
+		// Assegurar que l'escenari te els VAOs i textures vinculats al shader Phong actual
+		if (escenariActual != nullptr)
+		{
+			escenariActual->creaEscenari(shader_programID);
+		}
+
+		// Assegurar que el Skybox i els Eixos estan carregats
+		if (!eixos_Id) eixos_Id = deixos();
+		SkyBoxCube = g_EstatSimulador.opcionsVisualitzacio.mostrarSkybox;
+		if (SkyBoxCube) OnVistaSkyBox();
+
+		g_EstatSimulador.configuracioInicialPendent = false;
+	}
+
+	// 2. Sincronitzacio continua de les opcions de Visualitzacio del menu superior
+	if (objecte == SISTEMA_SOLAR)
+	{
+		SkyBoxCube = g_EstatSimulador.opcionsVisualitzacio.mostrarSkybox;
+		if (SkyBoxCube && skC_VAOID.vaoId == 0) OnVistaSkyBox();
+
+		eixos = g_EstatSimulador.opcionsVisualitzacio.mostrarEixos;
+
+		sw_material[0] = g_EstatSimulador.opcionsVisualitzacio.iluminacioSolarDirecta;
+		llumGL[0].encesa = g_EstatSimulador.opcionsVisualitzacio.iluminacioSolarDirecta;
+
+		llum_ambient = g_EstatSimulador.opcionsVisualitzacio.vistaClaraAmbient;
+		sw_material[1] = g_EstatSimulador.opcionsVisualitzacio.vistaClaraAmbient;
+	}
+
+	// 3. Aplicacio dels canvis de mode de camera o d'astre enfocat des del menu
+	if (g_EstatSimulador.canviCameraPendent)
+	{
+		int cid = g_EstatSimulador.cosEnfocatId;
+		if (cid < 0 || cid >= 9) cid = 0;
+
+		float distPerDefecte = 140.0f;
+		if (cid > 0 && escenariActual != nullptr)
+		{
+			distPerDefecte = escenariActual->m_objectList[cid].m_radiCos * 4.5f;
+			if (distPerDefecte < 14.0f) distPerDefecte = 14.0f;
+		}
+
+		if (g_EstatSimulador.cameraConfig.mode == ModeCamera::FIXA_INCLINADA_25)
+		{
+			camera = CAM_ESFERICA;
+			oCamera = 0;
+			mobil = true;	zzoom = true;	satelit = false;	pan = false;
+			Vis_Polar = POLARZ;
+			OPV.alfa = 25.0;
+			OPV.R = distPerDefecte;
+		}
+		else if (g_EstatSimulador.cameraConfig.mode == ModeCamera::ORBITAL_CENTRADOR)
+		{
+			camera = CAM_ESFERICA;
+			oCamera = 0;
+			mobil = true;	zzoom = true;	satelit = false;	pan = false;
+			Vis_Polar = POLARZ;
+			if (OPV.alfa == 0.0) OPV.alfa = 25.0;
+			OPV.R = distPerDefecte;
+		}
+		else if (g_EstatSimulador.cameraConfig.mode == ModeCamera::GLOBAL_SISTEMA)
+		{
+			camera = CAM_ESFERICA;
+			oCamera = 0;
+			mobil = true;	zzoom = true;	satelit = false;	pan = false;
+			Vis_Polar = POLARZ;
+			g_EstatSimulador.cosEnfocatId = 0;
+			OPV.R = 550.0;
+			OPV.alfa = 65.0;
+			OPV.beta = 0.0;
+		}
+		else if (g_EstatSimulador.cameraConfig.mode == ModeCamera::COET_PRIMERA_PERSONA)
+		{
+			// Camera Lliure implementada a l'opcio Navega (CAM_NAVEGA)
+			OnCameraNavega();
+			oCamera = 1;
+			Vis_Polar = POLARZ;
+			fact_pan = 2.5;
+			// Situar la camera lliure en una posicio inicial privilegiada mirant cap al centre del Sistema Solar
+			opvN.x = 110.0;	opvN.y = -110.0;	opvN.z = 30.0;
+			n[0] = 0.0;		n[1] = 0.0;			n[2] = 0.0;
+			angleZ = 0.0;
+		}
+
+		cam_Esferica[0] = (float)OPV.R;
+		cam_Esferica[1] = (float)OPV.alfa;
+		cam_Esferica[2] = (float)OPV.beta;
+		g_EstatSimulador.canviCameraPendent = false;
+	}
+}
+
 // OnPaint: Funció de dibuix i visualització en frame buffer del frame
 void OnPaint(GLFWwindow* window)
 {
 	// TODO: Agregue aquí su código de controlador de mensajes
 	GLdouble vpv[3] = { 0.0, 0.0, 1.0 };
 
-	// Entorn VGI.ImGui: Menú ImGui condicionat al color de fons
-	if ((c_fons.r < 0.5) || (c_fons.g < 0.5) || (c_fons.b < 0.5))
-		ImGui::StyleColorsLight();
-	else ImGui::StyleColorsDark();
+	// Neteja del framebuffer durant la visualitzacio del Selector Inicial de Modes (per no mostrar el sistema)
+	if (g_EstatSimulador.mostrarSelectorModes)
+	{
+		glDisable(GL_SCISSOR_TEST);
+		glViewport(0, 0, w, h);
+		glClearColor(0.03f, 0.04f, 0.08f, 1.0f);
+		glClearDepth(1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		return;
+	}
+
+	// Sincronitzar les opcions de la interficie ImGui amb l'estat d'OpenGL
+	SincronitzarEstatSimuladorAmbOpenGL();
 
 	// Entorn VGI: Cridem a les funcions de l'escena i la projecció segons s'hagi 
 	// seleccionat una projecció o un altra
@@ -533,41 +772,6 @@ void OnPaint(GLFWwindow* window)
 		// Dibuix de l'Objecte o l'Escena
 		configura_Escena();     // Aplicar Transformacions Geometriques segons persiana Transformacio i configurar objectes
 		dibuixa_Escena();		// Dibuix geometria de l'escena amb comandes GL.
-		/*
-		// ISOMÈTRICA (Inferior Dreta)
-				// Definició de Viewport, Projecció i Càmara
-				ProjectionMatrix = Projeccio_Orto();
-				ViewMatrix = Vista_Ortografica(shader_programID, 3, OPV.R, c_fons, col_obj, objecte, mida, pas, front_faces, oculta,
-					test_vis, back_line, ilumina, llum_ambient, llumGL, ifixe, ilum2sides,
-					eixos, grid, hgrid);
-				// Dibuix de l'Objecte o l'Escena
-				configura_Escena();     // Aplicar Transformacions Geometriques segons persiana Transformacio i configurar objectes
-				dibuixa_Escena();		// Dibuix geometria de l'escena amb comandes GL.
-
-		// ALÇAT (Superior Esquerra)
-				// Definició de Viewport, Projecció i Càmara
-				ProjectionMatrix = Projeccio_Orto();
-				ViewMatrix = Vista_Ortografica(shader_programID, 1, OPV.R, c_fons, col_obj, objecte, mida, pas, front_faces, oculta,
-					test_vis, back_line, ilumina, llum_ambient, llumGL, ifixe, ilum2sides,
-					eixos, grid, hgrid);
-				// Dibuix de l'Objecte o l'Escena
-				  configura_Escena();     // Aplicar Transformacions Geom?triques segons persiana Transformacio i configurar objectes
-				  dibuixa_Escena();		// Dibuix geometria de l'escena amb comandes GL.
-
-		// PERFIL (Superior Dreta)
-				// Definició de Viewport, Projecció i Càmara
-				ProjectionMatrix = Projeccio_Orto();
-				ViewMatrix = Vista_Ortografica(shader_programID, 2, OPV.R, c_fons, col_obj, objecte, mida, pas, front_faces, oculta,
-					test_vis, back_line, ilumina, llum_ambient, llumGL, ifixe, ilum2sides,
-					eixos, grid, hgrid);
-				// Dibuix de l'Objecte o l'Escena
-				configura_Escena();     // Aplicar Transformacions Geom?triques segons persiana Transformacio i configurar objectes
-				  // glScalef();			// Escalat d'objectes, per adequar-los a les vistes ortogràfiques (Pràctica 2)
-				dibuixa_Escena();		// Dibuix geometria de l'escena amb comandes GL.
-		*/
-		// Entorn VGI: Transferència del buffer OpenGL a buffer de pantalla
-				//glfwSwapBuffers(window);
-
 		break;
 
 	case PERSPECT:
@@ -588,6 +792,20 @@ void OnPaint(GLFWwindow* window)
 				front_faces, oculta, test_vis, back_line,
 				ilumina, llum_ambient, llumGL, ifixe, ilum2sides,
 				eixos, grid, hgrid);
+
+			// Quan hi ha un planeta enfocat (cosEnfocatId > 0), centrar la camera sobre la posicio orbital (x, y, 0) de l'astre
+			if (objecte == SISTEMA_SOLAR && escenariActual != nullptr && g_EstatSimulador.cosEnfocatId > 0 && g_EstatSimulador.cosEnfocatId < 9)
+			{
+				int cid = g_EstatSimulador.cosEnfocatId;
+				float ang = escenariActual->m_objectList[cid].m_angleOrbita * (float)PI / 180.0f;
+				float rOrb = escenariActual->m_objectList[cid].m_radiOrbita;
+				float px = rOrb * cos(ang);
+				float py = rOrb * sin(ang);
+
+				ViewMatrix = glm::translate(ViewMatrix, glm::vec3(-px, -py, 0.0f));
+				glUseProgram(shader_programID);
+				glUniformMatrix4fv(glGetUniformLocation(shader_programID, "viewMatrix"), 1, GL_FALSE, &ViewMatrix[0][0]);
+			}
 		}
 		else if (camera == CAM_NAVEGA) {
 			if (Vis_Polar == POLARZ) {
@@ -617,7 +835,7 @@ void OnPaint(GLFWwindow* window)
 		dibuixa_Escena();		// Dibuix geometria de l'escena amb comandes GL.
 
 		// Entorn VGI: Transferència del buffer OpenGL a buffer de pantalla
-				//glfwSwapBuffers(window);
+		//glfwSwapBuffers(window);
 		break;
 
 	default:
@@ -635,7 +853,7 @@ void OnPaint(GLFWwindow* window)
 		FonsB();
 
 		// Entorn VGI: Transferència del buffer OpenGL a buffer de pantalla
-				//glfwSwapBuffers(window);
+		//glfwSwapBuffers(window);
 		break;
 	}
 
@@ -653,7 +871,7 @@ void configura_Escena() {
 
 // dibuixa_Escena: Funcio que crida al dibuix dels diferents elements de l'escana
 void dibuixa_Escena() {
-	
+
 	//glUseProgram(shader_programID);
 
 //	Dibuix SkyBox Cúbic.
@@ -670,10 +888,9 @@ void dibuixa_Escena() {
 		textura, texturesID, textura_map, tFlag_invert_Y,
 		npts_T, PC_t, pas_CS, sw_Punts_Control, dibuixa_TriedreFrenet,
 		ObOBJ,				// Classe de l'objecte OBJ que conté els VAO's
-		GTMatrix);
-
-	//#~#~#~#
-	if (currentEscenari != nullptr) currentEscenari->dibuixaEscenari(shader_programID);
+		GTMatrix,
+		escenariActual,
+		g_EstatSimulador.opcionsVisualitzacio.mostrarOrbites);
 }
 
 
@@ -784,16 +1001,14 @@ void Barra_Estat()
 	if (projeccio == CAP) buffer = "       ";
 	else if (pan) buffer = std::to_string(tr_cpv.y);
 	else buffer = std::to_string(PVy);
-	//sss = "PVy=" + buffer;
-// Refrescar posició PVy Status Bar
+	// Refrescar posició PVy Status Bar
 	fprintf(stderr, " PVy= %s", buffer.c_str());
 
 	// Status Bar PVz
 	if (projeccio == CAP) buffer = "       ";
 	else if (pan) buffer = std::to_string(tr_cpv.z);
 	else buffer = std::to_string(PVz);
-	//sss = "PVz=" + buffer;
-// Refrescar posició PVz Status Bar
+	// Refrescar posició PVz Status Bar
 	fprintf(stderr, " PVz= %s \n", buffer.c_str());
 
 	// Status Bar per indicar el modus de canvi de color (FONS o OBJECTE)
@@ -920,103 +1135,45 @@ void draw_Menu_ImGui()
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+	// Renderitzar la interficie principal del Simulador del Sistema Solar (Selector inicial, barra superior, panell de temps, HUD)
+	InterficieUI::Renderitzar(g_EstatSimulador, escenariActual, escenaris, shader_programID);
+
+	// Projeccio de les etiquetes 2D dels astres sobre la pantalla quan la simulacio esta activa
+	if (!g_EstatSimulador.mostrarSelectorModes &&
+		g_EstatSimulador.opcionsVisualitzacio.mostrarEtiquetes &&
+		objecte == SISTEMA_SOLAR &&
+		escenariActual != nullptr &&
+		escenariActual->m_objectList != nullptr)
+	{
+		static const char* nomsEtiquetes[9] = {
+			"Sol", "Mercuri", "Venus", "Terra", "Mart", "Jupiter", "Saturn", "Ura", "Neptu"
+		};
+		glm::vec4 viewport(0.0f, 0.0f, (float)w, (float)h);
+		for (int i = 0; i < 9; i++)
+		{
+			float ang = escenariActual->m_objectList[i].m_angleOrbita * (float)PI / 180.0f;
+			float rOrb = escenariActual->m_objectList[i].m_radiOrbita;
+			float rCos = escenariActual->m_objectList[i].m_radiCos;
+			glm::vec3 posMon(rOrb * cos(ang), rOrb * sin(ang), rCos * 1.15f);
+			InterficieUI::DibuixarEtiquetaPlaneta(nomsEtiquetes[i], posMon, ViewMatrix, ProjectionMatrix, viewport);
+		}
+	}
+
+	// Finestres opcionals d'EntornVGI (desactivades per defecte)
 	if (show_demo_window)
 		ImGui::ShowDemoWindow(&show_demo_window);
 
-	// 2. Show another simple window.
 	if (show_another_window)
 	{
-		ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+		ImGui::Begin("Another Window", &show_another_window);
 		ImGui::Text("Hello from another window!");
 		if (ImGui::Button("Close Me"))
 			show_another_window = false;
 		ImGui::End();
 	}
 
-	// 1. Show the EntornVGI window. Finestra amb totes les opcions de l'aplicació.
 	if (show_EntornVGI_window)
-		ShowEntornVGIWindow(&show_EntornVGI_window); //ShowEntornVGIWindow(&show_EntornVGI_window);
-
-	// 3. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
-	{
-		static float f = 0.0f;
-		static int counter = 0;
-		static float PV[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-
-		ImGui::Begin("Status Menu");                          // Create a window called "Status Menu" and append into it.
-
-		ImGui::Text("Finestres EntornVGI:");               // Display some text (you can use a format strings too)
-		ImGui::SameLine();
-		ImGui::Checkbox("EntornVGI Window", &show_EntornVGI_window);
-		ImGui::Separator();
-		ImGui::Spacing();
-
-		// Transformació PV de Coord. esfèriques (R,anglev,angleh) --> Coord. cartesianes (PVx,PVy,PVz)
-		if (camera == CAM_NAVEGA) { PV[0] = opvN.x; PV[1] = opvN.y; PV[2] = opvN.z; }
-		else {
-			cam_Esferica[0] = OPV.R;	cam_Esferica[1] = OPV.alfa; cam_Esferica[2] = OPV.beta;
-			if (Vis_Polar == POLARZ)
-			{
-				PV[0] = OPV.R * cos(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-				PV[1] = OPV.R * sin(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-				PV[2] = OPV.R * sin(OPV.alfa * PI / 180);
-			}
-			else if (Vis_Polar == POLARY)
-			{
-				PV[0] = OPV.R * sin(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-				PV[1] = OPV.R * sin(OPV.alfa * PI / 180);
-				PV[2] = OPV.R * cos(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-			}
-			else {
-				PV[0] = OPV.R * sin(OPV.alfa * PI / 180);
-				PV[1] = OPV.R * cos(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-				PV[2] = OPV.R * sin(OPV.beta * PI / 180) * cos(OPV.alfa * PI / 180);
-			}
-		}
-
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
-		ImGui::SeparatorText("CAMERA:");
-		ImGui::PopStyleColor();
-
-		ImGui::InputFloat3("Esferiques (R,alfa,beta)", cam_Esferica);
-		ImGui::InputFloat3("Cartesianes (PVx,PVy,PVz)", PV);
-		//ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
-		ImGui::SeparatorText("COLORS:");
-		ImGui::PopStyleColor();
-		ImGui::ColorEdit3("Color de Fons", (float*)&clear_colorB); // Edit 3 floats representing a background color
-		ImGui::ColorEdit3("Color d'Objecte", (float*)&clear_colorO); // Edit 3 floats representing a object color
-		c_fons.r = clear_colorB.x;	c_fons.g = clear_colorB.y;	c_fons.b = clear_colorB.z;	c_fons.a = clear_colorB.w;
-		col_obj.r = clear_colorO.x;	col_obj.g = clear_colorO.y;	col_obj.b = clear_colorO.z;		col_obj.a = clear_colorO.w;
-		ImGui::Separator();
-
-
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
-		ImGui::SeparatorText("TRANSFORMA:");
-		ImGui::PopStyleColor();
-		float tras_ImGui[3] = { (float)TG.VTras.x,(float)TG.VTras.y,(float)TG.VTras.z };
-		ImGui::InputFloat3("Traslacio (Tx,Ty,Tz)", tras_ImGui);
-		float rota_ImGui[3] = { (float)TG.VRota.x,(float)TG.VRota.y,(float)TG.VRota.z };
-		ImGui::InputFloat3("Rotacio (Rx,Ry,Rz)", rota_ImGui);
-		float scal_ImGui[3] = { (float)TG.VScal.x,(float)TG.VScal.y,(float)TG.VScal.z };
-		ImGui::InputFloat3("Escala (Sx, Sy, Sz)", scal_ImGui);
-
-		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
-		ImGui::SeparatorText("ImGui:");               // Display some text (you can use a format strings too)
-		ImGui::PopStyleColor();
-		ImGui::Checkbox("Demo ImGui Window", &show_demo_window);      // Edit bools storing our window open/close state
-		ImGui::SameLine();
-		ImGui::Checkbox("Another ImGui Window", &show_another_window);
-		ImGui::Spacing();
-
-		ImGui::Text("imgui versions: (%s) (%d)", IMGUI_VERSION, IMGUI_VERSION_NUM);
-		ImGui::Spacing();
-
-		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-		ImGui::End();
-	}
+		ShowEntornVGIWindow(&show_EntornVGI_window);
 
 	// Rendering ImGui Menus
 	ImGui::Render();
@@ -1025,8 +1182,7 @@ void draw_Menu_ImGui()
 
 // Entorn VGI: Funció que mostra el menú principal de l'Entorn VGI amb els seus desplegables.
 void MostraEntornVGIWindow(bool* p_open)
-{
-	// Exceptionally add an extra assert here for people confused about initial Dear ImGui setup
+{	// Exceptionally add an extra assert here for people confused about initial Dear ImGui setup
 	// Most functions would normally just crash if the context is missing.
 	IM_ASSERT(ImGui::GetCurrentContext() != NULL && "Missing dear imgui context. Refer to examples app!");
 
@@ -1044,8 +1200,7 @@ void MostraEntornVGIWindow(bool* p_open)
 	ImGuiWindowFlags window_flags = 0;
 	// Main body of the Demo window starts here.
 	if (!ImGui::Begin("EntornVGI Menu", p_open, window_flags))
-	{
-		// Early out if the window is collapsed, as an optimization.
+	{	// Early out if the window is collapsed, as an optimization.
 		ImGui::End();
 		return;
 	}
@@ -1060,18 +1215,15 @@ void MostraEntornVGIWindow(bool* p_open)
 	if (ImGui::BeginMenuBar())
 	{
 		if (ImGui::BeginMenu("Arxius"))
-		{
-			//IMGUI_DEMO_MARKER("Menu/File");
+		{	//IMGUI_DEMO_MARKER("Menu/File");
 			ShowArxiusOptions();
 			ImGui::EndMenu();
 		}
 		if (ImGui::BeginMenu("Sobre EntornVGI"))
-		{
-			//IMGUI_DEMO_MARKER("Menu/Examples");
+		{	//IMGUI_DEMO_MARKER("Menu/Examples");
 			//ShowAboutOptions(&show_window_about);
 			ImGui::EndMenu();
 		}
-
 		ImGui::EndMenuBar();
 	}
 
@@ -1162,13 +1314,13 @@ void ShowArxiusOptions()
 void ShowAboutWindow(bool* p_open)
 {
 	// For the demo: add a debug button _BEFORE_ the normal log window contents
-// We take advantage of a rarely used feature: multiple calls to Begin()/End() are appending to the _same_ window.
-// Most of the contents of the window will be added by the log.Draw() call.
+	// We take advantage of a rarely used feature: multiple calls to Begin()/End() are appending to the _same_ window.
+	// Most of the contents of the window will be added by the log.Draw() call.
 	ImGui::SetNextWindowSize(ImVec2(500, 400), ImGuiCond_FirstUseEver);
 	ImGui::Begin("About", p_open);
 	//IMGUI_DEMO_MARKER("Window/About");
 	ImGui::Text("VISUALITZACIO GRAFICA INTERACTIVA (Escola d'Enginyeria - UAB");
-	ImGui::Text("Entorn Grafic VS2022 amb interficie GLFW 3.4, ImGui i OpenGL 4.6 per a practiques i ABP");
+	ImGui::Text("Entorn Grafic VS2026 amb interficie GLFW 3.4, ImGui i OpenGL 4.6 per a practiques i ABP");
 	ImGui::Text("AUTOR: Enric Marti Godia");
 	ImGui::Text("Copyright (C) 2026");
 	if (ImGui::Button("Acceptar"))
@@ -1308,6 +1460,11 @@ int shortCut_Objecte()
 	case OBJOBJ:	// Objecte Arxiu OBJ
 		auxObjecte = 9;
 		break;
+		//objecte sistema solar $
+	case SISTEMA_SOLAR:	// Objecte Sistema Solar (tots)
+		auxObjecte = 15;
+		break;
+
 	default:			// Opció OBJECTE <Altres Objectes>
 		auxObjecte = 0;
 		break;
@@ -1332,7 +1489,7 @@ int shortCut_Iluminacio()
 	case PLANA:		// Iluminacio PLANA
 		auxIlumina = 2;
 		break;
-	case SUAU:	// Iluminacio SUAU
+	case SUAU:		// Iluminacio SUAU
 		auxIlumina = 3;
 		break;
 	default:		 // Opció Iluminacio <Altres Iluminacio>
@@ -1398,7 +1555,7 @@ void ShowEntornVGIWindow(bool* p_open)
 	static bool show_app_custom_rendering = false;
 
 	// Examples Apps (accessible from the "Examples" menu)
-	//static bool show_window_about = false;
+		//static bool show_window_about = false;
 
 	if (show_window_about)       ShowAboutWindow(&show_window_about);
 
@@ -1474,8 +1631,7 @@ void ShowEntornVGIWindow(bool* p_open)
 
 	// Main body of the Demo window starts here.
 	if (!ImGui::Begin("EntornVGI Menu", p_open, window_flags))
-	{
-		// Early out if the window is collapsed, as an optimization.
+	{	// Early out if the window is collapsed, as an optimization.
 		ImGui::End();
 		return;
 	}
@@ -1513,8 +1669,7 @@ void ShowEntornVGIWindow(bool* p_open)
 	// DESPLEGABLE CAMERA
 	//IMGUI_DEMO_MARKER("Help");
 	if (ImGui::CollapsingHeader("CAMERA"))
-	{
-		// Entorn VGI. Mostrar Opcions desplegable TIPUS CAMERA
+	{	// Entorn VGI. Mostrar Opcions desplegable TIPUS CAMERA
 		//IMGUI_DEMO_MARKER("Widgets/Basic/RadioButton");
 
 		ImGui::RadioButton("Esferica (<Shift>+L)", &oCamera, 0); ImGui::SameLine();
@@ -1584,8 +1739,8 @@ void ShowEntornVGIWindow(bool* p_open)
 		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
 		ImGui::SeparatorText("POLARS");
 		ImGui::PopStyleColor();
-		// Entorn VGI. Mostrar Opcions desplegable POLARS
 
+		// Entorn VGI. Mostrar Opcions desplegable POLARS
 		//IMGUI_DEMO_MARKER("Widgets/Basic/RadioButton");
 		oPolars = shortCut_Polars();	//static int oPolars = -1;
 		ImGui::RadioButton("Polars X (<Shift>+X)", &oPolars, 0); ImGui::SameLine();
@@ -1611,7 +1766,7 @@ void ShowEntornVGIWindow(bool* p_open)
 	}
 
 	// DESPLEGABLE VISTA
-		//IMGUI_DEMO_MARKER("Help");
+	//IMGUI_DEMO_MARKER("Help");
 	if (ImGui::CollapsingHeader("VISTA"))
 	{
 		if (ImGui::BeginTable("split", 2))
@@ -1655,8 +1810,7 @@ void ShowEntornVGIWindow(bool* p_open)
 	// DESPLEGABLE PROJECCIO
 			//IMGUI_DEMO_MARKER("Help");
 	if (ImGui::CollapsingHeader("PROJECCIO"))
-	{
-		//IMGUI_DEMO_MARKER("Widgets/Selectables/Single Selection PROJECCIO");
+	{	//IMGUI_DEMO_MARKER("Widgets/Selectables/Single Selection PROJECCIO");
 		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
 		ImGui::SeparatorText("TIPUS PROJECCIO");
 		ImGui::PopStyleColor();
@@ -1688,10 +1842,9 @@ void ShowEntornVGIWindow(bool* p_open)
 	}
 
 	// DESPLEGABLE VISTA
-		//IMGUI_DEMO_MARKER("Help");
+	//IMGUI_DEMO_MARKER("Help");
 	if (ImGui::CollapsingHeader("OBJECTE"))
-	{
-		// Entorn VGI. Mostrar Opcions desplegable OBJECTES
+	{	// Entorn VGI. Mostrar Opcions desplegable OBJECTES
 		//IMGUI_DEMO_MARKER("Widgets/Basic/RadioButton");
 
 		// Using the _simplified_ one-liner Combo() api here
@@ -1699,13 +1852,27 @@ void ShowEntornVGIWindow(bool* p_open)
 		//IMGUI_DEMO_MARKER("Widgets/Basic/Combo");
 		const char* items[] = { "Cap(<Shift>+B)", "Cub (<Shift>+C)", "Cub RGB (<Shift>+D)", "Esfera (<Shift>+E)", "Tetera (<Shift>+T)",
 			"Arc (<Shift>+R)", "Matriu Primitives (<Shift>+H)", "Matriu Primitives VAO (<Shift>+V)", "Tie (<Shift>+I)", "Arxiu OBJ",
-			"Bezier (<Shift>+F5)", "B-spline (<Shift>+F6)", "Lemniscata (<Shift>+F7)", "Hermitte (<Shift>+F8)", "Catmull-Rom (<Shift>+F9)" };
+			"Bezier (<Shift>+F5)", "B-spline (<Shift>+F6)", "Lemniscata (<Shift>+F7)", "Hermitte (<Shift>+F8)", "Catmull-Rom (<Shift>+F9)","Sistema Solar(tots)" };
 		//static int item_current = 0;
 		ImGui::Combo(" ", &oObjecte, items, IM_ARRAYSIZE(items));
 		ImGui::Spacing();
 
+		// Sistema Solar: Sol i planetes (vista individual, centrats a l'origen)
+		ImGui::SeparatorText("SISTEMA SOLAR (cos individual):");
+		const char* nomsCossos[9] = { "Sol", "Mercuri", "Venus", "Terra", "Mart", "Jupiter", "Saturn", "Uranus", "Neptu" };
+		for (int i = 0; i < 9; i++)
+		{
+			if (i % 3 != 0) ImGui::SameLine();
+			if (ImGui::RadioButton(nomsCossos[i], (objecte == ESFERA && cosSolar == i)))
+			{
+				MostraCos(i);
+				oObjecte = shortCut_Objecte();	// Actualitzar opció de menú OBJECTE
+			}
+		}
+		ImGui::Spacing();
+
 		// Mostrar fram PARAMETRES CORBES si Objectes Corbes seleccionats
-		if ((oObjecte > 9) && (oObjecte < 16)) {
+		if ((oObjecte > 9) && (oObjecte < 15)) {
 			//IMGUI_DEMO_MARKER("Widgets/Selectables/Single Selection CORBES");
 			ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 0, 0, 255));
 			ImGui::SeparatorText("PARAMETRES CORBES:");
@@ -1772,6 +1939,9 @@ void ShowEntornVGIWindow(bool* p_open)
 		case 14: // Opció OBJECTE CORBA CATMULL-ROM
 			if (objecte != C_CATMULL_ROM) OnObjecteCorbaCatmullRom();
 			break;
+		case 15:
+			if (objecte != SISTEMA_SOLAR) OnSistemaTots();
+			break;
 		default:
 			// Opció per defecte: CAP
 			OnObjecteCap();
@@ -1782,8 +1952,7 @@ void ShowEntornVGIWindow(bool* p_open)
 	// DESPLEGABLE VISTA
 	//IMGUI_DEMO_MARKER("Help");
 	if (ImGui::CollapsingHeader("TRANSFORMA"))
-	{
-		//IMGUI_DEMO_MARKER("Widgets/Basic/RadioButton");
+	{	//IMGUI_DEMO_MARKER("Widgets/Basic/RadioButton");
 		static int clickTT = 0;
 		ImGui::Checkbox("Traslacio (<Ctrl>+T)", &trasl); ImGui::SameLine();
 		if (ImGui::Button("Origen Traslacio (<Ctrl>+O)")) clickTT++;
@@ -1851,8 +2020,7 @@ void ShowEntornVGIWindow(bool* p_open)
 	// DESPLEGABLE VISTA
 	//IMGUI_DEMO_MARKER("Help");
 	if (ImGui::CollapsingHeader("OCULTACIONS"))
-	{
-		//IMGUI_DEMO_MARKER("Widgets/Selectables/Single Selection OCULTACIONS");
+	{	//IMGUI_DEMO_MARKER("Widgets/Selectables/Single Selection OCULTACIONS");
 		if (ImGui::BeginTable("split", 2))
 		{
 			ImGui::TableNextColumn(); ImGui::Checkbox("Test Visibilitat? (<Ctrl>+C)", &test_vis);
@@ -1898,8 +2066,7 @@ void ShowEntornVGIWindow(bool* p_open)
 			for (int n = 0; n < IM_ARRAYSIZE(items); n++)
 			{
 				const bool is_selected = (oIlumina == n);
-				if (ImGui::Selectable(items[n], is_selected))
-					oIlumina = n;
+				if (ImGui::Selectable(items[n], is_selected)) oIlumina = n;
 
 				// Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
 				if (is_selected) ImGui::SetItemDefaultFocus();
@@ -1930,7 +2097,6 @@ void ShowEntornVGIWindow(bool* p_open)
 			// Opció per defecte: FILFERROS
 			OnIluminacioFilferros();
 			break;
-
 		}
 
 		//IMGUI_DEMO_MARKER("Widgets/Selectables/Single Selection REFLEXIO MATERIAL");
@@ -1946,7 +2112,14 @@ void ShowEntornVGIWindow(bool* p_open)
 
 		if (ImGui::BeginTable("split", 2))
 		{
-			ImGui::TableNextColumn(); ImGui::Checkbox("Emissio? (<Ctrl>+F6)", &sw_material[0]);
+			ImGui::TableNextColumn(); if (ImGui::Checkbox("Emissio? (<Ctrl>+F6)", &sw_material[0])
+				&& objecte == SISTEMA_SOLAR)
+			{
+				// En el sistema solar, apagar la emisión del Sol también apaga
+				// la luz que ilumina a los planetas.
+				llumGL[0].encesa = sw_material[0];
+				OnLlumsLlum0();
+			}
 			ImGui::TableNextColumn(); ImGui::Checkbox("Ambient? (<Ctrl>+F7)", &sw_material[1]);
 			ImGui::TableNextColumn(); ImGui::Checkbox("Difusa? (<Ctrl>+F8)", &sw_material[2]);
 			ImGui::TableNextColumn(); ImGui::Checkbox("Especular? (<Ctrl>+F9)", &sw_material[3]);
@@ -1987,15 +2160,49 @@ void ShowEntornVGIWindow(bool* p_open)
 	// DESPLEGABLE LLUMS
 	//IMGUI_DEMO_MARKER("Help");
 	if (ImGui::CollapsingHeader("LLUMS"))
-	{
-		ImGui::Checkbox("Llum Ambient? (<Ctrl>+A)", &llum_ambient);
+	{	
+		if (objecte==SISTEMA_SOLAR)
+		{
+			if (ImGui::Checkbox("Vista clara (llum ambient)", &llum_ambient))
+			{
+				// La luz ambiente y la reflexión ambiental del material
+				// se activan o desactivan juntas.
+				sw_material[1] = llum_ambient;
+
+				// Actualizamos las cuatro componentes del vector de iluminación:
+				// emisión, ambiente, difusa y especular.
+				glUniform4i(
+					glGetUniformLocation(shader_programID, "sw_intensity"),
+					sw_material[0],
+					sw_material[1],
+					sw_material[2],
+					sw_material[3]
+				);
+
+				OnLlumsLlumAmbient();
+			}
+		}
+		else
+		{
+			ImGui::Checkbox("Llum Ambient? (<Ctrl>+A)", &llum_ambient);
+		}
 		ImGui::Separator();
 		ImGui::Spacing();
 
 		if (ImGui::BeginTable("split", 2))
 		{
 			ImGui::TableNextColumn();
-			ImGui::Checkbox("Llum #0 (+Z) (<Ctrl>+0)?", &llumGL[0].encesa);
+			if (ImGui::Checkbox("Llum #0 (+Z) (<Ctrl>+0)?", &llumGL[0].encesa))
+			{
+				if (objecte == SISTEMA_SOLAR)
+				{
+					// En el sistema solar, Llum #0 es la luz del Sol:
+					// su estado debe coincidir con la emisión del Sol.
+					sw_material[0] = llumGL[0].encesa;
+				}
+
+				OnLlumsLlum0();
+			}
 			ImGui::TableNextColumn();
 			ImGui::Checkbox("Llum #1 (+X) (<Ctrl>+1)?", &llumGL[1].encesa);
 			ImGui::TableNextColumn();
@@ -2036,8 +2243,7 @@ void ShowEntornVGIWindow(bool* p_open)
 	// DESPLEGABLE SHADERS
 	//IMGUI_DEMO_MARKER("Help");
 	if (ImGui::CollapsingHeader("SHADERS"))
-	{
-		// Combo Boxes are also called "Dropdown" in other systems
+	{	// Combo Boxes are also called "Dropdown" in other systems
 		// Expose flags as checkbox for the demo
 		static ImGuiComboFlags flagsS = (0 && ImGuiComboFlags_PopupAlignLeft && ImGuiComboFlags_NoPreview && ImGuiComboFlags_NoArrowButton);
 
@@ -2085,10 +2291,9 @@ void ShowEntornVGIWindow(bool* p_open)
 	}
 
 	// DESPLEGABLE SHADERS
-//IMGUI_DEMO_MARKER("Help");
+	//IMGUI_DEMO_MARKER("Help");
 	if (ImGui::CollapsingHeader("ABOUT"))
-	{
-		//IMGUI_DEMO_MARKER("Window/About");
+	{	//IMGUI_DEMO_MARKER("Window/About");
 		ImGui::Text("VISUALITZACIO GRAFICA INTERACTIVA (Escola d'Enginyeria - UAB");
 		ImGui::Text("Entorn Grafic VS2022 amb interficie GLFW 3.4, ImGui i OpenGL 4.6 per a practiques i ABP");
 		ImGui::Text("AUTOR: Enric Marti Godia");
@@ -2203,11 +2408,6 @@ bool llegir_FontLlum(char* nomf)
 	if ((fd = fopen(nomf, "rt")) == NULL)
 	{
 		fprintf(stderr, "%s", "ERROR: File .lght was not opened");
-		//LPCWSTR texte1 = reinterpret_cast<LPCWSTR> ("ERROR:");
-		//LPCWSTR texte2 = reinterpret_cast<LPCWSTR> ("File .lght was not opened");
-		//MessageBox(NULL, texte1, texte2, MB_OK);
-		//MessageBox(texte1, texte2, MB_OK);
-		//AfxMessageBox("file was not opened");
 		return false;
 	}
 	fscanf(fd, "%i \n", &i);
@@ -2240,82 +2440,81 @@ void OnArxiuObrirSkybox()
 	std::vector<std::string> faces;
 
 	/*
-		// TODO: Agregue aquí su código de controlador de comandos
+	// TODO: Agregue aquí su código de controlador de comandos
 		CString folderPath;
 
-		// Càrrega VAO Skybox Cube
+	// Càrrega VAO Skybox Cube
 		if (skC_VAOID.vaoId == 0) skC_VAOID = loadCubeSkybox_VAO();
 		Set_VAOList(CUBE_SKYBOX, skC_VAOID);
 
-		// Càrrega del fitxer right (+X <--> posx <--> right)
+	// Càrrega del fitxer right (+X <--> posx <--> right)
 		CString facesCS = folderPath;
 		facesCS += "\\right.jpg";
 		// Convert a TCHAR string to a LPCSTR
 		CT2CA pszConvertedAnsiString(facesCS);
-		// construct a std::string using the LPCSTR input
+	// construct a std::string using the LPCSTR input
 		std::string facesS1(pszConvertedAnsiString);
 		faces.push_back(facesS1);
 
-		// Càrrega del fitxer left (-X <--> negx <--> left)
+	// Càrrega del fitxer left (-X <--> negx <--> left)
 		facesCS = folderPath;
 		facesCS += "\\left.jpg";
-		// Convert a TCHAR string to a LPCSTR
+	// Convert a TCHAR string to a LPCSTR
 		CT2CA pszConvertedAnsiString2(facesCS);
-		// Construct a std::string using the LPCSTR input
+	// Construct a std::string using the LPCSTR input
 		std::string facesS2(pszConvertedAnsiString2);
 		faces.push_back(facesS2);
 
-		// Càrrega del fitxer top (+Y <--> posy <--> top)
+	// Càrrega del fitxer top (+Y <--> posy <--> top)
 		facesCS = folderPath;
 		facesCS += "\\top.jpg";
-		// Convert a TCHAR string to a LPCSTR
+	// Convert a TCHAR string to a LPCSTR
 		CT2CA pszConvertedAnsiString3(facesCS);
-		// Construct a std::string using the LPCSTR input
+	// Construct a std::string using the LPCSTR input
 		std::string facesS3(pszConvertedAnsiString3);
 		faces.push_back(facesS3);
 
-		// Càrrega del fitxer bottom (-Y <--> negy <--> bottom)
+	// Càrrega del fitxer bottom (-Y <--> negy <--> bottom)
 		facesCS = folderPath;
 		facesCS += "\\bottom.jpg";
-		// Convert a TCHAR string to a LPCSTR
+	// Convert a TCHAR string to a LPCSTR
 		CT2CA pszConvertedAnsiString4(facesCS);
-		// Construct a std::string using the LPCSTR input
+	// Construct a std::string using the LPCSTR input
 		std::string facesS4(pszConvertedAnsiString4);
 		faces.push_back(facesS4);
-
-		// Càrrega del fitxer front (+Z <--> posz <--> front)
+	// Càrrega del fitxer front (+Z <--> posz <--> front)
 		facesCS = folderPath;
 		facesCS += "\\front.jpg";
-		// Convert a TCHAR string to a LPCSTR
+	// Convert a TCHAR string to a LPCSTR
 		CT2CA pszConvertedAnsiString5(facesCS);
-		// Construct a std::string using the LPCSTR input
+	// Construct a std::string using the LPCSTR input
 		std::string facesS5(pszConvertedAnsiString5);
 		faces.push_back(facesS5);
 
-		// Càrrega del fitxer back (-Z <--> negz <--> back)
+	// Càrrega del fitxer back (-Z <--> negz <--> back)
 		facesCS = folderPath;
 		facesCS += "\\back.jpg";
-		// Convert a TCHAR string to a LPCSTR
+	// Convert a TCHAR string to a LPCSTR
 		CT2CA pszConvertedAnsiString6(facesCS);
-		// construct a std::string using the LPCSTR input
+	// construct a std::string using the LPCSTR input
 		std::string facesS6(pszConvertedAnsiString6);
 		faces.push_back(facesS6);
 
-		//
-		//		if (!cubemapTexture)
-		//		{	// load Skybox textures
-		//			// -------------
-		//			std::vector<std::string> faces =
-		//			{ ".\\textures\\skybox\\right.jpg",
-		//				".\\textures\\skybox\\left.jpg",
-		//				".\\textures\\skybox\\top.jpg",
-		//				".\\textures\\skybox\\bottom.jpg",
-		//				".\\textures\\skybox\\front.jpg",
-		//				".\\textures\\skybox\\back.jpg"
-		//			};
+	//
+	//	if (!cubemapTexture)
+	//	{	// load Skybox textures
+	//		// -------------
+	//		std::vector<std::string> faces =
+	//		{ ".\\textures\\skybox\\right.jpg",
+	//		".\\textures\\skybox\\left.jpg",
+	//		".\\textures\\skybox\\top.jpg",
+	//		".\\textures\\skybox\\bottom.jpg",
+	//		".\\textures\\skybox\\front.jpg",
+	//		".\\textures\\skybox\\back.jpg"
+	//	};
 
 		cubemapTexture = loadCubemap(faces);
-		//	}
+	//	}
 
 	*/
 }
@@ -2332,7 +2531,10 @@ void OnCameraEsferica()
 		camera = CAM_ESFERICA;
 
 		// Inicialitzar paràmetres Càmera Esfèrica
-		OPV.R = 15.0;		OPV.alfa = 0.0;		OPV.beta = 0.0;				// Origen PV en esfèriques
+		//(NOA)
+		OPV.R = 100.0;		
+		OPV.alfa = 25.0;		
+		OPV.beta = 0.0;				// Origen PV en esfèriques
 		mobil = true;		zzoom = true;		satelit = false;
 		Vis_Polar = POLARZ;
 	}
@@ -2344,7 +2546,10 @@ void OnCameraOrigenEsferica()
 	// TODO: Agregue aquí su código de controlador de comandos
 	if (camera == CAM_ESFERICA) {
 		// Inicialitzar paràmetres Càmera Esfèrica
-		OPV.R = 15.0;		OPV.alfa = 0.0;		OPV.beta = 0.0;				// Origen PV en esfèriques
+		//(NOA)
+		OPV.R = 100.0;		
+		OPV.alfa = 25.0;		
+		OPV.beta = 0.0;				// Origen PV en esfèriques
 		mobil = true;		zzoom = true;		satelit = false;
 		Vis_Polar = POLARZ;
 	}
@@ -2362,6 +2567,7 @@ void OnVistaMobil()
 		transX = false;	transY = false; transZ = false;
 	}
 }
+
 
 // CÀMERA--> ESFERICA: Zoom. Zoom Interactiu (opció booleana)
 void OnVistaZoom()
@@ -2403,7 +2609,6 @@ void OnVistaSatelit()
 	}
 	bool testA = anima;									// Testejar si hi ha alguna animació activa apart de Satèlit.
 	//if ((!satelit) && (!testA)) KillTimer(WM_TIMER);	// Si es desactiva Satèlit i no hi ha cap animació activa es desactiva el Timer.
-
 }
 
 
@@ -2414,7 +2619,8 @@ void OnVistaPolarsX()
 	if (projeccio != CAP) Vis_Polar = POLARX;
 
 	// EntornVGI: Inicialitzar la càmera en l'opció NAVEGA (posició i orientació eixos)
-	if (camera == CAM_NAVEGA) {
+	if (camera == CAM_NAVEGA)
+	{
 		opvN.x = 0.0;	opvN.y = 10.0;	opvN.z = 0.0;	 // opvN = (0,10,0)
 		n[0] = 0.0;		n[1] = 0.0;		n[2] = 0.0;
 		angleZ = 0.0;
@@ -2429,7 +2635,8 @@ void OnVistaPolarsY()
 	if (projeccio != CAP) Vis_Polar = POLARY;
 
 	// EntornVGI: Inicialitzar la càmera en l'opció NAVEGA (posició i orientació eixos)
-	if (camera == CAM_NAVEGA) {
+	if (camera == CAM_NAVEGA)
+	{
 		opvN.x = 0.0;	opvN.y = 0.0;	opvN.z = 10.0; // opvN = (0,0,10)
 		n[0] = 0.0;		n[1] = 0.0;		n[2] = 0.0;
 		angleZ = 0.0;
@@ -2444,7 +2651,8 @@ void OnVistaPolarsZ()
 	if (projeccio != CAP) Vis_Polar = POLARZ;
 
 	// EntornVGI: Inicialitzar la càmera en l'opció NAVEGA (posició i orientació eixos)
-	if (camera == CAM_NAVEGA) {
+	if (camera == CAM_NAVEGA)
+	{
 		opvN.x = 10.0;	opvN.y = 0.0;	opvN.z = 0.0; // opvN = (10,0,0)
 		n[0] = 0.0;		n[1] = 0.0;		n[2] = 0.0;
 		angleZ = 0.0;
@@ -2489,7 +2697,8 @@ void OnCameraNavega()
 void OnCameraOrigenNavega()
 {
 	// TODO: Agregue aquí su código de controlador de comandos
-	if (camera == CAM_NAVEGA) {
+	if (camera == CAM_NAVEGA)
+	{
 		n[0] = 0.0;		n[1] = 0.0;		n[2] = 0.0;
 		opvN.x = 10.0;	opvN.y = 0.0;		opvN.z = 0.0;
 		angleZ = 0.0;
@@ -2572,7 +2781,6 @@ void OnVistaPan()
 		transX = false;		transY = false;		transZ = false;
 		//navega = false;
 	}
-
 }
 
 // Tornar a lloc d'origen
@@ -2598,25 +2806,25 @@ void OnVistaEixos()
 void OnVistaSkyBox()
 {
 	// TODO: Agregue aquí su código de controlador de comandos
-	//SkyBoxCube = !SkyBoxCube;
+		//SkyBoxCube = !SkyBoxCube;
 
-// Càrrega Shader Skybox
+	// Càrrega Shader Skybox
 	if (!skC_programID) skC_programID = shader_SkyBoxC.loadFileShaders(".\\shaders\\skybox.VERT", ".\\shaders\\skybox.FRAG");
 
-	// Càrrega VAO Skybox Cube
-	if (skC_VAOID.vaoId == 0) skC_VAOID = loadCubeSkybox_VAO();
+	// Càrrega VAO Skybox Cube (verificant si el VAO es valid en OpenGL)
+	if (skC_VAOID.vaoId == 0 || !glIsVertexArray(skC_VAOID.vaoId)) skC_VAOID = loadCubeSkybox_VAO();
 	Set_VAOList(CUBE_SKYBOX, skC_VAOID);
 
 	if (!cubemapTexture)
 	{	// load Skybox textures
 		// -------------
 		std::vector<std::string> faces =
-		{ ".\\textures\\skybox\\right.jpg",
-			".\\textures\\skybox\\left.jpg",
-			".\\textures\\skybox\\top.jpg",
-			".\\textures\\skybox\\bottom.jpg",
-			".\\textures\\skybox\\front.jpg",
-			".\\textures\\skybox\\back.jpg"
+		{ ".\\textures\\skybox\\right.png",
+			".\\textures\\skybox\\left.png",
+			".\\textures\\skybox\\top.png",
+			".\\textures\\skybox\\bottom.png",
+			".\\textures\\skybox\\front.png",
+			".\\textures\\skybox\\back.png"
 		};
 		cubemapTexture = loadCubemap(faces);
 	}
@@ -2660,7 +2868,8 @@ void OnObjecteCap()
 {
 	// TODO: Agregue aquí su código de controlador de comandos
 	objecte = CAP;
-
+	// com reutilitzem esfera, declarem cosSolar = -1 per deixar clar que no tractem cap cos
+	cosSolar = -1;
 	netejaVAOList();						// Neteja Llista VAO.
 
 	// Entorn VGI: Eliminar buffers de textures previs del vector texturesID[].
@@ -2672,7 +2881,8 @@ void OnObjecteCap()
 	}
 
 	// Entorn VGI: Alliberar memòria i textures objecte OBJ, si creades.
-	if (ObOBJ != NULL) {
+	if (ObOBJ != NULL)
+	{
 		ObOBJ->netejaVAOList_OBJ();		// Netejar VAO, EBO i VBO
 		ObOBJ->netejaTextures_OBJ();	// Netejar buffers de textures
 	}
@@ -2723,6 +2933,7 @@ void OnObjecteEsfera()
 {
 	// TODO: Agregue aquí su código de controlador de comandos
 	objecte = ESFERA;
+	cosSolar = -1;
 
 	//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
 
@@ -2844,8 +3055,168 @@ void OnObjecteTie()
 	Set_VAOList(GLUT_USER6, loadgluDisk_EBO(0.0f, 1.5f, 8, 1)); // Càrrega disk com a VAO
 }
 
-// ----------------- OBJECTES CORBES BEZIER, LEMNISCATA i B-SPLINE
+// CarregaPlaneta: Carrega la textura del Sol (idx=0) o d'un planeta (idx=1..8) sobre l'esfera actual. #€#€#€# Va a dibuixaEscenari()
+void CarregaPlaneta(int idx)
+{
+	static char* fitxers[] = {
+		(char*)".\\textures\\sun\\\\2k_sun.jpg",
+		(char*)".\\textures\\planet\\Mercury\\2k_mercury.jpg",	// 1
+		(char*)".\\textures\\planet\\Venus\\2k_venus_surface.jpg",		// 2
+		(char*)".\\textures\\planet\\Earth\\2k_earth_daymap.jpg",		// 3
+		(char*)".\\textures\\planet\\Mars\\2k_mars.jpg",		// 4
+		(char*)".\\textures\\planet\\Jupiter\\2k_jupiter.jpg",	// 5
+		(char*)".\\textures\\planet\\Saturn\\2k_saturn.jpg",	// 6
+		(char*)".\\textures\\planet\\Uranus\\2k_uranus.jpg",	// 7
+		(char*)".\\textures\\planet\\Neptune\\2k_neptune.jpg"		// 8
+	};
+	if (idx < 0 || idx >= 9) return;
 
+	cosSolar = idx;
+	t_textura = TEXTURA_FITXERIMA;		tFlag_invert_Y = true;		textura = true;
+	sw_material[0] = (idx == 0);		// El Sol brilla amb llum pròpia (emissió)
+
+	glUseProgram(shader_programID);
+
+	// Eliminar textures anteriors
+	for (int i = 0; i < NUM_MAX_TEXTURES; i++)
+		if (texturesID[i]) { glDeleteTextures(1, &texturesID[i]); texturesID[i] = 0; }
+
+	// Carregar la nova textura a texturesID[0]
+	texturesID[0] = loadIMA_SOIL(fitxers[idx]);
+	if (texturesID[0] == 0) fprintf(stderr, "No s'ha pogut carregar: %s\n", fitxers[idx]);
+
+	glUniform1i(glGetUniformLocation(shader_programID, "texture0"), GLint(0));
+	glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), tFlag_invert_Y);
+	glUniform1i(glGetUniformLocation(shader_programID, "sw_intensity[0]"), sw_material[0]);
+}
+
+// MostraCos: Deixa l'escena a punt per veure el cos idx (0=Sol, 1..8=planetes) centrat a l'origen
+void MostraCos(int idx)
+{
+	OnProjeccioPerspectiva();	oProjeccio = shortCut_Projeccio();	// Sincronitzar menú ImGui
+	OnIluminacioSuau();			oIlumina = shortCut_Iluminacio();	// (recarrega el shader: abans de carregar textura)
+	OnObjecteEsfera();			// Esfera (la teva funció)
+	CarregaPlaneta(idx);		// Textura del cos
+}
+
+void OnSistemaTots() //#€#€#€# Va a 
+{
+	static char* fitxers[9] = {
+		(char*)".\\textures\\sun\\\\2k_sun.jpg",
+		(char*)".\\textures\\planet\\Mercury\\2k_mercury.jpg",	// 1
+		(char*)".\\textures\\planet\\Venus\\2k_venus_surface.jpg",		// 2
+		(char*)".\\textures\\planet\\Earth\\2k_earth_daymap.jpg",		// 3
+		(char*)".\\textures\\planet\\Mars\\2k_mars.jpg",		// 4
+		(char*)".\\textures\\planet\\Jupiter\\2k_jupiter.jpg",	// 5
+		(char*)".\\textures\\planet\\Saturn\\2k_saturn.jpg",	// 6
+		(char*)".\\textures\\planet\\Uranus\\2k_uranus.jpg",	// 7
+		(char*)".\\textures\\planet\\Neptune\\2k_neptune.jpg"		// 8
+	};
+
+	OnProjeccioPerspectiva();	oProjeccio = shortCut_Projeccio();
+	// Usamos Phong para calcular la iluminación en cada fragmento de la esfera.
+	// Así la transición entre la zona iluminada y la zona oscura queda suave.
+	OnShaderPhong();
+
+	// Sincronizamos el control del menú de iluminación con el modo SUAU.
+	// La palabra "suau" aquí se refiere al modo de dibujo sólido y sombreado
+	// suave que usa el entorno; el cálculo de luz lo hace el shader Phong.
+	oIlumina = shortCut_Iluminacio();
+
+	// Esta selección hace que dibuixa_EscenaGL entre en el caso del sistema solar.
+	objecte = SISTEMA_SOLAR;
+	cosSolar = -1;
+	camera = CAM_ESFERICA;		Vis_Polar = POLARZ;
+	t_textura = TEXTURA_FITXERIMA;	tFlag_invert_Y = true;	textura = true;
+
+	// La luz debe permanecer fija en coordenadas del mundo.
+	// En este caso, "fija" significa que no se mueve con la cámara.
+	ifixe = true;
+
+	// Activamos la luz número 0, que será la luz del Sol.
+	llumGL[0].encesa = true;
+
+	// La esfera del Sol está centrada en (0, 0, 0), así que colocamos
+	// la fuente puntual exactamente en el centro del sistema solar.
+	// El valor w = 1 indica que es una luz puntual, no direccional.
+	llumGL[0].posicio.x = 0.0f;
+	llumGL[0].posicio.y = 0.0f;
+	llumGL[0].posicio.z = 0.0f;
+	llumGL[0].posicio.w = 1.0f;
+
+	// Luz blanca: ilumina los colores de las texturas sin teñirlos.
+	llumGL[0].difusa.r = 1.0f;
+	llumGL[0].difusa.g = 1.0f;
+	llumGL[0].difusa.b = 1.0f;
+	llumGL[0].difusa.a = 1.0f;
+
+	// La componente especular produce reflejos en las superficies.
+	// La dejamos blanca para que los brillos sigan el color de la luz.
+	llumGL[0].especular.r = 1.0f;
+	llumGL[0].especular.g = 1.0f;
+	llumGL[0].especular.b = 1.0f;
+	llumGL[0].especular.a = 1.0f;
+
+	// Atenuación de la luz puntual:
+	//   a = término cuadrático,
+	//   b = término lineal,
+	//   c = término constante.
+	// Estos valores dan una caída gradual con la distancia en las unidades
+	// visuales actuales del sistema solar.
+	llumGL[0].atenuacio.a = 0.00004f;
+	llumGL[0].atenuacio.b = 0.0f;
+	llumGL[0].atenuacio.c = 1.0f;
+
+	// La luz del Sol no es un foco; ilumina en todas las direcciones.
+	llumGL[0].restringida = false;
+
+	// Evitamos que la luz ambiente ilumine demasiado la cara nocturna.
+	// Si preferís que las caras oscuras sigan visibles, podéis mantener true.
+	llum_ambient = false;
+	sw_material[1] = false;
+
+	// El Sol emite luz propia. El shader solo aplicará esta emisión al Sol
+	// cuando sistema_solar active sw_intensity[0] para el cuerpo i == 0.
+	sw_material[0] = true;
+	llumGL[0].encesa = true;
+
+	// Càmera allunyada i enlairada per veure les òrbites des de dalt
+	OPV.R = 100.0;/*també o cambió :p*/	OPV.alfa = 25.0;/*estava a 65 pero o he cambiat a 25 (noa)*/ OPV.beta = 0.0;
+	cam_Esferica[0] = (float)OPV.R;	cam_Esferica[1] = (float)OPV.alfa;	cam_Esferica[2] = (float)OPV.beta;
+
+	glUseProgram(shader_programID);
+
+	netejaVAOList();
+	SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
+	//Set_VAOList(GLU_DISK, loadgluDisk_EBO());
+	Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(1.0, 40, 40));				// Esfera de radi 1 (cossos)
+	Set_VAOList(GLUT_TORUS, loadglutSolidTorus_EBO(0.005, 1.0, 8, 120));		// Anell fi de radi 1 (òrbites)
+
+	for (int i = 0; i < NUM_MAX_TEXTURES; i++)
+		if (texturesID[i]) { glDeleteTextures(1, &texturesID[i]); texturesID[i] = 0; }
+	for (int i = 0; i < 9; i++)
+	{
+		texturesID[i] = loadIMA_SOIL(fitxers[i]);
+		if (texturesID[i] == 0) fprintf(stderr, "No s'ha pogut carregar: %s\n", fitxers[i]);
+	}
+
+	glUniform1i(glGetUniformLocation(shader_programID, "texture0"), GLint(0));
+	glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), tFlag_invert_Y);
+
+
+	const float radiCos[9] = { 20.0f,  3.0f,  5.0f,  5.0f,  4.0f, 12.0f, 10.0f,  7.0f,  7.0f };
+	const float radiOrbita[9] = { 0.0f, 40.0f, 60.0f, 80.0f,100.0f,135.0f,175.0f,210.0f,240.0f };
+	const float angleOrbita[9] = { 0.0f,  0.0f, 40.0f, 80.0f,120.0f,160.0f,200.0f,240.0f,280.0f };
+
+	for (int i = 0; i < 9; i++)
+	{
+		escenariActual->m_objectList[i].m_radiCos = radiCos[i];
+		escenariActual->m_objectList[i].m_radiOrbita = radiOrbita[i];
+		escenariActual->m_objectList[i].m_angleOrbita = angleOrbita[i];
+	}
+}
+
+// ----------------- OBJECTES CORBES BEZIER, LEMNISCATA i B-SPLINE
 
 // OBJECTE Corba Bezier
 void OnObjecteCorbaBezier()
@@ -2877,7 +3248,7 @@ void OnObjecteCorbaBezier()
 		Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(5.0, 20, 20));	// Genera esfera i la guarda a la posició GLUT_CUBE.
 
 		// Definir Corba Bezier com a VAO
-			//Set_VAOList(CRV_BEZIER, load_Bezier_Curve_VAO(npts_T, PC_t, pas_CS, false)); // Genera corba i la guarda a la posició CRV_BEZIER.
+		//Set_VAOList(CRV_BEZIER, load_Bezier_Curve_VAO(npts_T, PC_t, pas_CS, false)); // Genera corba i la guarda a la posició CRV_BEZIER.
 		Set_VAOList(CRV_BEZIER, load_Bezier_Curve_EBO(npts_T, PC_t, pas_CS, false)); // Genera corba i la guarda a la posició CRV_BEZIER.
 		free(nomFitxer);
 	}
@@ -2975,7 +3346,7 @@ void OnObjecteCorbaCatmullRom()
 		Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(5.0, 20, 20));	// Guarda (vaoId, vboId, nVertexs) a la posició GLUT_CUBE.
 
 		// Definir Corba CATMULL ROM com a VAO o EBO
-			//Set_VAOList(CRV_CATMULL_ROM, load_CatmullRom_Curve_VAO(npts_T, PC_t, pas_CS)); // Genera corba i la guarda a la posició CRV_CATMULL_ROM.
+		//Set_VAOList(CRV_CATMULL_ROM, load_CatmullRom_Curve_VAO(npts_T, PC_t, pas_CS)); // Genera corba i la guarda a la posició CRV_CATMULL_ROM.
 		Set_VAOList(CRV_CATMULL_ROM, load_CatmullRom_Curve_EBO(npts_T, PC_t, pas_CS));	// Genera corba i la guarda a la posició CRV_CATMULL_ROM.
 		free(nomFitxer);
 	}
@@ -3026,7 +3397,6 @@ void OnObjectePuntsControl()
 	if (objecte != C_BEZIER || objecte != C_BSPLINE || objecte != C_LEMNISCATA || objecte != C_HERMITTE || objecte != C_CATMULL_ROM)
 		sw_Punts_Control = !sw_Punts_Control;
 }
-
 
 
 // OBJECTE --> CORBES: Activar o desactivar visualització Triedre de Frenet de les corbes 
@@ -3270,8 +3640,9 @@ void OnIluminacioPlana()
 {
 	// TODO: Agregue aquí su código de controlador de comandos
 	test_vis = false;		oculta = true;
-	if (ilumina != PLANA) {
-		ilumina = PLANA;
+	if (ilumina != PLANA)
+	{
+		ilumina = PLANA;	shader = FLAT_SHADER; oIlumina = 2;
 		// Elimina shader anterior
 		shaderLighting.DeleteProgram();
 		// Càrrega Flat shader
@@ -3285,8 +3656,9 @@ void OnIluminacioSuau()
 {
 	// TODO: Agregue aquí su código de controlador de comandos
 	test_vis = false;		oculta = true;
-	if (ilumina != SUAU) {
-		ilumina = SUAU;
+	if (ilumina != SUAU)
+	{
+		ilumina = SUAU;		shader = GOURAUD_SHADER;
 		// Elimina shader anterior
 		shaderLighting.DeleteProgram();
 		// Càrrega Flat shader
@@ -3312,8 +3684,25 @@ void OnMaterialEmissio()
 	// TODO: Agregue aquí su código de controlador de comandos
 	sw_material[0] = !sw_material[0];
 
-	// Pas màscara llums
-	glUniform1i(glGetUniformLocation(shader_programID, "sw_intensity[0]"), sw_material[0]);
+	// Si se usa F6 en el sistema solar, emisión y luz directa
+	// cambian juntas.
+	if (objecte == SISTEMA_SOLAR)
+	{
+		llumGL[0].encesa = sw_material[0];
+		OnLlumsLlum0();
+		glUniform4i(
+			glGetUniformLocation(shader_programID, "sw_intensity"),
+			sw_material[0],
+			sw_material[1],
+			sw_material[2],
+			sw_material[3]
+		);
+	}
+	else
+	{
+		// Pas màscara llums
+		glUniform1i(glGetUniformLocation(shader_programID, "sw_intensity[0]"), sw_material[0]);
+	}
 }
 
 
@@ -3371,15 +3760,16 @@ void OnIluminacioTexturaFitxerimatge()
 	t_textura = TEXTURA_FITXERIMA;		tFlag_invert_Y = true;
 	textura = true;
 
-	if (result == NFD_OKAY) {
-		// Entorn VGI: Variable de tipus nfdchar_t* 'nomFitxer' conté el nom del fitxer seleccionat
+	if (result == NFD_OKAY)
+	{	// Entorn VGI: Variable de tipus nfdchar_t* 'nomFitxer' conté el nom del fitxer seleccionat
 		puts("Success!");
 		puts(nomFitxer);
 
 		// Entorn VGI: Eliminar buffers de textures previs del vector texturesID[].
-		for (int i = 0; i < NUM_MAX_TEXTURES; i++) {
-			if (texturesID[i]) {
-				//err = glIsTexture(texturesID[i]);
+		for (int i = 0; i < NUM_MAX_TEXTURES; i++)
+		{
+			if (texturesID[i])
+			{	//err = glIsTexture(texturesID[i]);
 				glDeleteTextures(1, &texturesID[i]);
 				//err = glIsTexture(texturesID[i]);
 				texturesID[i] = 0;
@@ -3525,7 +3915,7 @@ void OnShaderFlat()
 	// TODO: Agregue aquí su código de controlador de comandos
 	GLuint newShaderID = 0;
 
-	shader = FLAT_SHADER;	ilumina = SUAU;
+	shader = FLAT_SHADER;	ilumina = PLANA;
 	test_vis = false;		oculta = true;
 
 	// Càrrega Shader de Flat
@@ -3615,11 +4005,13 @@ void OnShaderLoadFiles()
 	// Entorn VGI: Obrir diàleg de lectura de fitxer (fitxers (*.VERT)
 	nfdresult_t resultVS = NFD_OpenDialog("vert,vrt,vs", NULL, &nomVertS);
 
-	if (resultVS == NFD_OKAY) {
+	if (resultVS == NFD_OKAY)
+	{
 		puts("Fitxer .vert llegit!");
 		puts(nomVertS);
 	}
-	else if (resultVS == NFD_CANCEL) {
+	else if (resultVS == NFD_CANCEL)
+	{
 		puts("User pressed cancel.");
 		return;
 	}
@@ -3632,11 +4024,13 @@ void OnShaderLoadFiles()
 	// Entorn VGI: Obrir diàleg de lectura de fitxer (fitxers (*.FRAG)
 	nfdresult_t resultFS = NFD_OpenDialog("frag,frg,fs", NULL, &nomFragS);
 
-	if (resultVS == NFD_OKAY) {
+	if (resultVS == NFD_OKAY)
+	{
 		puts("Fitxer .FRAG llegit!");
 		puts(nomFragS);
 	}
-	else if (resultVS == NFD_CANCEL) {
+	else if (resultVS == NFD_CANCEL)
+	{
 		puts("User pressed cancel.");
 		return;
 	}
@@ -3651,7 +4045,8 @@ void OnShaderLoadFiles()
 	newShaderID = shaderLighting.loadFileShaders(nomVertS, nomFragS);
 
 	// Càrrega shaders dels fitxers
-	if (newShaderID) {
+	if (newShaderID)
+	{
 		shader_programID = newShaderID;
 		// Activa shader.
 		glUseProgram(shader_programID); // shaderLighting.use();
@@ -3670,8 +4065,8 @@ void OnShaderPBinaryWrite()
 	// Entorn VGI: Obrir diàleg d'escriptura de fitxer (fitxers (*.bin)
 	nfdresult_t resultBS = NFD_OpenDialog(NULL, NULL, &nomPBinary);
 
-	if (resultBS == NFD_OKAY) {
-		// Entorn VGI: Variable de tipus nfdchar_t* 'nomFitxer' conté el nom del fitxer seleccionat
+	if (resultBS == NFD_OKAY)
+	{	// Entorn VGI: Variable de tipus nfdchar_t* 'nomFitxer' conté el nom del fitxer seleccionat
 		puts("Success!");
 		puts(nomPBinary);
 
@@ -3699,8 +4094,6 @@ void OnShaderPBinaryWrite()
 		//AfxMessageBox(_T("Fitxer ben gravat"));
 		fprintf(stderr, "%s \n", "Fitxer ben gravat");
 	}
-
-
 }
 
 
@@ -3718,8 +4111,8 @@ void OnShaderPBinaryRead()
 	// Entorn VGI: Obrir diàleg de lectura de fitxer (fitxers (*.bin)
 	nfdresult_t resultBS = NFD_OpenDialog(NULL, NULL, &nomPBinary);
 
-	if (resultBS == NFD_OKAY) {
-		// Entorn VGI: Variable de tipus nfdchar_t* 'nomFitxer' conté el nom del fitxer seleccionat
+	if (resultBS == NFD_OKAY)
+	{	// Entorn VGI: Variable de tipus nfdchar_t* 'nomFitxer' conté el nom del fitxer seleccionat
 		puts("Success!");
 		puts(nomPBinary);
 
@@ -3795,7 +4188,6 @@ void OnShaderPBinaryRead()
 	}
 }
 
-
 /* ------------------------------------------------------------------------- */
 /*                            FI MENUS ImGui                                 */
 /* ------------------------------------------------------------------------- */
@@ -3818,20 +4210,100 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 	GLdouble vdir[3] = { 0, 0, 0 };
 
 	// EntornVGI.ImGui: Test si events de mouse han sigut filtrats per ImGui (io.WantCaptureMouse)
-// (1) ALWAYS forward mouse data to ImGui! This is automatic with default backends. With your own backend:
+	// (1) ALWAYS forward mouse data to ImGui! This is automatic with default backends. With your own backend:
 	ImGuiIO& io = ImGui::GetIO();
 	//io.AddMouseButtonEvent(button, true);
 
-	// (2) ONLY forward mouse data to your underlying app/game.
+// (2) ONLY forward mouse data to your underlying app/game.
 	if (!io.WantCaptureKeyboard) { //<Tractament mouse de l'aplicació>}
 		// EntornVGI: Si tecla pulsada és ESCAPE, tancar finestres i aplicació.
-		if (mods == 0 && key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) glfwSetWindowShouldClose(window, GL_TRUE);
-		else if (mods == 0 && key == GLFW_KEY_PRINT_SCREEN && action == GLFW_PRESS) statusB = !statusB;
+		if (mods == 0 && key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+			glfwSetWindowShouldClose(window, GL_TRUE);
+			return;
+		}
+		// Bloquejar teclat si el selector inicial de modes està obert
+		if (g_EstatSimulador.mostrarSelectorModes) return;
+
+		// Dreceres de control del simulador (Pausa, Invertir temps, Reenquadrar vista, Vista Global)
+		if (mods == 0 && action == GLFW_PRESS) {
+			if (key == GLFW_KEY_SPACE) {
+				g_EstatSimulador.tempsSimulacio.enPausa = !g_EstatSimulador.tempsSimulacio.enPausa;
+				return;
+			}
+			else if (key == GLFW_KEY_BACKSPACE) {
+				g_EstatSimulador.tempsSimulacio.direccioTemps = -g_EstatSimulador.tempsSimulacio.direccioTemps;
+				return;
+			}
+			else if (key == GLFW_KEY_R) {
+				g_EstatSimulador.canviCameraPendent = true;
+				return;
+			}
+			else if (key == GLFW_KEY_HOME) {
+				g_EstatSimulador.cameraConfig.mode = ModeCamera::GLOBAL_SISTEMA;
+				g_EstatSimulador.cosEnfocatId = 0;
+				InterficieUI::ActualitzarDadesCosActiu(g_EstatSimulador);
+				g_EstatSimulador.canviCameraPendent = true;
+				return;
+			}
+		}
+
+		if (mods == 0 && key == GLFW_KEY_PRINT_SCREEN && action == GLFW_PRESS) statusB = !statusB;
 		else if ((mods == 1) && (action == GLFW_PRESS)) Teclat_Shift(key, window);	// Shorcuts Shift Key
 		else if ((mods == 2) && (action == GLFW_PRESS)) Teclat_Ctrl(key);	// Shortcuts Ctrl Key
 		else if ((objecte == C_BEZIER || objecte == C_BSPLINE || objecte == C_LEMNISCATA || objecte == C_HERMITTE
 			|| objecte == C_CATMULL_ROM) && (action == GLFW_PRESS)) Teclat_PasCorbes(key, action);
-		else if (camera == CAM_NAVEGA) Teclat_Navega(key, action);
+		//(NOA)
+		else if (camera == CAM_ESFERICA &&
+			(action == GLFW_PRESS || action == GLFW_REPEAT) &&
+			(key == GLFW_KEY_LEFT ||
+				key == GLFW_KEY_RIGHT ||
+				key == GLFW_KEY_UP ||
+				key == GLFW_KEY_DOWN))
+		{
+			const double pasAngle = 5.0;
+			int cosId = g_EstatSimulador.cosEnfocatId;
+			double radiCos = 35.0;
+			if (escenariActual != nullptr && cosId >= 0 && cosId < 9) {
+				radiCos = escenariActual->m_objectList[cosId].m_radiCos;
+			}
+			double minR = (cosId == 0) ? 42.0 : std::max(2.5, radiCos * 2.2);
+			double maxR = 800.0;
+			const double pasDistancia = (cosId == 0) ? 5.0 : std::max(1.0, radiCos * 0.5);
+
+			// Gir horitzontal al voltant del cos enfocat
+			if (key == GLFW_KEY_LEFT)
+				OPV.beta -= pasAngle;
+
+			else if (key == GLFW_KEY_RIGHT)
+				OPV.beta += pasAngle;
+
+			// Zoom: apropar-se o allunyar-se
+			else if (key == GLFW_KEY_UP)
+				OPV.R -= pasDistancia;
+
+			else if (key == GLFW_KEY_DOWN)
+				OPV.R += pasDistancia;
+
+			// Evitem que la càmera travessi el cos
+			if (OPV.R < minR)
+				OPV.R = minR;
+			if (OPV.R > maxR)
+				OPV.R = maxR;
+
+			// Mantenim l'angle horitzontal entre 0 i 360 graus
+			while (OPV.beta >= 360.0)
+				OPV.beta -= 360.0;
+
+			while (OPV.beta < 0.0)
+				OPV.beta += 360.0;
+
+			cam_Esferica[0] = (float)OPV.R;
+			cam_Esferica[1] = (float)OPV.alfa;
+			cam_Esferica[2] = (float)OPV.beta;
+		}
+
+		else if (camera == CAM_NAVEGA)
+			Teclat_Navega(key, action);
 		else if ((sw_grid) && ((grid.x) || (grid.y) || (grid.z))) Teclat_Grid(key, action);
 		else if (((key == GLFW_KEY_G) && (action == GLFW_PRESS)) && ((grid.x) || (grid.y) || (grid.z))) sw_grid = !sw_grid;
 		else if ((key == GLFW_KEY_O) && (action == GLFW_PRESS)) sw_color = true; // Activació color objecte
@@ -3849,21 +4321,20 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 	// Crida a OnPaint() per redibuixar l'escena
 		//OnPaint(window);
 
-	/*	if (key == GLFW_KEY_E && action == GLFW_PRESS)
+/*
+	if (key == GLFW_KEY_E && action == GLFW_PRESS)
 			activate_airship();
 
-		int state = glfwGetKey(window, GLFW_KEY_E);
-		if (state == GLFW_PRESS) activate_airship();
-	*/
+	int state = glfwGetKey(window, GLFW_KEY_E);
+	if (state == GLFW_PRESS) activate_airship();
+*/
 }
 
 void OnKeyUp(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-}
+{}
 
 void OnTextDown(GLFWwindow* window, unsigned int codepoint)
-{
-}
+{}
 
 // Teclat_Shift: Shortcuts per Pop Ups Fitxer, Finestra, Vista, Projecció i Objecte
 void Teclat_Shift(int key, GLFWwindow* window)
@@ -3880,23 +4351,23 @@ void Teclat_Shift(int key, GLFWwindow* window)
 	switch (key)
 	{
 		// ----------- POP UP Fitxers
-				// Tecla Obrir Fractal
+		// Tecla Obrir Fractal
 	case GLFW_KEY_F1:
 		OnArxiuObrirFractal();
 		/*
-		nomFitxer = NULL;
-		// Entorn VGI: Obrir diàleg de lectura de fitxer (fitxers (*.MNT)
-		result = NFD_OpenDialog(NULL, NULL, &nomFitxer);
+				nomFitxer = NULL;
+				// Entorn VGI: Obrir diàleg de lectura de fitxer (fitxers (*.MNT)
+				result = NFD_OpenDialog(NULL, NULL, &nomFitxer);
 
-		if (result == NFD_OKAY) {
-			puts("Fitxer Fractal Success!");
-			puts(nomFitxer);
+				if (result == NFD_OKAY) {
+					puts("Fitxer Fractal Success!");
+					puts(nomFitxer);
 
-			objecte = O_FRACTAL;
-			// Entorn VGI: TO DO -> Llegir fitxer fractal (nomFitxer) i inicialitzar alçades
+					objecte = O_FRACTAL;
+					// Entorn VGI: TO DO -> Llegir fitxer fractal (nomFitxer) i inicialitzar alçades
 
-			free(nomFitxer);
-			}
+					free(nomFitxer);
+					}
 		*/
 		break;
 
@@ -3904,42 +4375,42 @@ void Teclat_Shift(int key, GLFWwindow* window)
 	case GLFW_KEY_F2:
 		OnArxiuObrirFitxerObj();
 		/*
-		// Entorn VGI: Obrir diàleg de lectura de fitxer (fitxers (*.OBJ)
-		nomFitxer = NULL;
-		result = NFD_OpenDialog(NULL, NULL, &nomFitxer);
+				// Entorn VGI: Obrir diàleg de lectura de fitxer (fitxers (*.OBJ)
+				nomFitxer = NULL;
+				result = NFD_OpenDialog(NULL, NULL, &nomFitxer);
 
-		if (result == NFD_OKAY) {
-			puts("Success!");
-			puts(nomFitxer);
+				if (result == NFD_OKAY) {
+					puts("Success!");
+					puts(nomFitxer);
 
-			objecte = OBJOBJ;	textura = true;		tFlag_invert_Y = false;
-			//char* nomfitx = nomFitxer;
-			if (ObOBJ == NULL) ObOBJ = ::new COBJModel;
-			else { // Si instància ja s'ha utilitzat en un objecte OBJ
-				ObOBJ->netejaVAOList_OBJ();		// Netejar VAO, EBO i VBO
-				ObOBJ->netejaTextures_OBJ();	// Netejar buffers de textures
-				}
+					objecte = OBJOBJ;	textura = true;		tFlag_invert_Y = false;
+					//char* nomfitx = nomFitxer;
+					if (ObOBJ == NULL) ObOBJ = ::new COBJModel;
+					else { // Si instància ja s'ha utilitzat en un objecte OBJ
+						ObOBJ->netejaVAOList_OBJ();		// Netejar VAO, EBO i VBO
+						ObOBJ->netejaTextures_OBJ();	// Netejar buffers de textures
+						}
 
-			//int error = ObOBJ->LoadModel(nomfitx);			// Carregar objecte OBJ amb textura com a varis VAO's
-			int error = ObOBJ->LoadModel(nomFitxer);			// Carregar objecte OBJ amb textura com a varis VAO's
+					//int error = ObOBJ->LoadModel(nomfitx);			// Carregar objecte OBJ amb textura com a varis VAO's
+					int error = ObOBJ->LoadModel(nomFitxer);			// Carregar objecte OBJ amb textura com a varis VAO's
 
-			//	Pas de paràmetres textura al shader
-			if (!shader_programID) glUniform1i(glGetUniformLocation(shader_programID, "textur"), textura);
-			if (!shader_programID) glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), tFlag_invert_Y);
-			free(nomFitxer);
-			}
-		*/
+					//	Pas de paràmetres textura al shader
+					if (!shader_programID) glUniform1i(glGetUniformLocation(shader_programID, "textur"), textura);
+					if (!shader_programID) glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), tFlag_invert_Y);
+					free(nomFitxer);
+					}
+			*/
 		break;
 
 		// ----------- POP UP Finestra
-				// Tecla Obrir nova finestra
+		// Tecla Obrir nova finestra
 	case GLFW_KEY_W:
 
 		break;
 
 		// ----------- POP UP Camera
 
-		// 		// Tecla Camera Esferica
+			// 		// Tecla Camera Esferica
 	case GLFW_KEY_L:
 		OnCameraEsferica();
 		oCamera = shortCut_Camera();	// Actualitzar opció de menú CAMERA
@@ -3992,9 +4463,9 @@ void Teclat_Shift(int key, GLFWwindow* window)
 	case GLFW_KEY_S:
 		OnVistaSatelit();
 		/*
-		if ((projeccio != CAP && projeccio != ORTO)) satelit = !satelit;
-		if (satelit) mobil = true;
-		testA = anima;				// Testejar si hi ha alguna animació activa apart de Satèlit.
+				if ((projeccio != CAP && projeccio != ORTO)) satelit = !satelit;
+				if (satelit) mobil = true;
+				testA = anima;				// Testejar si hi ha alguna animació activa apart de Satèlit.
 		*/
 		break;
 
@@ -4003,19 +4474,19 @@ void Teclat_Shift(int key, GLFWwindow* window)
 		OnCameraNavega();
 		oCamera = shortCut_Camera();	// Actualitzar opció de menú CAMERA
 		/*
-		if ((projeccio != ORTO) && (projeccio != CAP)) camera = CAM_NAVEGA;
-		// Desactivació de zoom, mobil, Transformacions Geomètriques via mouse i pan
-		//		si navega activat
-		if (camera == CAM_NAVEGA)
-		{	mobil = false;	zzoom = false;
-			transX = false;	transY = false;	transZ = false;
-			pan = false;
-			tr_cpv.x = 0.0;		tr_cpv.y = 0.0;		tr_cpv.z = 0.0;	// Inicialitzar a 0 desplaçament de pantalla
-			tr_cpvF.x = 0.0;	tr_cpvF.y = 0.0;	tr_cpvF.x = 0.0; // Inicialitzar a 0 desplaçament de pantalla
-		}
-		else {	mobil = true;
-				zzoom = true;
-			}
+				if ((projeccio != ORTO) && (projeccio != CAP)) camera = CAM_NAVEGA;
+				// Desactivació de zoom, mobil, Transformacions Geomètriques via mouse i pan
+				//		si navega activat
+				if (camera == CAM_NAVEGA)
+				{	mobil = false;	zzoom = false;
+					transX = false;	transY = false;	transZ = false;
+					pan = false;
+					tr_cpv.x = 0.0;		tr_cpv.y = 0.0;		tr_cpv.z = 0.0;	// Inicialitzar a 0 desplaçament de pantalla
+					tr_cpvF.x = 0.0;	tr_cpvF.y = 0.0;	tr_cpvF.x = 0.0; // Inicialitzar a 0 desplaçament de pantalla
+				}
+				else {	mobil = true;
+						zzoom = true;
+					}
 		*/
 		break;
 
@@ -4024,17 +4495,17 @@ void Teclat_Shift(int key, GLFWwindow* window)
 		OnCameraGeode();
 		oCamera = shortCut_Camera();	// Actualitzar opció de menú CAMERA
 		/*
-		if ((projeccio != ORTO) && (projeccio != CAP)) camera = CAM_GEODE;
-		// Desactivació de zoom, mobil, Transformacions Geomètriques via mouse i pan
-		//		si navega activat
-		if (camera == CAM_GEODE)
-		{
-			OPV_G.R = 0.0;		OPV_G.alfa = 0.0;		OPV_G.beta = 0.0;
-			OPV.R = 0.0;		OPV.alfa = 0.0;			OPV.beta = 0.0;				// Origen PV en esfèriques
-			mobil = true;		zzoom = true;	zzoomO = false;	 satelit = false;	pan = false;
-			Vis_Polar = POLARZ;	llumGL[5].encesa = true;
-			glFrontFace(GL_CW);
-		}
+				if ((projeccio != ORTO) && (projeccio != CAP)) camera = CAM_GEODE;
+				// Desactivació de zoom, mobil, Transformacions Geomètriques via mouse i pan
+				//		si navega activat
+				if (camera == CAM_GEODE)
+				{
+					OPV_G.R = 0.0;		OPV_G.alfa = 0.0;		OPV_G.beta = 0.0;
+					OPV.R = 0.0;		OPV.alfa = 0.0;			OPV.beta = 0.0;				// Origen PV en esfèriques
+					mobil = true;		zzoom = true;	zzoomO = false;	 satelit = false;	pan = false;
+					Vis_Polar = POLARZ;	llumGL[5].encesa = true;
+					glFrontFace(GL_CW);
+				}
 		*/
 		break;
 
@@ -4042,16 +4513,16 @@ void Teclat_Shift(int key, GLFWwindow* window)
 	case GLFW_KEY_HOME:
 		if (pan) OnVistaOrigenPan();
 		/*
-		{	fact_pan = 1;
-					tr_cpv.x = 0;	tr_cpv.y = 0;	tr_cpv.z = 0;
-				}
+				{	fact_pan = 1;
+							tr_cpv.x = 0;	tr_cpv.y = 0;	tr_cpv.z = 0;
+						}
 		*/
 		if (camera == CAM_NAVEGA) OnCameraOrigenNavega();
 		/*
-			{	n[0] = 0.0;		n[1] = 0.0;		n[2] = 0.0;
-				opvN.x = 10.0;	opvN.y = 0.0;		opvN.z = 0.0;
-				angleZ = 0.0;
-			}
+					{	n[0] = 0.0;		n[1] = 0.0;		n[2] = 0.0;
+						opvN.x = 10.0;	opvN.y = 0.0;		opvN.z = 0.0;
+						angleZ = 0.0;
+					}
 		*/
 		else if (camera == CAM_NAVEGA) OnCameraOrigenGeode();
 
@@ -4076,8 +4547,8 @@ void Teclat_Shift(int key, GLFWwindow* window)
 		break;
 
 		// ----------- POP UP Vista
-		// 
-				// Tecla Full Screen?
+			// 
+						// Tecla Full Screen?
 	case GLFW_KEY_F:
 		OnFull_Screen(primary, window);
 		break;
@@ -4093,25 +4564,25 @@ void Teclat_Shift(int key, GLFWwindow* window)
 		SkyBoxCube = !SkyBoxCube;
 		if (SkyBoxCube) OnVistaSkyBox();
 		/*
-		{	Vis_Polar = POLARY;
-			// Càrrega VAO Skybox Cube
-			if (skC_VAOID.vaoId == 0) skC_VAOID = loadCubeSkybox_VAO();
+				{	Vis_Polar = POLARY;
+					// Càrrega VAO Skybox Cube
+					if (skC_VAOID.vaoId == 0) skC_VAOID = loadCubeSkybox_VAO();
 
-			if (!cubemapTexture)
-				{	// load Skybox textures
-					// -------------
-					std::vector<std::string> faces =
-						{	".\\textures\\skybox\\right.jpg",
-							".\\textures\\skybox\\right.jpg",
-							".\\textures\\skybox\\left.jpg",
-							".\\textures\\skybox\\top.jpg",
-							".\\textures\\skybox\\bottom.jpg",
-							".\\textures\\skybox\\front.jpg",
-							".\\textures\\skybox\\back.jpg"
-						};
-					cubemapTexture = loadCubemap(faces);
+					if (!cubemapTexture)
+						{	// load Skybox textures
+							// -------------
+							std::vector<std::string> faces =
+								{	".\\textures\\skybox\\right.jpg",
+									".\\textures\\skybox\\right.jpg",
+									".\\textures\\skybox\\left.jpg",
+									".\\textures\\skybox\\top.jpg",
+									".\\textures\\skybox\\bottom.jpg",
+									".\\textures\\skybox\\front.jpg",
+									".\\textures\\skybox\\back.jpg"
+								};
+							cubemapTexture = loadCubemap(faces);
+						}
 				}
-		}
 		*/
 		break;
 
@@ -4119,24 +4590,24 @@ void Teclat_Shift(int key, GLFWwindow* window)
 	case GLFW_KEY_G:
 		OnVistaPan();
 		/*
-		if ((projeccio != ORTO) && (projeccio != CAP)) pan = !pan;
-		// Desactivació de Transformacions Geomètriques via mouse i navega si pan activat
-		if (pan) {	mobil = true;		zzoom = true;
-					transX = false;		transY = false;	transZ = false;
-				}
+				if ((projeccio != ORTO) && (projeccio != CAP)) pan = !pan;
+				// Desactivació de Transformacions Geomètriques via mouse i navega si pan activat
+				if (pan) {	mobil = true;		zzoom = true;
+							transX = false;		transY = false;	transZ = false;
+						}
 		*/
 		break;
 
 		// ----------- POP UP Projecció
-				// Tecla Axonomètrica
+			// Tecla Axonomètrica
 	case GLFW_KEY_A:
 		OnProjeccioAxonometrica();
 		oProjeccio = shortCut_Projeccio();	// Actualitzar opció de menú PROJECCIO
 		/*
-		if (projeccio != AXONOM) {
-			projeccio = AXONOM;
-			mobil = true;			zzoom = true;
-		}
+				if (projeccio != AXONOM) {
+					projeccio = AXONOM;
+					mobil = true;			zzoom = true;
+				}
 		*/
 		break;
 
@@ -4145,10 +4616,10 @@ void Teclat_Shift(int key, GLFWwindow* window)
 		OnProjeccioOrtografica();
 		oProjeccio = shortCut_Projeccio();	// Actualitzar opció de menú PROJECCIO
 		/*
-		if (projeccio != ORTO) {
-			projeccio = ORTO;
-			mobil = false;			zzoom = false;
-			}
+				if (projeccio != ORTO) {
+					projeccio = ORTO;
+					mobil = false;			zzoom = false;
+					}
 		*/
 		break;
 
@@ -4157,23 +4628,23 @@ void Teclat_Shift(int key, GLFWwindow* window)
 		OnProjeccioPerspectiva();
 		oProjeccio = shortCut_Projeccio();	// Actualitzar opció de menú PROJECCIO
 		/*
-		if (projeccio != PERSPECT) {
-			projeccio = PERSPECT;
-			mobil = true;			zzoom = true;
-			}
+				if (projeccio != PERSPECT) {
+					projeccio = PERSPECT;
+					mobil = true;			zzoom = true;
+					}
 		*/
 		break;
 
 		// ----------- POP UP Objecte
-		// 		// Tecla CAP
+			// Tecla CAP
 	case GLFW_KEY_B:
 		if (objecte != CAP) OnObjecteCap();
 		oObjecte = shortCut_Objecte();	// Actualitzar opció de menú OBJECTE
 		/*
-		if (objecte != CAP) {
-			objecte = CAP;
-			netejaVAOList();							// Neteja Llista VAO.
-			}
+				if (objecte != CAP) {
+					objecte = CAP;
+					netejaVAOList();							// Neteja Llista VAO.
+					}
 		*/
 		break;
 
@@ -4182,15 +4653,15 @@ void Teclat_Shift(int key, GLFWwindow* window)
 		if (objecte != CUB)	OnObjecteCub();
 		oObjecte = shortCut_Objecte();	// Actualitzar opció de menú OBJECTE
 		/*
-		objecte = CUB;
-		//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
+				objecte = CUB;
+				//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
 
-		//  ---- Entorn VGI: ATENCIÓ!!. Modificar R per centrar la Vista a la mida de l'objecte (Perspectiva)
-		netejaVAOList();											// Neteja Llista VAO.
+				//  ---- Entorn VGI: ATENCIÓ!!. Modificar R per centrar la Vista a la mida de l'objecte (Perspectiva)
+				netejaVAOList();											// Neteja Llista VAO.
 
-		// Posar color objecte (col_obj) al vector de colors del VAO.
-		SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
-		Set_VAOList(GLUT_CUBE, loadglutSolidCube_EBO(1.0));		// Genera EBO de cub mida 1 i el guarda a la posició GLUT_CUBE.
+				// Posar color objecte (col_obj) al vector de colors del VAO.
+				SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
+				Set_VAOList(GLUT_CUBE, loadglutSolidCube_EBO(1.0));		// Genera EBO de cub mida 1 i el guarda a la posició GLUT_CUBE.
 		*/
 		break;
 
@@ -4199,13 +4670,13 @@ void Teclat_Shift(int key, GLFWwindow* window)
 		if (objecte != CUB_RGB)	OnObjecteCubRGB();
 		oObjecte = shortCut_Objecte();	// Actualitzar opció de menú OBJECTE
 		/*
-		objecte = CUB_RGB;
-		//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
+				objecte = CUB_RGB;
+				//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
 
-		//  ---- Entorn VGI: ATENCIÓ!!. Modificar R per centrar la Vista a la mida de l'objecte (Perspectiva)
-		netejaVAOList();						// Neteja Llista VAO.
+				//  ---- Entorn VGI: ATENCIÓ!!. Modificar R per centrar la Vista a la mida de l'objecte (Perspectiva)
+				netejaVAOList();						// Neteja Llista VAO.
 
-		Set_VAOList(GLUT_CUBE_RGB, loadglutSolidCubeRGB_EBO(1.0));	// Genera EBO de cub mida 1 i el guarda a la posició GLUT_CUBE_RGB.
+				Set_VAOList(GLUT_CUBE_RGB, loadglutSolidCubeRGB_EBO(1.0));	// Genera EBO de cub mida 1 i el guarda a la posició GLUT_CUBE_RGB.
 		*/
 		break;
 
@@ -4214,16 +4685,16 @@ void Teclat_Shift(int key, GLFWwindow* window)
 		if (objecte != ESFERA)	OnObjecteEsfera();
 		oObjecte = shortCut_Objecte();	// Actualitzar opció de menú OBJECTE
 		/*
-		objecte = ESFERA;
-		//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
+				objecte = ESFERA;
+				//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
 
-		//  ---- Entorn VGI: ATENCIÓ!!. Modificar R per centrar la Vista a la mida de l'objecte (Perspectiva)
-		netejaVAOList();						// Neteja Llista VAO.
+				//  ---- Entorn VGI: ATENCIÓ!!. Modificar R per centrar la Vista a la mida de l'objecte (Perspectiva)
+				netejaVAOList();						// Neteja Llista VAO.
 
-		// Posar color objecte (col_obj) al vector de colors del VAO.
-		SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
+				// Posar color objecte (col_obj) al vector de colors del VAO.
+				SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
 
-		Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(1.0, 30, 30));
+				Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(1.0, 30, 30));
 		*/
 		break;
 
@@ -4232,17 +4703,17 @@ void Teclat_Shift(int key, GLFWwindow* window)
 		if (objecte != TETERA)	OnObjecteTetera();
 		oObjecte = shortCut_Objecte();	// Actualitzar opció de menú OBJECTE
 		/*
-		objecte = TETERA;
-		//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
+				objecte = TETERA;
+				//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
 
-		//  ---- Entorn VGI: ATENCIÓ!!. Modificar R per centrar la Vista a la mida de l'objecte (Perspectiva)
-		netejaVAOList();						// Neteja Llista VAO.
+				//  ---- Entorn VGI: ATENCIÓ!!. Modificar R per centrar la Vista a la mida de l'objecte (Perspectiva)
+				netejaVAOList();						// Neteja Llista VAO.
 
-		// Posar color objecte (col_obj) al vector de colors del VAO.
-		SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
+				// Posar color objecte (col_obj) al vector de colors del VAO.
+				SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
 
-		//if (Get_VAOId(GLUT_TEAPOT) != 0) deleteVAOList(GLUT_TEAPOT);
-		Set_VAOList(GLUT_TEAPOT, loadglutSolidTeapot_VAO()); //Genera VAO tetera mida 1 i el guarda a la posició GLUT_TEAPOT.
+				//if (Get_VAOId(GLUT_TEAPOT) != 0) deleteVAOList(GLUT_TEAPOT);
+				Set_VAOList(GLUT_TEAPOT, loadglutSolidTeapot_VAO()); //Genera VAO tetera mida 1 i el guarda a la posició GLUT_TEAPOT.
 		*/
 		break;
 
@@ -4251,32 +4722,32 @@ void Teclat_Shift(int key, GLFWwindow* window)
 		if (objecte != ARC)	OnObjecteArc();
 		oObjecte = shortCut_Objecte();	// Actualitzar opció de menú OBJECTE
 		/*
-		objecte = ARC;
-		//  Modificar R per centrar la Vista a la mida de l'objecte (Perspectiva)
-		//	Canviar l'escala per a centrar la vista (Ortogràfica)
+				objecte = ARC;
+				//  Modificar R per centrar la Vista a la mida de l'objecte (Perspectiva)
+				//	Canviar l'escala per a centrar la vista (Ortogràfica)
 
-		color_Mar.r = 0.5;	color_Mar.g = 0.4; color_Mar.b = 0.9; color_Mar.a = 1.0;
-		//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
+				color_Mar.r = 0.5;	color_Mar.g = 0.4; color_Mar.b = 0.9; color_Mar.a = 1.0;
+				//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
 
-		//  ---- Entorn VGI: ATENCIÓ!!. Modificar R per centrar la Vista a la mida de l'objecte (Perspectiva)
+				//  ---- Entorn VGI: ATENCIÓ!!. Modificar R per centrar la Vista a la mida de l'objecte (Perspectiva)
 
-		// Càrrega dels VAO's per a construir objecte ARC
-		netejaVAOList();						// Neteja Llista VAO.
+				// Càrrega dels VAO's per a construir objecte ARC
+				netejaVAOList();						// Neteja Llista VAO.
 
-		// Posar color objecte (col_obj) al vector de colors del VAO.
-		SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
+				// Posar color objecte (col_obj) al vector de colors del VAO.
+				SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
 
-		//if (Get_VAOId(GLUT_CUBE) != 0) deleteVAOList(GLUT_CUBE);
-		Set_VAOList(GLUT_CUBE, loadglutSolidCube_EBO(1.0));		// Càrrega Cub de costat 1 com a EBO a la posició GLUT_CUBE.
+				//if (Get_VAOId(GLUT_CUBE) != 0) deleteVAOList(GLUT_CUBE);
+				Set_VAOList(GLUT_CUBE, loadglutSolidCube_EBO(1.0));		// Càrrega Cub de costat 1 com a EBO a la posició GLUT_CUBE.
 
-		//if (Get_VAOId(GLU_SPHERE) != 0) deleteVAOList(GLU_SPHERE);
-		Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(0.5, 20, 20));	// Càrrega Esfera a la posició GLU_SPHERE.
+				//if (Get_VAOId(GLU_SPHERE) != 0) deleteVAOList(GLU_SPHERE);
+				Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(0.5, 20, 20));	// Càrrega Esfera a la posició GLU_SPHERE.
 
-		//if (Get_VAOId(GLUT_TEAPOT) != 0) deleteVAOList(GLUT_TEAPOT);
-		Set_VAOList(GLUT_TEAPOT, loadglutSolidTeapot_VAO());		// Carrega Tetera a la posició GLUT_TEAPOT.
+				//if (Get_VAOId(GLUT_TEAPOT) != 0) deleteVAOList(GLUT_TEAPOT);
+				Set_VAOList(GLUT_TEAPOT, loadglutSolidTeapot_VAO());		// Carrega Tetera a la posició GLUT_TEAPOT.
 
-		//if (Get_VAOId(MAR_FRACTAL_VAO) != 0) deleteVAOList(MAR_FRACTAL_VAO);
-		Set_VAOList(MAR_FRACTAL_VAO, loadSea_VAO(color_Mar));		// Carrega Mar a la posició MAR_FRACTAL_VAO.
+				//if (Get_VAOId(MAR_FRACTAL_VAO) != 0) deleteVAOList(MAR_FRACTAL_VAO);
+				Set_VAOList(MAR_FRACTAL_VAO, loadSea_VAO(color_Mar));		// Carrega Mar a la posició MAR_FRACTAL_VAO.
 		*/
 		break;
 
@@ -4285,49 +4756,49 @@ void Teclat_Shift(int key, GLFWwindow* window)
 		if (objecte != TIE)	OnObjecteTie();
 		oObjecte = shortCut_Objecte();	// Actualitzar opció de menú OBJECTE
 		/*
-		objecte = TIE;		textura = true;
-			//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
+				objecte = TIE;		textura = true;
+					//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
 
-			//  ---- Entorn VGI: ATENCIÓ!!. Modificar R per centrar la Vista a la mida de l'objecte (Perspectiva)
+					//  ---- Entorn VGI: ATENCIÓ!!. Modificar R per centrar la Vista a la mida de l'objecte (Perspectiva)
 
-		// Càrrega dels VAO's per a construir objecte TIE
-		netejaVAOList();						// Neteja Llista VAO.
+				// Càrrega dels VAO's per a construir objecte TIE
+				netejaVAOList();						// Neteja Llista VAO.
 
-		// Posar color objecte (col_obj) al vector de colors del VAO.
-		SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
+				// Posar color objecte (col_obj) al vector de colors del VAO.
+				SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
 
-		//if (Get_VAOId(GLU_CYLINDER) != 0) deleteVAOList(GLU_CYLINDER);
-		Set_VAOList(GLUT_CYLINDER, loadgluCylinder_EBO(5.0f, 5.0f, 0.5f, 6, 1));// Càrrega cilindre com a VAO.
+				//if (Get_VAOId(GLU_CYLINDER) != 0) deleteVAOList(GLU_CYLINDER);
+				Set_VAOList(GLUT_CYLINDER, loadgluCylinder_EBO(5.0f, 5.0f, 0.5f, 6, 1));// Càrrega cilindre com a VAO.
 
-		//if (Get_VAOId(GLU_DISK) != 0)deleteVAOList(GLU_DISK);
-		Set_VAOList(GLU_DISK, loadgluDisk_EBO(0.0f, 5.0f, 6, 1));	// Càrrega disc com a VAO
+				//if (Get_VAOId(GLU_DISK) != 0)deleteVAOList(GLU_DISK);
+				Set_VAOList(GLU_DISK, loadgluDisk_EBO(0.0f, 5.0f, 6, 1));	// Càrrega disc com a VAO
 
-		//if (Get_VAOId(GLU_SPHERE) != 0)deleteVAOList(GLU_SPHERE);
-		Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(10.0f, 80, 80));	// Càrrega disc com a VAO
+				//if (Get_VAOId(GLU_SPHERE) != 0)deleteVAOList(GLU_SPHERE);
+				Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(10.0f, 80, 80));	// Càrrega disc com a VAO
 
-		//if (Get_VAOId(GLUT_USER1) != 0)deleteVAOList(GLUT_USER1);
-		Set_VAOList(GLUT_USER1, loadgluCylinder_EBO(5.0f, 5.0f, 2.0f, 6, 1)); // Càrrega cilindre com a VAO
+				//if (Get_VAOId(GLUT_USER1) != 0)deleteVAOList(GLUT_USER1);
+				Set_VAOList(GLUT_USER1, loadgluCylinder_EBO(5.0f, 5.0f, 2.0f, 6, 1)); // Càrrega cilindre com a VAO
 
-		//if (Get_VAOId(GLUT_CUBE) != 0)deleteVAOList(GLUT_CUBE);
-		Set_VAOList(GLUT_CUBE, loadglutSolidCube_EBO(1.0));			// Càrrega cub com a EBO
+				//if (Get_VAOId(GLUT_CUBE) != 0)deleteVAOList(GLUT_CUBE);
+				Set_VAOList(GLUT_CUBE, loadglutSolidCube_EBO(1.0));			// Càrrega cub com a EBO
 
-		//if (Get_VAOId(GLUT_TORUS) != 0)deleteVAOList(GLUT_TORUS);
-		Set_VAOList(GLUT_TORUS, loadglutSolidTorus_EBO(1.0, 5.0, 20, 20));
+				//if (Get_VAOId(GLUT_TORUS) != 0)deleteVAOList(GLUT_TORUS);
+				Set_VAOList(GLUT_TORUS, loadglutSolidTorus_EBO(1.0, 5.0, 20, 20));
 
-		//if (Get_VAOId(GLUT_USER2) != 0)deleteVAOList(GLUT_USER2);
-		Set_VAOList(GLUT_USER2, loadgluCylinder_EBO(1.0f, 0.5f, 5.0f, 60, 1)); // Càrrega cilindre com a VAO
+				//if (Get_VAOId(GLUT_USER2) != 0)deleteVAOList(GLUT_USER2);
+				Set_VAOList(GLUT_USER2, loadgluCylinder_EBO(1.0f, 0.5f, 5.0f, 60, 1)); // Càrrega cilindre com a VAO
 
-		//if (Get_VAOId(GLUT_USER3) != 0)deleteVAOList(GLUT_USER3);
-		Set_VAOList(GLUT_USER3, loadgluCylinder_EBO(0.35f, 0.35f, 5.0f, 80, 1)); // Càrrega cilindre com a VAO
+				//if (Get_VAOId(GLUT_USER3) != 0)deleteVAOList(GLUT_USER3);
+				Set_VAOList(GLUT_USER3, loadgluCylinder_EBO(0.35f, 0.35f, 5.0f, 80, 1)); // Càrrega cilindre com a VAO
 
-		//if (Get_VAOId(GLUT_USER4) != 0)deleteVAOList(GLUT_USER4);
-		Set_VAOList(GLUT_USER4, loadgluCylinder_EBO(4.0f, 2.0f, 10.25f, 40, 1)); // Càrrega cilindre com a VAO
+				//if (Get_VAOId(GLUT_USER4) != 0)deleteVAOList(GLUT_USER4);
+				Set_VAOList(GLUT_USER4, loadgluCylinder_EBO(4.0f, 2.0f, 10.25f, 40, 1)); // Càrrega cilindre com a VAO
 
-		//if (Get_VAOId(GLUT_USER5) != 0) deleteVAOList(GLUT_USER5);
-		Set_VAOList(GLUT_USER5, loadgluCylinder_EBO(1.5f, 4.5f, 2.0f, 8, 1)); // Càrrega cilindre com a VAO
+				//if (Get_VAOId(GLUT_USER5) != 0) deleteVAOList(GLUT_USER5);
+				Set_VAOList(GLUT_USER5, loadgluCylinder_EBO(1.5f, 4.5f, 2.0f, 8, 1)); // Càrrega cilindre com a VAO
 
-		//if (Get_VAOId(GLUT_USER6) != 0) deleteVAOList(GLUT_USER6);
-		Set_VAOList(GLUT_USER6, loadgluDisk_EBO(0.0f, 1.5f, 8, 1)); // Càrrega disk com a VAO
+				//if (Get_VAOId(GLUT_USER6) != 0) deleteVAOList(GLUT_USER6);
+				Set_VAOList(GLUT_USER6, loadgluDisk_EBO(0.0f, 1.5f, 8, 1)); // Càrrega disk com a VAO
 		*/
 		break;
 
@@ -4336,31 +4807,31 @@ void Teclat_Shift(int key, GLFWwindow* window)
 		if (objecte != C_BEZIER)	OnObjecteCorbaBezier();
 		oObjecte = shortCut_Objecte();	// Actualitzar opció de menú OBJECTE
 		/*
-		nomFitxer = NULL;
-		// Entorn VGI: Obrir diàleg de lectura de fitxer (fitxers (*.MNT)
-		result = NFD_OpenDialog(NULL, NULL, &nomFitxer);
+				nomFitxer = NULL;
+				// Entorn VGI: Obrir diàleg de lectura de fitxer (fitxers (*.MNT)
+				result = NFD_OpenDialog(NULL, NULL, &nomFitxer);
 
-		if (result == NFD_OKAY) {
-			puts("Bezier File Success!");
-			puts(nomFitxer);
+				if (result == NFD_OKAY) {
+					puts("Bezier File Success!");
+					puts(nomFitxer);
 
-			nom = "";			objecte = C_BEZIER;
-			npts_T = llegir_ptsC(nomFitxer);
-			free(nomFitxer);
+					nom = "";			objecte = C_BEZIER;
+					npts_T = llegir_ptsC(nomFitxer);
+					free(nomFitxer);
 
-			// Càrrega dels VAO's per a construir la corba Bezier
-			netejaVAOList();						// Neteja Llista VAO.
+					// Càrrega dels VAO's per a construir la corba Bezier
+					netejaVAOList();						// Neteja Llista VAO.
 
-			// Posar color objecte (col_obj) al vector de colors del VAO.
-			SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
+					// Posar color objecte (col_obj) al vector de colors del VAO.
+					SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
 
-			// Definir Esfera EBO per a indicar punts de control de la corba
-			Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(5.0, 20, 20));	// Genera esfera i la guarda a la posició GLUT_CUBE.
+					// Definir Esfera EBO per a indicar punts de control de la corba
+					Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(5.0, 20, 20));	// Genera esfera i la guarda a la posició GLUT_CUBE.
 
-			// Definir Corba Bezier com a VAO
-				//Set_VAOList(CRV_BEZIER, load_Bezier_Curve_VAO(npts_T, PC_t, pas_CS, false)); // Genera corba i la guarda a la posició CRV_BEZIER.
-			Set_VAOList(CRV_BEZIER, load_Bezier_Curve_EBO(npts_T, PC_t, pas_CS, false)); // Genera corba i la guarda a la posició CRV_BEZIER.
-			}
+					// Definir Corba Bezier com a VAO
+						//Set_VAOList(CRV_BEZIER, load_Bezier_Curve_VAO(npts_T, PC_t, pas_CS, false)); // Genera corba i la guarda a la posició CRV_BEZIER.
+					Set_VAOList(CRV_BEZIER, load_Bezier_Curve_EBO(npts_T, PC_t, pas_CS, false)); // Genera corba i la guarda a la posició CRV_BEZIER.
+					}
 		*/
 		break;
 
@@ -4369,31 +4840,31 @@ void Teclat_Shift(int key, GLFWwindow* window)
 		if (objecte != C_BSPLINE)	OnObjecteCorbaBSpline();
 		oObjecte = shortCut_Objecte();	// Actualitzar opció de menú OBJECTE
 		/*
-		nomFitxer = NULL;
-		// Entorn VGI: Obrir diàleg de lectura de fitxer (fitxers (*.MNT)
-		result = NFD_OpenDialog(NULL, NULL, &nomFitxer);
+				nomFitxer = NULL;
+				// Entorn VGI: Obrir diàleg de lectura de fitxer (fitxers (*.MNT)
+				result = NFD_OpenDialog(NULL, NULL, &nomFitxer);
 
-		if (result == NFD_OKAY) {
-			puts("B-Spline File Success!");
-			puts(nomFitxer);
+				if (result == NFD_OKAY) {
+					puts("B-Spline File Success!");
+					puts(nomFitxer);
 
-			nom = "";			objecte = C_BSPLINE;
-			npts_T = llegir_ptsC(nomFitxer);
-			free(nomFitxer);
+					nom = "";			objecte = C_BSPLINE;
+					npts_T = llegir_ptsC(nomFitxer);
+					free(nomFitxer);
 
-			// Càrrega dels VAO's per a construir la corba BSpline
-			netejaVAOList();						// Neteja Llista VAO.
+					// Càrrega dels VAO's per a construir la corba BSpline
+					netejaVAOList();						// Neteja Llista VAO.
 
-			// Posar color objecte (col_obj) al vector de colors del VAO.
-			SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
+					// Posar color objecte (col_obj) al vector de colors del VAO.
+					SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
 
-			// Definir Esfera EBO per a indicar punts de control de la corba
-			Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(5.0, 20, 20));	// Guarda (vaoId, vboId, nVertexs) a la posició GLUT_CUBE.
+					// Definir Esfera EBO per a indicar punts de control de la corba
+					Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(5.0, 20, 20));	// Guarda (vaoId, vboId, nVertexs) a la posició GLUT_CUBE.
 
-			// Definr Corba BSpline com a VAO
-				//Set_VAOList(CRV_BSPLINE, load_BSpline_Curve_VAO(npts_T, PC_t, pas_CS)); // Genera corba i la guarda a la posició CRV_BSPLINE.
-			Set_VAOList(CRV_BSPLINE, load_BSpline_Curve_EBO(npts_T, PC_t, pas_CS)); // Genera corba i la guarda a la posició CRV_BSPLINE.
-			}
+					// Definr Corba BSpline com a VAO
+						//Set_VAOList(CRV_BSPLINE, load_BSpline_Curve_VAO(npts_T, PC_t, pas_CS)); // Genera corba i la guarda a la posició CRV_BSPLINE.
+					Set_VAOList(CRV_BSPLINE, load_BSpline_Curve_EBO(npts_T, PC_t, pas_CS)); // Genera corba i la guarda a la posició CRV_BSPLINE.
+					}
 		*/
 		break;
 
@@ -4402,18 +4873,18 @@ void Teclat_Shift(int key, GLFWwindow* window)
 		if (objecte != C_LEMNISCATA)	OnObjecteCorbaLemniscata();
 		oObjecte = shortCut_Objecte();	// Actualitzar opció de menú OBJECTE
 		/*
-		if (objecte != C_LEMNISCATA) {
-			objecte = C_LEMNISCATA;
-			// Càrrega dels VAO's per a construir la corba Bezier
-			netejaVAOList();						// Neteja Llista VAO.
+				if (objecte != C_LEMNISCATA) {
+					objecte = C_LEMNISCATA;
+					// Càrrega dels VAO's per a construir la corba Bezier
+					netejaVAOList();						// Neteja Llista VAO.
 
-			// Posar color objecte (col_obj) al vector de colors del VAO.
-			SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
+					// Posar color objecte (col_obj) al vector de colors del VAO.
+					SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
 
-			// Definr Corba Lemniscata 3D com a VAO
-				//Set_VAOList(CRV_LEMNISCATA3D, load_Lemniscata3D_VAO(800, pas_CS * 20.0)); // Genera corba i la guarda a la posició CRV_LEMNISCATA3D.
-			Set_VAOList(CRV_LEMNISCATA3D, load_Lemniscata3D_EBO(800, pas_CS * 20.0)); // Genera corba i la guarda a la posició CRV_LEMNISCATA3D.
-			}
+					// Definr Corba Lemniscata 3D com a VAO
+						//Set_VAOList(CRV_LEMNISCATA3D, load_Lemniscata3D_VAO(800, pas_CS * 20.0)); // Genera corba i la guarda a la posició CRV_LEMNISCATA3D.
+					Set_VAOList(CRV_LEMNISCATA3D, load_Lemniscata3D_EBO(800, pas_CS * 20.0)); // Genera corba i la guarda a la posició CRV_LEMNISCATA3D.
+					}
 		*/
 		break;
 
@@ -4456,24 +4927,24 @@ void Teclat_Shift(int key, GLFWwindow* window)
 		if (objecte != MATRIUP_VAO)	OnObjecteMatriuPrimitivesVAO();
 		oObjecte = shortCut_Objecte();	// Actualitzar opció de menú OBJECTE
 		/*
-		if (objecte != MATRIUP_VAO) {
-			objecte = MATRIUP_VAO;
+				if (objecte != MATRIUP_VAO) {
+					objecte = MATRIUP_VAO;
 
-			// Càrrega dels VAO's per a construir objecte ARC
-			netejaVAOList();						// Neteja Llista VAO.
+					// Càrrega dels VAO's per a construir objecte ARC
+					netejaVAOList();						// Neteja Llista VAO.
 
-			// Posar color objecte (col_obj) al vector de colors del VAO.
-			SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
+					// Posar color objecte (col_obj) al vector de colors del VAO.
+					SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
 
-			//if (Get_VAOId(GLUT_CUBE) != 0) deleteVAOList(GLUT_CUBE);
-			Set_VAOList(GLUT_CUBE, loadglutSolidCube_EBO(1.0f));
+					//if (Get_VAOId(GLUT_CUBE) != 0) deleteVAOList(GLUT_CUBE);
+					Set_VAOList(GLUT_CUBE, loadglutSolidCube_EBO(1.0f));
 
-			//if (Get_VAOId(GLUT_TORUS) != 0)deleteVAOList(GLUT_TORUS);
-			Set_VAOList(GLUT_TORUS, loadglutSolidTorus_EBO(2.0, 3.0, 20, 20));
+					//if (Get_VAOId(GLUT_TORUS) != 0)deleteVAOList(GLUT_TORUS);
+					Set_VAOList(GLUT_TORUS, loadglutSolidTorus_EBO(2.0, 3.0, 20, 20));
 
-			//if (Get_VAOId(GLUT_SPHERE) != 0) deleteVAOList(GLU_SPHERE);
-			Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(1.0, 20, 20));
-		}
+					//if (Get_VAOId(GLUT_SPHERE) != 0) deleteVAOList(GLU_SPHERE);
+					Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(1.0, 20, 20));
+				}
 		*/
 		break;
 
@@ -4491,7 +4962,7 @@ void Teclat_Ctrl(int key)
 	switch (key)
 	{
 		// ----------- POP UP TRANSFORMA
-		// Tecla Transforma --> Traslació?
+			// Tecla Transforma --> Traslació?
 	case GLFW_KEY_T:
 		OnTransformaTraslacio();
 		break;
@@ -4560,7 +5031,7 @@ void Teclat_Ctrl(int key)
 		//	break;
 
 	// ----------- POP UP ILUMINACIÓ
-		// Tecla Llum Fixe? (opció booleana).
+	// Tecla Llum Fixe? (opció booleana).
 	case GLFW_KEY_F:
 		OnIluminacioLlumfixe();
 		//ifixe = !ifixe;
@@ -4833,7 +5304,8 @@ void Teclat_ColorFons(int key, int action)
 			}
 		}
 		//	else 
-		if (key == GLFW_KEY_DOWN) {
+		if (key == GLFW_KEY_DOWN)
+		{
 			if (fonsR) {
 				c_fons.r -= incr;
 				if (c_fons.r < 0.0) c_fons.r = 0.0;
@@ -4848,7 +5320,8 @@ void Teclat_ColorFons(int key, int action)
 			}
 		}
 		else if (key == GLFW_KEY_UP) {
-			if (fonsR) {
+			if (fonsR)
+			{
 				c_fons.r += incr;
 				if (c_fons.r > 1.0) c_fons.r = 1.0;
 			}
@@ -4909,25 +5382,29 @@ void Teclat_Navega(int key, int action)
 	vdir[1] = vdir[1] / modul;
 	vdir[2] = vdir[2] / modul;
 
-	if (action == GLFW_PRESS)
+	if (action == GLFW_PRESS || action == GLFW_REPEAT)
 	{
+		double nx = 0.0, ny = 0.0, nz = 0.0;
 		switch (key)
-		{
-			// Tecla cursor amunt
+		{	// Tecla cursor amunt o W
 		case GLFW_KEY_UP:
-			if (Vis_Polar == POLARZ) {  // (X,Y,Z)
+		case GLFW_KEY_W:
+			if (Vis_Polar == POLARZ)
+			{  // (X,Y,Z)
 				opvN.x += fact_pan * vdir[0];
 				opvN.y += fact_pan * vdir[1];
 				n[0] += fact_pan * vdir[0];
 				n[1] += fact_pan * vdir[1];
 			}
-			else if (Vis_Polar == POLARY) { //(X,Y,Z) --> (Z,X,Y)
+			else if (Vis_Polar == POLARY)
+			{ //(X,Y,Z) --> (Z,X,Y)
 				opvN.x += fact_pan * vdir[0];
 				opvN.z += fact_pan * vdir[2];
 				n[0] += fact_pan * vdir[0];
 				n[2] += fact_pan * vdir[2];
 			}
-			else if (Vis_Polar == POLARX) {	//(X,Y,Z) --> (Y,Z,X)
+			else if (Vis_Polar == POLARX)
+			{	//(X,Y,Z) --> (Y,Z,X)
 				opvN.y += fact_pan * vdir[1];
 				opvN.z += fact_pan * vdir[2];
 				n[1] += fact_pan * vdir[1];
@@ -4935,21 +5412,25 @@ void Teclat_Navega(int key, int action)
 			}
 			break;
 
-			// Tecla cursor avall
+			// Tecla cursor avall o S
 		case GLFW_KEY_DOWN:
-			if (Vis_Polar == POLARZ) { // (X,Y,Z)
+		case GLFW_KEY_S:
+			if (Vis_Polar == POLARZ)
+			{ // (X,Y,Z)
 				opvN.x -= fact_pan * vdir[0];
 				opvN.y -= fact_pan * vdir[1];
 				n[0] -= fact_pan * vdir[0];
 				n[1] -= fact_pan * vdir[1];
 			}
-			else if (Vis_Polar == POLARY) { //(X,Y,Z) --> (Z,X,Y)
+			else if (Vis_Polar == POLARY)
+			{ //(X,Y,Z) --> (Z,X,Y)
 				opvN.x -= fact_pan * vdir[0];
 				opvN.z -= fact_pan * vdir[2];
 				n[0] -= fact_pan * vdir[0];
 				n[2] -= fact_pan * vdir[2];
 			}
-			else if (Vis_Polar == POLARX) { //(X,Y,Z) --> (Y,Z,X)
+			else if (Vis_Polar == POLARX)
+			{ //(X,Y,Z) --> (Y,Z,X)
 				opvN.y -= fact_pan * vdir[1];
 				opvN.z -= fact_pan * vdir[2];
 				n[1] -= fact_pan * vdir[1];
@@ -4957,66 +5438,63 @@ void Teclat_Navega(int key, int action)
 			}
 			break;
 
-			// Tecla cursor esquerra
+			// Tecla cursor esquerra o A
 		case GLFW_KEY_LEFT:
-			angleZ += fact_pan;
-			if (Vis_Polar == POLARZ) { // (X,Y,Z)
-				n[0] = vdir[0]; // n[0] - opvN.x;
-				n[1] = vdir[1]; // n[1] - opvN.y;
-				n[0] = n[0] * cos(angleZ * PI / 180) - n[1] * sin(angleZ * PI / 180);
-				n[1] = n[0] * sin(angleZ * PI / 180) + n[1] * cos(angleZ * PI / 180);
-				n[0] = n[0] + opvN.x;
-				n[1] = n[1] + opvN.y;
+		case GLFW_KEY_A:
+			angleZ = fact_pan;
+			if (Vis_Polar == POLARZ)
+			{ // (X,Y,Z)
+				nx = vdir[0] * cos(angleZ * PI / 180.0) - vdir[1] * sin(angleZ * PI / 180.0);
+				ny = vdir[0] * sin(angleZ * PI / 180.0) + vdir[1] * cos(angleZ * PI / 180.0);
+				n[0] = nx + opvN.x;
+				n[1] = ny + opvN.y;
 			}
-			else if (Vis_Polar == POLARY) { //(X,Y,Z) --> (Z,X,Y)
-				n[2] = vdir[2]; // n[2] - opvN.z;
-				n[0] = vdir[0]; // n[0] - opvN.x;
-				n[2] = n[2] * cos(angleZ * PI / 180) - n[0] * sin(angleZ * PI / 180);
-				n[0] = n[2] * sin(angleZ * PI / 180) + n[0] * cos(angleZ * PI / 180);
-				n[2] = n[2] + opvN.z;
-				n[0] = n[0] + opvN.x;
+			else if (Vis_Polar == POLARY)
+			{ //(X,Y,Z) --> (Z,X,Y)
+				nz = vdir[2] * cos(angleZ * PI / 180.0) - vdir[0] * sin(angleZ * PI / 180.0);
+				nx = vdir[2] * sin(angleZ * PI / 180.0) + vdir[0] * cos(angleZ * PI / 180.0);
+				n[2] = nz + opvN.z;
+				n[0] = nx + opvN.x;
 			}
-			else if (Vis_Polar == POLARX) { //(X,Y,Z) --> (Y,Z,X)
-				n[1] = vdir[1]; // n[1] - opvN.y;
-				n[2] = vdir[2]; // n[2] - opvN.z;
-				n[1] = n[1] * cos(angleZ * PI / 180) - n[2] * sin(angleZ * PI / 180);
-				n[2] = n[1] * sin(angleZ * PI / 180) + n[2] * cos(angleZ * PI / 180);
-				n[1] = n[1] + opvN.y;
-				n[2] = n[2] + opvN.z;
+			else if (Vis_Polar == POLARX)
+			{ //(X,Y,Z) --> (Y,Z,X)
+				ny = vdir[1] * cos(angleZ * PI / 180.0) - vdir[2] * sin(angleZ * PI / 180.0);
+				nz = vdir[1] * sin(angleZ * PI / 180.0) + vdir[2] * cos(angleZ * PI / 180.0);
+				n[1] = ny + opvN.y;
+				n[2] = nz + opvN.z;
 			}
 			break;
 
-			// Tecla cursor dret
+			// Tecla cursor dret o D
 		case GLFW_KEY_RIGHT:
-			angleZ = 360 - fact_pan;
-			if (Vis_Polar == POLARZ) { // (X,Y,Z)
-				n[0] = vdir[0]; // n[0] - opvN.x;
-				n[1] = vdir[1]; // n[1] - opvN.y;
-				n[0] = n[0] * cos(angleZ * PI / 180) - n[1] * sin(angleZ * PI / 180);
-				n[1] = n[0] * sin(angleZ * PI / 180) + n[1] * cos(angleZ * PI / 180);
-				n[0] = n[0] + opvN.x;
-				n[1] = n[1] + opvN.y;
+		case GLFW_KEY_D:
+			angleZ = 360.0 - fact_pan;
+			if (Vis_Polar == POLARZ)
+			{ // (X,Y,Z)
+				nx = vdir[0] * cos(angleZ * PI / 180.0) - vdir[1] * sin(angleZ * PI / 180.0);
+				ny = vdir[0] * sin(angleZ * PI / 180.0) + vdir[1] * cos(angleZ * PI / 180.0);
+				n[0] = nx + opvN.x;
+				n[1] = ny + opvN.y;
 			}
-			else if (Vis_Polar == POLARY) { //(X,Y,Z) --> (Z,X,Y)
-				n[2] = vdir[2]; // n[2] - opvN.z;
-				n[0] = vdir[0]; // n[0] - opvN.x;
-				n[2] = n[2] * cos(angleZ * PI / 180) - n[0] * sin(angleZ * PI / 180);
-				n[0] = n[2] * sin(angleZ * PI / 180) + n[0] * cos(angleZ * PI / 180);
-				n[2] = n[2] + opvN.z;
-				n[0] = n[0] + opvN.x;
+			else if (Vis_Polar == POLARY)
+			{ //(X,Y,Z) --> (Z,X,Y)
+				nz = vdir[2] * cos(angleZ * PI / 180.0) - vdir[0] * sin(angleZ * PI / 180.0);
+				nx = vdir[2] * sin(angleZ * PI / 180.0) + vdir[0] * cos(angleZ * PI / 180.0);
+				n[2] = nz + opvN.z;
+				n[0] = nx + opvN.x;
 			}
-			else if (Vis_Polar == POLARX) { //(X,Y,Z) --> (Y,Z,X)
-				n[1] = vdir[1]; // n[1] - opvN.y;
-				n[2] = vdir[2]; // n[2] - opvN.z;
-				n[1] = n[1] * cos(angleZ * PI / 180) - n[2] * sin(angleZ * PI / 180);
-				n[2] = n[1] * sin(angleZ * PI / 180) + n[2] * cos(angleZ * PI / 180);
-				n[1] = n[1] + opvN.y;
-				n[2] = n[2] + opvN.z;
+			else if (Vis_Polar == POLARX)
+			{ //(X,Y,Z) --> (Y,Z,X)
+				ny = vdir[1] * cos(angleZ * PI / 180.0) - vdir[2] * sin(angleZ * PI / 180.0);
+				nz = vdir[1] * sin(angleZ * PI / 180.0) + vdir[2] * cos(angleZ * PI / 180.0);
+				n[1] = ny + opvN.y;
+				n[2] = nz + opvN.z;
 			}
 			break;
 
-			// Tecla Inicio ('7')
+			// Tecla Inicio ('7') o Q (Pujar)
 		case GLFW_KEY_KP_7: //GLFW_KEY_HOME:
+		case GLFW_KEY_Q:
 			if (Vis_Polar == POLARZ) {
 				opvN.z += fact_pan;
 				n[2] += fact_pan;
@@ -5031,8 +5509,9 @@ void Teclat_Navega(int key, int action)
 			}
 			break;
 
-			// Tecla Fin
+			// Tecla Fin o E (Baixar)
 		case GLFW_KEY_END:
+		case GLFW_KEY_E:
 			if (Vis_Polar == POLARZ) {
 				opvN.z -= fact_pan;
 				n[2] -= fact_pan;
@@ -5097,36 +5576,36 @@ void Teclat_Pan(int key, int action)
 			// Tecla cursor esquerra
 		case GLFW_KEY_LEFT:
 			tr_cpv.x += fact_pan;
-			if (tr_cpv.x > 100000) tr_cpv.x = 100000;
+			if (tr_cpv.x > 100000.0) tr_cpv.x = 100000.0;
 			break;
 
 			// Tecla cursor dret
 		case GLFW_KEY_RIGHT:
 			tr_cpv.x -= fact_pan;
-			if (tr_cpv.x < -100000) tr_cpv.x = 100000;
+			if (tr_cpv.x < -100000.0) tr_cpv.x = 100000;
 			break;
 
 			// Tecla PgUp ('9')
-		case GLFW_KEY_KP_9: //GLFW_KEY_PAGE_UP:
-			fact_pan /= 2;
+		case GLFW_KEY_KP_9: //GLFW_KEY_PAGE_UP.0
+			fact_pan /= 2.0;
 			if (fact_pan < 0.125) fact_pan = 0.125;
 			break;
 
 			// Tecla PgDown ('3')
 		case GLFW_KEY_KP_3: //GLFW_KEY_PAGE_DOWN:
-			fact_pan *= 2;
-			if (fact_pan > 2048) fact_pan = 2048;
+			fact_pan *= 2.0;
+			if (fact_pan > 2048.0) fact_pan = 2048.0;
 			break;
 
 			// Tecla Insert: Fixar el desplaçament de pantalla (pan)
 		case GLFW_KEY_INSERT:
 			// Acumular desplaçaments de pan (tr_cpv) en variables fixes (tr_cpvF).
 			tr_cpvF.x += tr_cpv.x;		tr_cpv.x = 0.0;
-			if (tr_cpvF.x > 100000) tr_cpvF.y = 100000;
+			if (tr_cpvF.x > 100000.0)	tr_cpvF.x = 100000.0;
 			tr_cpvF.y += tr_cpv.y;		tr_cpv.y = 0.0;
-			if (tr_cpvF.y > 100000) tr_cpvF.y = 100000;
+			if (tr_cpvF.y > 100000.0)	tr_cpvF.y = 100000.0;
 			tr_cpvF.z += tr_cpv.z;		tr_cpv.z = 0.0;
-			if (tr_cpvF.z > 100000) tr_cpvF.z = 100000;
+			if (tr_cpvF.z > 100000.0)	tr_cpvF.z = 100000.0;
 			break;
 
 			// Tecla Delete: Inicialitzar el desplaçament de pantalla (pan)
@@ -5137,6 +5616,15 @@ void Teclat_Pan(int key, int action)
 			break;
 
 		default:
+			if (transf)
+			{
+				if (rota) Teclat_TransRota(key, action);
+				else if (trasl) Teclat_TransTraslada(key, action);
+				else if (escal) Teclat_TransEscala(key, action);
+			}
+			else if (camera == CAM_NAVEGA) Teclat_Navega(key, action);
+			else if (!sw_color) Teclat_ColorFons(key, action);
+			else Teclat_ColorObjecte(key, action);
 			break;
 		}
 	}
@@ -5152,78 +5640,78 @@ void Teclat_TransEscala(int key, int action)
 			// Modificar vector d'Escalatge per teclat (actiu amb Escalat únicament)
 					// Tecla '+' (augmentar tot l'escalat)
 		case GLFW_KEY_KP_ADD:
-			TG.VScal.x = TG.VScal.x * 2;
-			if (TG.VScal.x > 8192) TG.VScal.x = 8192;
-			TG.VScal.y = TG.VScal.y * 2;
-			if (TG.VScal.y > 8192) TG.VScal.y = 8192;
-			TG.VScal.z = TG.VScal.z * 2;
-			if (TG.VScal.z > 8192) TG.VScal.z = 8192;
+			TG.VScal.x = TG.VScal.x * 2.0;
+			if (TG.VScal.x > 8192.0) TG.VScal.x = 8192.0;
+			TG.VScal.y = TG.VScal.y * 2.0;
+			if (TG.VScal.y > 8192.0) TG.VScal.y = 8192.0;
+			TG.VScal.z = TG.VScal.z * 2.0;
+			if (TG.VScal.z > 8192.0) TG.VScal.z = 8192.0;
 			break;
 
 			// Tecla '-' (disminuir tot l'escalat)
 		case GLFW_KEY_KP_SUBTRACT:
-			TG.VScal.x = TG.VScal.x / 2;
-			if (TG.VScal.x < 0.25) TG.VScal.x = 0.25;
-			TG.VScal.y = TG.VScal.y / 2;
-			if (TG.VScal.y < 0.25) TG.VScal.y = 0.25;
-			TG.VScal.z = TG.VScal.z / 2;
-			if (TG.VScal.z < 0.25) TG.VScal.z = 0.25;
+			TG.VScal.x = TG.VScal.x / 2.0;
+			if (TG.VScal.x < 0.125) TG.VScal.x = 0.125;
+			TG.VScal.y = TG.VScal.y / 2.0;
+			if (TG.VScal.y < 0.125) TG.VScal.y = 0.125;
+			TG.VScal.z = TG.VScal.z / 2.0;
+			if (TG.VScal.z < 0.125) TG.VScal.z = 0.125;
 			break;
 
 			// Tecla cursor amunt ('8')
 		case GLFW_KEY_UP:
-			TG.VScal.x = TG.VScal.x * 2;
-			if (TG.VScal.x > 8192) TG.VScal.x = 8192;
+			TG.VScal.x = TG.VScal.x * 2.0;
+			if (TG.VScal.x > 8192.0) TG.VScal.x = 8192.0;
 			break;
 
 			// Tecla cursor avall ('2')
 		case GLFW_KEY_DOWN:
-			TG.VScal.x = TG.VScal.x / 2;
+			TG.VScal.x = TG.VScal.x / 2.0;
 			if (TG.VScal.x < 0.25) TG.VScal.x = 0.25;
 			break;
 
 			// Tecla cursor esquerra ('4')
 		case GLFW_KEY_LEFT:
-			TG.VScal.y = TG.VScal.y / 2;
-			if (TG.VScal.y < 0.25) TG.VScal.y = 0.25;
+			TG.VScal.y = TG.VScal.y / 2.0;
+			if (TG.VScal.y < 0.125) TG.VScal.y = 0.125;
 			break;
 
 			// Tecla cursor dret ('6')
 		case GLFW_KEY_RIGHT:
-			TG.VScal.y = TG.VScal.y * 2;
-			if (TG.VScal.y > 8192) TG.VScal.y = 8192;
+			TG.VScal.y = TG.VScal.y * 2.0;
+			if (TG.VScal.y > 8192.0) TG.VScal.y = 8192.0;
 			break;
 
 			// Tecla HOME ('7')
 		case GLFW_KEY_KP_7: //GLFW_KEY_HOME:
-			TG.VScal.z = TG.VScal.z * 2;
-			if (TG.VScal.z > 8192) TG.VScal.z = 8192;
+			TG.VScal.z = TG.VScal.z * 2.0;
+			if (TG.VScal.z > 8192.0) TG.VScal.z = 8192.0;
 			break;
 
 			// Tecla END ('1')
 		case GLFW_KEY_KP_1: //GLFW_KEY_END:
-			TG.VScal.z = TG.VScal.z / 2;
-			if (TG.VScal.z < 0.25) TG.VScal.z = 0.25;
+			TG.VScal.z = TG.VScal.z / 2.0;
+			if (TG.VScal.z < 0.125) TG.VScal.z = 0.125;
 			break;
 
 			// Tecla INSERT
 		case GLFW_KEY_INSERT:
 			// Acumular transformacions Geomètriques (variable TG) i de pan en variables fixes (variable TGF)
 			TGF.VScal.x *= TG.VScal.x;	TGF.VScal.y *= TG.VScal.y; TGF.VScal.z *= TG.VScal.z;
-			if (TGF.VScal.x > 8192)		TGF.VScal.x = 8192;
-			if (TGF.VScal.y > 8192)		TGF.VScal.y = 8192;
-			if (TGF.VScal.z > 8192)		TGF.VScal.z = 8192;
-			TG.VScal.x = 1.0;				TG.VScal.y = 1.0;			TG.VScal.z = 1.0;
-			TGF.VRota.x += TG.VRota.x;	TGF.VRota.y += TG.VRota.y; TGF.VRota.z += TG.VRota.z;
-			if (TGF.VRota.x >= 360)		TGF.VRota.x -= 360; 		if (TGF.VRota.x < 0) TGF.VRota.x += 360;
-			if (TGF.VRota.y >= 360)		TGF.VRota.y -= 360;		if (TGF.VRota.y < 0) TGF.VRota.y += 360;
-			if (TGF.VRota.z >= 360)		TGF.VRota.z -= 360;		if (TGF.VRota.z < 0) TGF.VRota.z += 360;
-			TG.VRota.x = 0.0;				TG.VRota.y = 0.0;					TG.VRota.z = 0.0;
-			TGF.VTras.x += TG.VTras.x;	TGF.VTras.y += TG.VTras.y; TGF.VTras.z += TG.VTras.z;
-			if (TGF.VTras.x < -100000)		TGF.VTras.x = 100000;		if (TGF.VTras.x > 10000) TGF.VTras.x = 100000;
-			if (TGF.VTras.y < -100000)		TGF.VTras.y = 100000;		if (TGF.VTras.y > 10000) TGF.VTras.y = 100000;
-			if (TGF.VTras.z < -100000)		TGF.VTras.z = 100000;		if (TGF.VTras.z > 10000) TGF.VTras.z = 100000;
-			TG.VTras.x = 0.0;		TG.VTras.y = 0.0;		TG.VTras.z = 0.0;
+			if (TGF.VScal.x > 8192.0) TGF.VScal.x = 8192.0;		if (TG.VScal.x < 0.125) TG.VScal.x = 0.125;
+			if (TGF.VScal.y > 8192.0) TGF.VScal.y = 8192.0;		if (TG.VScal.y < 0.125) TG.VScal.y = 0.125;
+			if (TGF.VScal.z > 8192.0) TGF.VScal.z = 8192.0;		if (TG.VScal.z < 0.125) TG.VScal.z = 0.125;
+			TG.VScal.x = 1.0;				TG.VScal.y = 1.0;		TG.VScal.z = 1.0;
+			TGF.VRota.x += TG.VRota.x;		TGF.VRota.y += TG.VRota.y;	TGF.VRota.z += TG.VRota.z;
+			if (TGF.VRota.x >= 360.0) TGF.VRota.x -= 360.0; 		if (TGF.VRota.x < 0) TGF.VRota.x += 360.0;
+			if (TGF.VRota.y >= 360.0) TGF.VRota.y -= 360.0;		if (TGF.VRota.y < 0.0) TGF.VRota.y += 360.0;
+			if (TGF.VRota.z >= 360.0) TGF.VRota.z -= 360.0;		if (TGF.VRota.z < 0.0) TGF.VRota.z += 360.0;
+			TG.VRota.x = 0.0;				TG.VRota.y = 0.0;			TG.VRota.z = 0.0;
+			TGF.VTras.x += TG.VTras.x;		TGF.VTras.y += TG.VTras.y;	TGF.VTras.z += TG.VTras.z;
+			if (TGF.VTras.x < -100000.0) TGF.VTras.x = 100000.0;	if (TGF.VTras.x > 10000.0) TGF.VTras.x = 100000.0;
+			if (TGF.VTras.y < -100000.0) TGF.VTras.y = 100000.0;	if (TGF.VTras.y > 10000.0) TGF.VTras.y = 100000.0;
+			if (TGF.VTras.z < -100000.0) TGF.VTras.z = 100000.0;	if (TGF.VTras.z > 10000.0) TGF.VTras.z = 100000.0;
+			TG.VTras.x = 0.0;				TG.VTras.y = 0.0;		TG.VTras.z = 0.0;
 			break;
 
 			// Tecla Delete: Esborrar les Transformacions Geomètriques Calculades
@@ -5257,104 +5745,176 @@ void Teclat_TransRota(int key, int action)
 			// Tecla cursor amunt ('8')
 		case GLFW_KEY_UP:
 			TG.VRota.x += fact_Rota;
-			if (TG.VRota.x >= 360) TG.VRota.x -= 360;
+			if (TG.VRota.x >= 360.0) TG.VRota.x -= 360.0;
+			// Entorn VGI. QUATERNIONS: Definir nou angle rotació X com a quaternió (angleQ) i multiplicar-lo per qT --> qT=angleQ*qT. 
+			if (rotaQ) {
+				/*							angle += nRepCnt * fact_Rota;
+											while (angle >= 360.0f) angle -= 360.0f;
+											EixAngleToQuat(1.0, 0.0, 0.0, angle, angleQ);
+											QuatMul(angleQ, qT, qT);
+											QuatToMatrix(qT, QMatrix);
+				*/
+			}
 			break;
 
 			// Tecla cursor avall ('2')
 		case GLFW_KEY_DOWN:
 			TG.VRota.x -= fact_Rota;
-			if (TG.VRota.x < 1) TG.VRota.x += 360;
+			if (TG.VRota.x < 1.0) TG.VRota.x += 360.0;
+			// Entorn VGI. QUATERNIONS: Definir nou angle rotació X com a quaternió (angleQ) i multiplicar-lo per qT --> qT=angleQ*qT.
+			if (rotaQ) { 	// TO DO. PENDENT DE FER.
+
+			}
 			break;
 
 			// Tecla cursor esquerra ('4')
 		case GLFW_KEY_LEFT:
 			TG.VRota.y -= fact_Rota;
-			if (TG.VRota.y < 1) TG.VRota.y += 360;
+			if (TG.VRota.y < 1.0) TG.VRota.y += 360.0;
+			// Entorn VGI. QUATERNIONS: Definir nou angle rotació X com a quaternió (angleQ) i multiplicar-lo per qT --> qT=angleQ*qT.
+			if (rotaQ) {	// TO DO. PENDENT DE FER.
+
+			}
 			break;
 
 			// Tecla cursor dret ('6')
 		case GLFW_KEY_RIGHT:
 			TG.VRota.y += fact_Rota;
-			if (TG.VRota.y >= 360) TG.VRota.y -= 360;
+			if (TG.VRota.y >= 360.0) TG.VRota.y -= 360.0;
+			// Entorn VGI. QUATERNIONS: Definir nou angle rotació X com a quaternió (angleQ) i multiplicar-lo per qT --> qT=angleQ*qT.
+			if (rotaQ) {	// TO DO. PENDENT DE FER.
+
+			}
 			break;
 
 			// Tecla HOME ('7')
 		case GLFW_KEY_KP_7: //GLFW_KEY_HOME:
 			TG.VRota.z += fact_Rota;
-			if (TG.VRota.z >= 360) TG.VRota.z -= 360;
+			if (TG.VRota.z >= 360.0) TG.VRota.z -= 360.0;
+			// Entorn VGI. QUATERNIONS: Definir nou angle rotació X com a quaternió (angleQ) i multiplicar-lo per qT --> qT=angleQ*qT.
+			if (rotaQ) {	// TO DO. PENDENT DE FER.
+
+			}
 			break;
 
 			// Tecla END ('1')
 		case GLFW_KEY_KP_1: //GLFW_KEY_END:
 			TG.VRota.z -= fact_Rota;
-			if (TG.VRota.z < 1) TG.VRota.z += 360;
+			if (TG.VRota.z < 1.0) TG.VRota.z += 360.0;
+			// Entorn VGI. QUATERNIONS: Definir nou angle rotació X com a quaternió (angleQ) i multiplicar-lo per qT --> qT=angleQ*qT.
+			if (rotaQ) {	// TO DO. PENDENT DE FER.
+
+			}
 			break;
 
 			// Tecla PgUp ('9')
 		case GLFW_KEY_KP_9: //GLFW_KEY_PAGE_UP:
 			fact_Rota /= 2;
-			if (fact_Rota < 1) fact_Rota = 1;
+			if (fact_Rota < 1.0) fact_Rota = 1.0;
 			break;
 
 			// Tecla PgDown ('3')
 		case GLFW_KEY_KP_3:// GLFW_KEY_PAGE_DOWN:
-			fact_Rota *= 2;
+			fact_Rota *= 2.0;
 			if (fact_Rota > 90) fact_Rota = 90;
+			break;
+
+			// Entorn VGI. QUATERNIONS: Tecla F5 (Activar animació cossos rígids per QUATERNIONS) -> PENDENT DE FER
+		case GLFW_KEY_F5:
+			if (rotaQ) { // TO DO. PENDENT DE FER
+
+			}
+			break;
+
+			// Entorn VGI. QUATERNIONS: Tecla Pausa (Activar/parar animació cossos rígids per QUATERNIONS) -> PENDENT DE FER
+		case GLFW_KEY_PAUSE:
+			if (rotaQ) {	// TO DO. PENDENT DE FER
+
+			}
+			break;
+
+			// Entorn VGI. QUATERNIONS: Tecla End (Para animació i inicialitzar vector Keyframes - PENDENT DE FER
+		case GLFW_KEY_END:
+			if (rotaQ) {	// TO DO. PENDENT DE FER
+
+			}
+			break;
+
+			// Entorn VGI. QUATERNIONS:  Tecla F3 (Accelerar animació cossos rígids per QUATERNIONS) - PENDENT DE FER (ADDICIONAL)
+		case GLFW_KEY_F3:
+			if (rotaQ) {	// TO DO. PENDENT DE FER (ADDICIONAL)
+
+			}
+			break;
+
+			// Entorn VGI. QUATERNIONS: Tecla F4 (Desaccelerar animació cossos rígids per QUATERNIONS) - PENDENT DE FER (ADDICIONAL)
+		case GLFW_KEY_F4:
+			if (rotaQ) {	// TO Do. PENDENT DE FER (ADDICIONAL)
+
+			}
+			break;
+
+
+
+			// Tecla Insert: Acumular transformacions Geomètriques (variable TG) i de pan en variables fixes (variable TGF)
+		case GLFW_KEY_INSERT:
+			// Entorn VGI. QUATERNIONS: Fixar els Quaternions en els keyframes (animació cossos rígids per QUATERNIONS)
+			if (rotaQ) { // TO DO. PENDENT DE FER
+
+			}
+			else {
+				TGF.VScal.x *= TG.VScal.x;		TGF.VScal.y *= TG.VScal.y; TGF.VScal.z *= TG.VScal.z;
+				if (TGF.VScal.x > 8192.0) TGF.VScal.x = 8192.0;			if (TG.VScal.x < 0.125) TG.VScal.x = 0.125;
+				if (TGF.VScal.y > 8192.0) TGF.VScal.y = 8192.0;			if (TG.VScal.y < 0.125) TG.VScal.y = 0.125;
+				if (TGF.VScal.z > 8192.0) TGF.VScal.z = 8192.0;			if (TG.VScal.z < 0.125) TG.VScal.z = 0.125;
+				TG.VScal.x = 1.0;				TG.VScal.y = 1.0;			TG.VScal.z = 1.0;
+				TGF.VRota.x += TG.VRota.x;		TGF.VRota.y += TG.VRota.y;	TGF.VRota.z += TG.VRota.z;
+				if (TGF.VRota.x >= 360.0) TGF.VRota.x -= 360.0; 		if (TGF.VRota.x < 0.0) TGF.VRota.x += 360.0;
+				if (TGF.VRota.y >= 360.0) TGF.VRota.y -= 360.0;			if (TGF.VRota.y < 0.0) TGF.VRota.y += 360.0;
+				if (TGF.VRota.z >= 360.0) TGF.VRota.z -= 360.0;			if (TGF.VRota.z < 0.0) TGF.VRota.z += 360.0;
+				TG.VRota.x = 0.0;				TG.VRota.y = 0.0;			TG.VRota.z = 0.0;
+				TGF.VTras.x += TG.VTras.x;		TGF.VTras.y += TG.VTras.y;	TGF.VTras.z += TG.VTras.z;
+				if (TGF.VTras.x < -100000.0) TGF.VTras.x = 100000.0;	if (TGF.VTras.x > 10000.0) TGF.VTras.x = 100000.0;
+				if (TGF.VTras.y < -100000.0) TGF.VTras.y = 100000.0;	if (TGF.VTras.y > 10000.0) TGF.VTras.y = 100000.0;
+				if (TGF.VTras.z < -100000.0) TGF.VTras.z = 100000.0;	if (TGF.VTras.z > 10000.0) TGF.VTras.z = 100000.0;
+				TG.VTras.x = 0.0;				TG.VTras.y = 0.0;			TG.VTras.z = 0.0;
+			}
+			break;
+
+			// Tecla Delete: Esborrar les Transformacions Geomètriques Calculades
+		case GLFW_KEY_DELETE:
+			// Inicialitzar els valors de transformacions Geomètriques i de pan en variables fixes.
+			TGF.VScal.x = 1.0;		TGF.VScal.y = 1.0;;	TGF.VScal.z = 1.0;
+			TG.VScal.x = 1.0;		TG.VScal.y = 1.0;		TG.VScal.z = 1.0;
+			TGF.VRota.x = 0.0;		TGF.VRota.y = 0.0;	TGF.VRota.z = 0.0;
+			TG.VRota.x = 0.0;		TG.VRota.y = 0.0;		TG.VRota.z = 0.0;
+			TGF.VTras.x = 0.0;		TGF.VTras.y = 0.0;	TGF.VTras.z = 0.0;
+			TG.VTras.x = 0.0;		TG.VTras.y = 0.0;		TG.VTras.z = 0.0;
 			break;
 
 			// Modificar vector d'Escalatge per teclat
 			// Tecla '+' (augmentar escalat)
 		case GLFW_KEY_KP_ADD:
 			if (escal) {
-				TG.VScal.x = TG.VScal.x * 2;
-				if (TG.VScal.x > 8192) TG.VScal.x = 8192;
-				TG.VScal.y = TG.VScal.y * 2;
-				if (TG.VScal.y > 8192) TG.VScal.y = 8192;
-				TG.VScal.z = TG.VScal.z * 2;
-				if (TG.VScal.z > 8192) TG.VScal.z = 8192;
+				TG.VScal.x = TG.VScal.x * 2.0;
+				if (TG.VScal.x > 8192.0) TG.VScal.x = 8192.0;
+				TG.VScal.y = TG.VScal.y * 2.0;
+				if (TG.VScal.y > 8192.0) TG.VScal.y = 8192.0;
+				TG.VScal.z = TG.VScal.z * 2.0;
+				if (TG.VScal.z > 8192.0) TG.VScal.z = 8192.0;
 			}
 			break;
 
 			// Tecla '-' (disminuir escalat)
 		case GLFW_KEY_KP_SUBTRACT:
 			if (escal) {
-				TG.VScal.x = TG.VScal.x / 2;
-				if (TG.VScal.x < 0.25) TG.VScal.x = 0.25;
-				TG.VScal.y = TG.VScal.y / 2;
-				if (TG.VScal.y < 0.25) TG.VScal.y = 0.25;
-				TG.VScal.z = TG.VScal.z / 2;
-				if (TG.VScal.z < 0.25) TG.VScal.z = 0.25;
+				TG.VScal.x = TG.VScal.x / 2.0;
+				if (TG.VScal.x < 0.125) TG.VScal.x = 0.125;
+				TG.VScal.y = TG.VScal.y / 2.0;
+				if (TG.VScal.y < 0.125) TG.VScal.y = 0.125;
+				TG.VScal.z = TG.VScal.z / 2.0;
+				if (TG.VScal.z < 0.125) TG.VScal.z = 0.125;
 			}
-			break;
-
-			// Tecla Insert: Acumular transformacions Geomètriques (variable TG) i de pan en variables fixes (variable TGF)
-		case GLFW_KEY_INSERT:
-			TGF.VScal.x *= TG.VScal.x;	TGF.VScal.y *= TG.VScal.y; TGF.VScal.z *= TG.VScal.z;
-			if (TGF.VScal.x > 8192)		TGF.VScal.x = 8192;
-			if (TGF.VScal.y > 8192)		TGF.VScal.y = 8192;
-			if (TGF.VScal.z > 8192)		TGF.VScal.z = 8192;
-			TG.VScal.x = 1.0;				TG.VScal.y = 1.0;			TG.VScal.z = 1.0;
-			TGF.VRota.x += TG.VRota.x;	TGF.VRota.y += TG.VRota.y; TGF.VRota.z += TG.VRota.z;
-			if (TGF.VRota.x >= 360)		TGF.VRota.x -= 360; 		if (TGF.VRota.x < 0) TGF.VRota.x += 360;
-			if (TGF.VRota.y >= 360)		TGF.VRota.y -= 360;		if (TGF.VRota.y < 0) TGF.VRota.y += 360;
-			if (TGF.VRota.z >= 360)		TGF.VRota.z -= 360;		if (TGF.VRota.z < 0) TGF.VRota.z += 360;
-			TG.VRota.x = 0.0;				TG.VRota.y = 0.0;					TG.VRota.z = 0.0;
-			TGF.VTras.x += TG.VTras.x;	TGF.VTras.y += TG.VTras.y; TGF.VTras.z += TG.VTras.z;
-			if (TGF.VTras.x < -100000)		TGF.VTras.x = 100000;		if (TGF.VTras.x > 10000) TGF.VTras.x = 100000;
-			if (TGF.VTras.y < -100000)		TGF.VTras.y = 100000;		if (TGF.VTras.y > 10000) TGF.VTras.y = 100000;
-			if (TGF.VTras.z < -100000)		TGF.VTras.z = 100000;		if (TGF.VTras.z > 10000) TGF.VTras.z = 100000;
-			TG.VTras.x = 0.0;		TG.VTras.y = 0.0;		TG.VTras.z = 0.0;
-			break;
-
-			// Tecla Delete: Esborrar les Transformacions Geomètriques Calculades
-		case GLFW_KEY_DELETE:
-			// Inicialitzar els valors de transformacions Geomètriques i de pan en variables fixes.
-			TGF.VScal.x = 1.0;	TGF.VScal.y = 1.0;;	TGF.VScal.z = 1.0;
-			TG.VScal.x = 1.0;		TG.VScal.y = 1.0;		TG.VScal.z = 1.0;
-			TGF.VRota.x = 0.0;	TGF.VRota.y = 0.0;	TGF.VRota.z = 0.0;
-			TG.VRota.x = 0.0;		TG.VRota.y = 0.0;		TG.VRota.z = 0.0;
-			TGF.VTras.x = 0.0;	TGF.VTras.y = 0.0;	TGF.VTras.z = 0.0;
-			TG.VTras.x = 0.0;		TG.VTras.y = 0.0;		TG.VTras.z = 0.0;
 			break;
 
 			// Tecla Espaiador
@@ -5387,94 +5947,94 @@ void Teclat_TransTraslada(int key, int action)
 			// Tecla cursor amunt ('8') - (ASCII:104)
 		case GLFW_KEY_UP:
 			TG.VTras.x -= fact_Tras;
-			if (TG.VTras.x < -100000) TG.VTras.x = 100000;
+			if (TG.VTras.x < -100000.0) TG.VTras.x = 100000.0;
 			break;
 
 			// Tecla cursor avall ('2') - (ASCII:98)
 		case GLFW_KEY_DOWN:
 			TG.VTras.x += fact_Tras;
-			if (TG.VTras.x > 10000) TG.VTras.x = 100000;
+			if (TG.VTras.x > 10000.0) TG.VTras.x = 100000.0;
 			break;
 
 			// Tecla cursor esquerra ('4') - (ASCII:100)
 		case GLFW_KEY_LEFT:
 			TG.VTras.y -= fact_Tras;
-			if (TG.VTras.y < -100000) TG.VTras.y = -100000;
+			if (TG.VTras.y < -100000.0) TG.VTras.y = -100000.0;
 			break;
 
 			// Tecla cursor dret ('6') - (ASCII:102)
 		case GLFW_KEY_RIGHT:
 			TG.VTras.y += fact_Tras;
-			if (TG.VTras.y > 100000) TG.VTras.y = 100000;
+			if (TG.VTras.y > 100000.0) TG.VTras.y = 100000.0;
 			break;
 
 			// Tecla HOME ('7') - (ASCII:103)
 		case GLFW_KEY_KP_7: //GLFW_KEY_HOME:
 			TG.VTras.z += fact_Tras;
-			if (TG.VTras.z > 100000) TG.VTras.z = 100000;
+			if (TG.VTras.z > 100000.0) TG.VTras.z = 100000.0;
 			break;
 
 			// Tecla END ('1') - (ASCII:10#)
 		case GLFW_KEY_KP_1: //GLFW_KEY_END:
 			TG.VTras.z -= fact_Tras;
-			if (TG.VTras.z < -100000) TG.VTras.z = -100000;
+			if (TG.VTras.z < -100000.0) TG.VTras.z = -100000.0;
 			break;
 
 			// Tecla PgUp ('9') - (ASCII:105)
 		case GLFW_KEY_KP_9: //GLFW_KEY_PAGE_UP:
-			fact_Tras /= 2;
-			if (fact_Tras < 1) fact_Tras = 1;
+			fact_Tras /= 2.0;
+			if (fact_Tras < 1.0) fact_Tras = 1.0;
 			break;
 
 			// Tecla PgDown ('3') - (ASCII:99)
 		case GLFW_KEY_KP_3: //GLFW_KEY_PAGE_DOWN:
 			fact_Tras *= 2;
-			if (fact_Tras > 100000) fact_Tras = 100000;
+			if (fact_Tras > 100000.0) fact_Tras = 100000.0;
 			break;
 
 			// Modificar vector d'Escalatge per teclat (actiu amb Traslació)
 			// Tecla '+' (augmentar escalat)
 		case GLFW_KEY_KP_ADD:
 			if (escal) {
-				TG.VScal.x = TG.VScal.x * 2;
-				if (TG.VScal.x > 8192) TG.VScal.x = 8192;
-				TG.VScal.y = TG.VScal.y * 2;
-				if (TG.VScal.y > 8192) TG.VScal.y = 8192;
-				TG.VScal.z = TG.VScal.z * 2;
-				if (TG.VScal.z > 8192) TG.VScal.z = 8192;
+				TG.VScal.x = TG.VScal.x * 2.0;
+				if (TG.VScal.x > 8192.0) TG.VScal.x = 8192.0;
+				TG.VScal.y = TG.VScal.y * 2.0;
+				if (TG.VScal.y > 8192.0) TG.VScal.y = 8192.0;
+				TG.VScal.z = TG.VScal.z * 2.0;
+				if (TG.VScal.z > 8192.0) TG.VScal.z = 8192.0;
 			}
 			break;
 
 			// Tecla '-' (disminuir escalat) . (ASCII:109)
 		case GLFW_KEY_KP_SUBTRACT:
 			if (escal) {
-				TG.VScal.x = TG.VScal.x / 2;
-				if (TG.VScal.x < 0.25) TG.VScal.x = 0.25;
-				TG.VScal.y = TG.VScal.y / 2;
-				if (TG.VScal.y < 0.25) TG.VScal.y = 0.25;
-				TG.VScal.z = TG.VScal.z / 2;
-				if (TG.VScal.z < 0.25) TG.VScal.z = 0.25;
+				TG.VScal.x = TG.VScal.x / 2.0;
+				if (TG.VScal.x < 0.125) TG.VScal.x = 0.125;
+				TG.VScal.y = TG.VScal.y / 2.0;
+				if (TG.VScal.y < 0.125) TG.VScal.y = 0.125;
+				TG.VScal.z = TG.VScal.z / 2.0;
+				if (TG.VScal.z < 0.125) TG.VScal.z = 0.125;
 			}
 			break;
 
 			// Tecla INSERT
 		case GLFW_KEY_INSERT:
 			// Acumular transformacions Geomètriques (variable TG) i de pan en variables fixes (variable TGF)
-			TGF.VScal.x *= TG.VScal.x;	TGF.VScal.y *= TG.VScal.y; TGF.VScal.z *= TG.VScal.z;
-			if (TGF.VScal.x > 8192)		TGF.VScal.x = 8192;
-			if (TGF.VScal.y > 8192)		TGF.VScal.y = 8192;
-			if (TGF.VScal.z > 8192)		TGF.VScal.z = 8192;
+			TGF.VScal.x *= TG.VScal.x;		TGF.VScal.y *= TG.VScal.y; TGF.VScal.z *= TG.VScal.z;
+			if (TGF.VScal.x > 8192.0) TGF.VScal.x = 8192.0;			if (TG.VScal.x < 0.125) TG.VScal.x = 0.125;
+			if (TGF.VScal.y > 8192.0) TGF.VScal.y = 8192.0;			if (TG.VScal.y < 0.125) TG.VScal.y = 0.125;
+			if (TGF.VScal.z > 8192.0) TGF.VScal.z = 8192.0;			if (TG.VScal.z < 0.125) TG.VScal.z = 0.125;
 			TG.VScal.x = 1.0;				TG.VScal.y = 1.0;			TG.VScal.z = 1.0;
-			TGF.VRota.x += TG.VRota.x;	TGF.VRota.y += TG.VRota.y; TGF.VRota.z += TG.VRota.z;
-			if (TGF.VRota.x >= 360)		TGF.VRota.x -= 360; 		if (TGF.VRota.x < 0) TGF.VRota.x += 360;
-			if (TGF.VRota.y >= 360)		TGF.VRota.y -= 360;		if (TGF.VRota.y < 0) TGF.VRota.y += 360;
-			if (TGF.VRota.z >= 360)		TGF.VRota.z -= 360;		if (TGF.VRota.z < 0) TGF.VRota.z += 360;
-			TG.VRota.x = 0.0;				TG.VRota.y = 0.0;					TG.VRota.z = 0.0;
-			TGF.VTras.x += TG.VTras.x;	TGF.VTras.y += TG.VTras.y; TGF.VTras.z += TG.VTras.z;
-			if (TGF.VTras.x < -100000)		TGF.VTras.x = 100000;		if (TGF.VTras.x > 10000) TGF.VTras.x = 100000;
-			if (TGF.VTras.y < -100000)		TGF.VTras.y = 100000;		if (TGF.VTras.y > 10000) TGF.VTras.y = 100000;
-			if (TGF.VTras.z < -100000)		TGF.VTras.z = 100000;		if (TGF.VTras.z > 10000) TGF.VTras.z = 100000;
-			TG.VTras.x = 0.0;		TG.VTras.y = 0.0;		TG.VTras.z = 0.0;
+			TGF.VRota.x += TG.VRota.x;		TGF.VRota.y += TG.VRota.y;	TGF.VRota.z += TG.VRota.z;
+			if (TGF.VRota.x >= 360.0) TGF.VRota.x -= 360.0; 		if (TGF.VRota.x < 0) TGF.VRota.x += 360.0;
+			if (TGF.VRota.y >= 360.0) TGF.VRota.y -= 360.0;			if (TGF.VRota.y < 0.0) TGF.VRota.y += 360.0;
+			if (TGF.VRota.z >= 360.0) TGF.VRota.z -= 360.0;			if (TGF.VRota.z < 0.0) TGF.VRota.z += 360, 0;
+			TG.VRota.x = 0.0;				TG.VRota.y = 0.0;			TG.VRota.z = 0.0;
+			TGF.VTras.x += TG.VTras.x;		TGF.VTras.y += TG.VTras.y; TGF.VTras.z += TG.VTras.z;
+			if (TGF.VTras.x < -100000.0) TGF.VTras.x = 100000.0;	if (TGF.VTras.x > 10000.0) TGF.VTras.x = 100000.0;
+			if (TGF.VTras.y < -100000.0) TGF.VTras.y = 100000.0;	if (TGF.VTras.y > 10000.0) TGF.VTras.y = 100000.0;
+			if (TGF.VTras.z < -100000.0) TGF.VTras.z = 100000.0;	if (TGF.VTras.z > 10000.0) TGF.VTras.z = 100000.0;
+			TG.VTras.x = 0.0;				TG.VTras.y = 0.0;			TG.VTras.z = 0.0;
 			break;
 
 			// Tecla Delete: Esborrar les Transformacions Geomètriques Calculades
@@ -5548,10 +6108,10 @@ void Teclat_Grid(int key, int action)
 			break;
 
 			/*
-			// Key grid ('g')
-			case 'g':
-			sw_grid = !sw_grid;
-			break;
+						// Key grid ('g')
+						case 'g':
+						sw_grid = !sw_grid;
+						break;
 			*/
 
 		default:
@@ -5718,7 +6278,6 @@ void Teclat_PasCorbes(int key, int action)
 }
 
 
-
 /* ------------------------------------------------------------------------- */
 /*                           CONTROL DEL RATOLI                              */
 /* ------------------------------------------------------------------------- */
@@ -5740,11 +6299,10 @@ void OnMouseButton(GLFWwindow* window, int button, int action, int mods)
 	io.AddMouseButtonEvent(button, action);
 
 	// (2) ONLY forward mouse data to your underlying app/game.
-	if (!io.WantCaptureMouse) { //<Tractament mouse de l'aplicació>}
+	if (!io.WantCaptureMouse && !g_EstatSimulador.mostrarSelectorModes) { //<Tractament mouse de l'aplicació>}
 		// OnLButtonDown
 		if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
-		{
-			// Entorn VGI: Detectem en quina posició s'ha apretat el botó esquerra del
+		{	// Entorn VGI: Detectem en quina posició s'ha apretat el botó esquerra del
 			//				mouse i ho guardem a la variable m_PosEAvall i activem flag m_ButoEAvall
 			m_ButoEAvall = true;
 			m_PosEAvall.x = xpos;	m_PosEAvall.y = ypos;
@@ -5794,6 +6352,8 @@ void OnMouseButton(GLFWwindow* window, int button, int action, int mods)
 //					- ypos: Posició Y del cursor del mouse(coord.pantalla) quan el botó s'ha apretat.
 void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 {
+	if (g_EstatSimulador.mostrarSelectorModes) return;
+
 	// TODO: Agregue aquí su código de controlador de mensajes o llame al valor predeterminado
 	double modul = 0;
 	GLdouble vdir[3] = { 0, 0, 0 };
@@ -5801,21 +6361,31 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 
 	// TODO: Add your message handler code here and/or call default
 	if (m_ButoEAvall && mobil && projeccio != CAP)
-	{
-		// Entorn VGI: Determinació dels angles (en graus) segons l'increment
+	{	// Entorn VGI: Determinació dels angles (en graus) segons l'increment
 		//				horitzontal i vertical de la posició del mouse.
 		gir.cx = m_PosEAvall.x - xpos;		gir.cy = m_PosEAvall.y - ypos;
 		m_PosEAvall.x = xpos;				m_PosEAvall.y = ypos;
 		if (camera == CAM_ESFERICA)
 		{	// Càmera Esfèrica
 			OPV.beta = OPV.beta - gir.cx / 2.0;
-			OPV.alfa = OPV.alfa + gir.cy / 2.0;
 
-			// Entorn VGI: Control per evitar el creixement desmesurat dels angles.
-			while (OPV.alfa >= 360)		OPV.alfa = OPV.alfa - 360.0;
-			while (OPV.alfa < 0)		OPV.alfa = OPV.alfa + 360.0;
-			while (OPV.beta >= 360)		OPV.beta = OPV.beta - 360.0;
-			while (OPV.beta < 0)		OPV.beta = OPV.beta + 360.0;
+			// Si estem en mode Càmera Fixa (25º), mantenim alfa fix a 25.0.
+			// En la resta de modes de càmera orbital/global, permetem variar l'angle vertical alfa.
+			if (g_EstatSimulador.cameraConfig.mode == ModeCamera::FIXA_INCLINADA_25) {
+				OPV.alfa = 25.0;
+			}
+			else {
+				OPV.alfa = OPV.alfa + gir.cy / 2.0;
+				while (OPV.alfa >= 360.0)	OPV.alfa = OPV.alfa - 360.0;
+				while (OPV.alfa < 0.0)		OPV.alfa = OPV.alfa + 360.0;
+			}
+
+			while (OPV.beta >= 360.0)		OPV.beta = OPV.beta - 360.0;
+			while (OPV.beta < 0.0)			OPV.beta = OPV.beta + 360.0;
+
+			cam_Esferica[0] = (float)OPV.R;
+			cam_Esferica[1] = (float)OPV.alfa;
+			cam_Esferica[2] = (float)OPV.beta;
 		}
 		else { // Càmera Geode
 			OPV_G.beta = OPV_G.beta + gir.cx / 2.0;
@@ -5834,33 +6404,33 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 		girn.cx = m_PosEAvall.x - xpos;		girn.cy = m_PosEAvall.y - ypos;
 		angleZ = girn.cx / 2.0;
 		// Entorn VGI: Control per evitar el creixement desmesurat dels angles.
-		while (angleZ >= 360, 0) angleZ = angleZ - 360;
-		while (angleZ < 0.0)	angleZ = angleZ + 360;
+		while (angleZ >= 360.0) angleZ = angleZ - 360.0;
+		while (angleZ < 0.0)	angleZ = angleZ + 360.0;
 
 		// Entorn VGI: Segons orientació dels eixos Polars (Vis_Polar)
-		if (Vis_Polar == POLARZ) { // (X,Y,Z)
-			n[0] = n[0] - opvN.x;
-			n[1] = n[1] - opvN.y;
-			n[0] = n[0] * cos(angleZ * PI / 180.0) - n[1] * sin(angleZ * PI / 180.0);
-			n[1] = n[0] * sin(angleZ * PI / 180.0) + n[1] * cos(angleZ * PI / 180.0);
-			n[0] = n[0] + opvN.x;
-			n[1] = n[1] + opvN.y;
+		if (Vis_Polar == POLARZ)
+		{ // (X,Y,Z)
+			double dx = n[0] - opvN.x;
+			double dy = n[1] - opvN.y;
+			n[0] = (dx * cos(angleZ * PI / 180.0) - dy * sin(angleZ * PI / 180.0)) + opvN.x;
+			n[1] = (dx * sin(angleZ * PI / 180.0) + dy * cos(angleZ * PI / 180.0)) + opvN.y;
+			n[2] = n[2] + girn.cy * 0.01;
 		}
-		else if (Vis_Polar == POLARY) { //(X,Y,Z) --> (Z,X,Y)
-			n[2] = n[2] - opvN.z;
-			n[0] = n[0] - opvN.x;
-			n[2] = n[2] * cos(angleZ * PI / 180.0) - n[0] * sin(angleZ * PI / 180.0);
-			n[0] = n[2] * sin(angleZ * PI / 180.0) + n[0] * cos(angleZ * PI / 180.0);
-			n[2] = n[2] + opvN.z;
-			n[0] = n[0] + opvN.x;
+		else if (Vis_Polar == POLARY)
+		{ //(X,Y,Z) --> (Z,X,Y)
+			double dz = n[2] - opvN.z;
+			double dx = n[0] - opvN.x;
+			n[2] = (dz * cos(angleZ * PI / 180.0) - dx * sin(angleZ * PI / 180.0)) + opvN.z;
+			n[0] = (dz * sin(angleZ * PI / 180.0) + dx * cos(angleZ * PI / 180.0)) + opvN.x;
+			n[1] = n[1] + girn.cy * 0.01;
 		}
-		else if (Vis_Polar == POLARX) { //(X,Y,Z) --> (Y,Z,X)
-			n[1] = n[1] - opvN.y;
-			n[2] = n[2] - opvN.z;
-			n[1] = n[1] * cos(angleZ * PI / 180.0) - n[2] * sin(angleZ * PI / 180.0);
-			n[2] = n[1] * sin(angleZ * PI / 180.0) + n[2] * cos(angleZ * PI / 180.0);
-			n[1] = n[1] + opvN.y;
-			n[2] = n[2] + opvN.z;
+		else if (Vis_Polar == POLARX)
+		{ //(X,Y,Z) --> (Y,Z,X)
+			double dy = n[1] - opvN.y;
+			double dz = n[2] - opvN.z;
+			n[1] = (dy * cos(angleZ * PI / 180.0) - dz * sin(angleZ * PI / 180.0)) + opvN.y;
+			n[2] = (dy * sin(angleZ * PI / 180.0) + dz * cos(angleZ * PI / 180.0)) + opvN.z;
+			n[0] = n[0] + girn.cy * 0.01;
 		}
 
 		m_PosEAvall.x = xpos;		m_PosEAvall.y = ypos;
@@ -5914,7 +6484,8 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 				}
 				else if (escal)
 				{
-					if (incrT <= 0.0) {
+					if (incrT <= 0.0)
+					{
 						if (incrT >= -2) incrT = -2;
 						incrT = 1 / Log2(-incrT);
 					}
@@ -5996,19 +6567,22 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 			vdir[2] = vdir[2] / modul;
 
 			// Entorn VGI: Segons orientació dels eixos Polars (Vis_Polar)
-			if (Vis_Polar == POLARZ) { // (X,Y,Z)
+			if (Vis_Polar == POLARZ)
+			{ // (X,Y,Z)
 				opvN.x += incr * vdir[0];
 				opvN.y += incr * vdir[1];
 				n[0] += incr * vdir[0];
 				n[1] += incr * vdir[1];
 			}
-			else if (Vis_Polar == POLARY) { //(X,Y,Z) --> (Z,X,Y)
+			else if (Vis_Polar == POLARY)
+			{ //(X,Y,Z) --> (Z,X,Y)
 				opvN.z += incr * vdir[2];
 				opvN.x += incr * vdir[0];
 				n[2] += incr * vdir[2];
 				n[0] += incr * vdir[0];
 			}
-			else if (Vis_Polar == POLARX) { //(X,Y,Z) --> (Y,Z,X)
+			else if (Vis_Polar == POLARX)
+			{ //(X,Y,Z) --> (Y,Z,X)
 				opvN.y += incr * vdir[1];
 				opvN.z += incr * vdir[2];
 				n[1] += incr * vdir[1];
@@ -6075,13 +6649,30 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 	//io.AddMouseButtonEvent(button, true);
 
 // (2) ONLY forward mouse data to your underlying app/game.
-	if (!io.WantCaptureMouse) { // <Tractament mouse de l'aplicació>}
+	if (!io.WantCaptureMouse && !g_EstatSimulador.mostrarSelectorModes) { // <Tractament mouse de l'aplicació>}
 		// Funció de zoom quan està activada la funció pan o les T. Geomètriques
 		if ((zzoom || zzoomO) || (transX) || (transY) || (transZ))
 		{
-			if (camera == CAM_ESFERICA) {	// Càmera Esfèrica
-				OPV.R = OPV.R + yoffset / 4.0;
-				if (OPV.R < 0.25) OPV.R = 0.25;
+			if (camera == CAM_ESFERICA)
+			{	// Càmera Esfèrica
+				int cosId = g_EstatSimulador.cosEnfocatId;
+				double radiCos = 35.0;
+				if (escenariActual != nullptr && cosId >= 0 && cosId < 9) {
+					radiCos = escenariActual->m_objectList[cosId].m_radiCos;
+				}
+				double minR = (cosId == 0) ? 42.0 : std::max(2.5, radiCos * 2.2);
+				double maxR = 800.0;
+				double pasZoom = (cosId == 0) ? 5.0 : std::max(1.0, radiCos * 0.5);
+
+				OPV.R = OPV.R - yoffset * pasZoom;
+				if (OPV.R < minR)
+					OPV.R = minR;
+				if (OPV.R > maxR)
+					OPV.R = maxR;
+
+				cam_Esferica[0] = (float)OPV.R;
+				cam_Esferica[1] = (float)OPV.alfa;
+				cam_Esferica[2] = (float)OPV.beta;
 				//InvalidateRect(NULL, false);
 			}
 			else if (camera == CAM_GEODE)
@@ -6102,33 +6693,268 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 			vdir[2] = vdir[2] / modul;
 
 			// Entorn VGI: Segons orientació dels eixos Polars (Vis_Polar)
-			if (Vis_Polar == POLARZ) { // (X,Y,Z)
-				opvN.x += (yoffset / 4.0) * vdir[0];
-				opvN.y += (yoffset / 4.0) * vdir[1];
-				n[0] += (yoffset / 4.0) * vdir[0];
-				n[1] += (yoffset / 4.0) * vdir[1];
+			double pasNav = yoffset * 2.5;
+			if (Vis_Polar == POLARZ)
+			{ // (X,Y,Z)
+				opvN.x += pasNav * vdir[0];
+				opvN.y += pasNav * vdir[1];
+				n[0] += pasNav * vdir[0];
+				n[1] += pasNav * vdir[1];
 			}
-			else if (Vis_Polar == POLARY) { //(X,Y,Z) --> (Z,X,Y)
-				opvN.z += (yoffset / 4.0) * vdir[2];
-				opvN.x += (yoffset / 4.0) * vdir[0];
-				n[2] += (yoffset / 4.0) * vdir[2];
-				n[0] += (yoffset / 4.0) * vdir[0];
+			else if (Vis_Polar == POLARY)
+			{ //(X,Y,Z) --> (Z,X,Y)
+				opvN.z += pasNav * vdir[2];
+				opvN.x += pasNav * vdir[0];
+				n[2] += pasNav * vdir[2];
+				n[0] += pasNav * vdir[0];
 			}
-			else if (Vis_Polar == POLARX) { //(X,Y,Z) --> (Y,Z,X)
-				opvN.y += (yoffset / 4.0) * vdir[1];
-				opvN.z += (yoffset / 4.0) * vdir[2];
-				n[1] += (yoffset / 4.0) * vdir[1];
-				n[2] += (yoffset / 4.0) * vdir[2];
+			else if (Vis_Polar == POLARX)
+			{ //(X,Y,Z) --> (Y,Z,X)
+				opvN.y += pasNav * vdir[1];
+				opvN.z += pasNav * vdir[2];
+				n[1] += pasNav * vdir[1];
+				n[2] += pasNav * vdir[2];
 			}
-			/*
-						opvN.x += (yoffset / 4.0) * vdir[0];		//opvN.x += (zDelta / 4.0) * vdir[0];
-						opvN.y += (yoffset / 4.0) * vdir[1];		//opvN.y += (zDelta / 4.0) * vdir[1];
-						n[0] += (yoffset / 4.0) * vdir[0];		//n[0] += (zDelta / 4.0) * vdir[0];
-						n[1] += (yoffset / 4.0) * vdir[1];		//n[1] += (zDelta / 4.0) * vdir[1];
-			*/
 		}
 	}
 }
+
+
+/* ------------------------------------------------------------------------- */
+/*                           CONTROL DEL GAMEPAD / JOYSTICK                  */
+/* ------------------------------------------------------------------------- */
+
+/*
+// OnGamepadMove: Funció de tractament de Gamepad (funció que es crida quan es prem una tecla o comandament d'un joystick)
+//   PARÀMETRES:
+//    - jid: Identificador del gamepad (GLFW_JOYSTICK_1, GLFW_JOYSTICK_2, GLFW_JOYSTICK_3, etc.) connectat o desconnectat
+//    - event: et retorna si el gamepad està connectat (GLFW_CONNECTED) o desconnectat (GLFW_DISCONECTED)
+void OnGamepadMove(int jid, int event)
+{
+	GLFWgamepadstate estat;		// Variable que obté l'estat (valors) del botons i eixos dels stocks i triggers del Gamepad.
+
+	//	if (event == GLFW_CONNECTED)	// NO FUNCIONA
+	if (glfwGetGamepadState(GLFW_JOYSTICK_1, &estat))
+	{
+		// BOTONS-----------------------------------
+
+		if (estat.buttons[GLFW_GAMEPAD_BUTTON_A])
+		{
+			fprintf(stderr, "%s \n", "Botó <A> pulsat");
+		}
+
+		if (estat.buttons[GLFW_GAMEPAD_BUTTON_B])
+		{
+			fprintf(stderr, "%s \n", "Botó <B> pulsat");
+		}
+
+		if (estat.buttons[GLFW_GAMEPAD_BUTTON_X])
+		{
+			fprintf(stderr, "%s \n", "Botó <X> pulsat");
+		}
+
+		if (estat.buttons[GLFW_GAMEPAD_BUTTON_Y])
+		{
+			fprintf(stderr, "%s \n", "Botó <Y> pulsat");
+		}
+
+		if (estat.buttons[GLFW_GAMEPAD_BUTTON_LEFT_BUMPER])
+		{
+			fprintf(stderr, "%s \n", "Left Bumper (LB) pulsat");
+		}
+
+		if (estat.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER])
+		{
+			fprintf(stderr, "%s \n", "Right Bumper (RB) pulsat");
+		}
+
+		if (estat.buttons[GLFW_GAMEPAD_BUTTON_BACK])
+		{
+			fprintf(stderr, "%s \n", "Botó <Back> pulsat");
+		}
+
+		if (estat.buttons[GLFW_GAMEPAD_BUTTON_START])
+		{
+			fprintf(stderr, "%s \n", "Botó <Start> pulsat");
+		}
+
+		if (estat.buttons[GLFW_GAMEPAD_BUTTON_LEFT_THUMB])
+		{
+			fprintf(stderr, "%s \n", "Stick esquerra (click) pulsat");
+		}
+
+		if (estat.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_THUMB])
+		{
+			fprintf(stderr, "%s \n", "Stick dret (click) pulsat");
+		}
+
+		if (estat.buttons[GLFW_GAMEPAD_BUTTON_DPAD_UP])
+		{
+			fprintf(stderr, "%s \n", "Fletxa amunt pulsada");
+		}
+
+		if (estat.buttons[GLFW_GAMEPAD_BUTTON_DPAD_RIGHT])
+		{
+			fprintf(stderr, "%s \n", "Fletxa dreta pulsada");
+		}
+
+		if (estat.buttons[GLFW_GAMEPAD_BUTTON_DPAD_DOWN])
+		{
+			fprintf(stderr, "%s \n", "Fletxa avall pulsada");
+		}
+
+		if (estat.buttons[GLFW_GAMEPAD_BUTTON_DPAD_LEFT])
+		{
+			fprintf(stderr, "%s \n", "Fletxa esquerra pulsada");
+		}
+
+		// EIXOS (DIRECCIONS) DE STICKS i TRIGGERS -----------------------------------
+
+		// STICK ESQUERRE
+		fprintf(stderr, "%s %f %s %f \n", "Stick esquerre X: ", estat.axes[GLFW_GAMEPAD_AXIS_LEFT_X], "Y: ", estat.axes[GLFW_GAMEPAD_AXIS_LEFT_Y]);
+		if (estat.axes[GLFW_GAMEPAD_AXIS_LEFT_X] < -0.5) fprintf(stderr, "%s \n", "Cap a l'esquerra");
+		if (estat.axes[GLFW_GAMEPAD_AXIS_LEFT_X] > 0.5) fprintf(stderr, "%s \n", "Cap a la dreta");
+		if (estat.axes[GLFW_GAMEPAD_AXIS_LEFT_Y] < -0.5) fprintf(stderr, "%s \n", "Cap amunt");
+		if (estat.axes[GLFW_GAMEPAD_AXIS_LEFT_Y] > 0.5) fprintf(stderr, "%s \n", "Cap avall");
+
+		// STICK DRET
+		fprintf(stderr, "%s %f %s %f \n", "Stick dret X: ", estat.axes[GLFW_GAMEPAD_AXIS_RIGHT_X], "Y: ", estat.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y]);
+		if (estat.axes[GLFW_GAMEPAD_AXIS_RIGHT_X] < -0.5) fprintf(stderr, "%s \n", "Cap a l'esquerra");
+		if (estat.axes[GLFW_GAMEPAD_AXIS_RIGHT_X] > 0.5) fprintf(stderr, "%s \n", "Cap a la dreta");
+		if (estat.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y] < -0.5) fprintf(stderr, "%s \n", "Cap amunt");
+		if (estat.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y] > 0.5) fprintf(stderr, "%s \n", "Cap avall");
+
+		// TRIGGERS LT i RT
+		fprintf(stderr, "%s %f \n", "Trigger esquerre (LT): ", estat.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER]);
+		fprintf(stderr, "%s %f \n", "Trigger dret (RT): ", estat.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER]);
+	}
+	else fprintf(stderr, "%s %i %s \n", "Gamepad ", jid, " desconnectat");
+}
+
+
+// OnJoystickMove: Funció de tractament de joystick (funció que es crida quan es prem una tecla o comandament d'un joystick)
+//   PARÀMETRES:
+//    - jid: Identificador del joystick (GLFW_JOYSTICK_1, GLFW_JOYSTICK_2, GLFW_JOYSTICK_3, etc.) connectat o desconnectat
+//    - event: et retorna si el joystick està connectat (GLFW_CONNECTED) o desconnectat (GLFW_DISCONECTED)
+void OnJoystickMove(int jid, int event)
+{
+	int buttonCount;	// Variable que obté l'estat dels botons del Joystick / Gamepad.
+	int axisCount;		// Variable que obté l'estat dels eixos dels sticks i triggers del Joystick / Gamepad.
+
+//	if (event == GLFW_CONNECTED)	// NO FUNCIONA
+	if (glfwJoystickPresent(GLFW_JOYSTICK_1))
+	{
+		// BOTONS-----------------------------------
+		// Obtenir botons del Gamepad: GLFW_PRESS si botó apretat, GLFW_RELEASE si botó s'ha deixat de pressionar.
+		const unsigned char* buttons = glfwGetJoystickButtons(GLFW_JOYSTICK_1, &buttonCount);
+
+		if (buttons[0] == GLFW_PRESS)
+		{
+			fprintf(stderr, "%s \n", "Botó <A> pulsat");
+		}
+
+		if (buttons[1] == GLFW_PRESS)
+		{
+			fprintf(stderr, "%s \n", "Botó <B> pulsat");
+		}
+
+		if (buttons[2] == GLFW_PRESS)
+		{
+			fprintf(stderr, "%s \n", "Botó <X> pulsat");
+		}
+
+		if (buttons[3] == GLFW_PRESS)
+		{
+			fprintf(stderr, "%s \n", "Botó <Y> pulsat");
+		}
+
+		if (buttons[4] == GLFW_PRESS)
+		{
+			fprintf(stderr, "%s \n", "Left Bumper (LB) pulsat");
+		}
+
+		if (buttons[5] == GLFW_PRESS)
+		{
+			fprintf(stderr, "%s \n", "Right Bumper (RB) pulsat");
+		}
+
+		if (buttons[6] == GLFW_PRESS)
+		{
+			fprintf(stderr, "%s \n", "Botó <Back> pulsat");
+		}
+
+		if (buttons[7] == GLFW_PRESS)
+		{
+			fprintf(stderr, "%s \n", "Botó <Start> pulsat");
+		}
+
+		if (buttons[8] == GLFW_PRESS)
+		{
+			fprintf(stderr, "%s \n", "Stick esquerra (click) pulsat");
+		}
+
+		if (buttons[9] == GLFW_PRESS)
+		{
+			fprintf(stderr, "%s \n", "Stick dret (click) pulsat");
+		}
+
+		if (buttons[10] == GLFW_PRESS)
+		{
+			fprintf(stderr, "%s \n", "Fletxa amunt pulsada");
+		}
+
+		if (buttons[11] == GLFW_PRESS)
+		{
+			fprintf(stderr, "%s \n", "Fletxa dreta pulsada");
+		}
+
+		if (buttons[12] == GLFW_PRESS)
+		{
+			fprintf(stderr, "%s \n", "Fletxa avall pulsada");
+		}
+
+		if (buttons[13] == GLFW_PRESS)
+		{
+			fprintf(stderr, "%s \n", "Fletxa esquerra pulsada");
+		}
+
+		if (buttons[14] == GLFW_PRESS)
+		{
+			fprintf(stderr, "%s \n", "Stick dret (click) pulsat");
+		}
+
+		// EIXOS (DIRECCIONS) DE STICKS i TRIGGERS -----------------------------------
+		// Obtenir direccions pulsades d'algun stick o trigger si s'han pulsat.
+		const float* axes = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &axisCount);
+
+		// STICK ESQUERRE
+		if (axisCount > 0)
+		{	fprintf(stderr, "%s %f %s %f \n", "Stick esquerre X: ", axes[0], "Y: ", axes[1]);
+			if (axes[0] < -0.5) fprintf(stderr, "%s \n", "Cap a l'esquerra");
+			if (axes[0] > 0.5) fprintf(stderr, "%s \n", "Cap a la dreta");
+			if (axes[1] < -0.5) fprintf(stderr, "%s \n", "Cap amunt");
+			if (axes[1] > 0.5) fprintf(stderr, "%s \n", "Cap avall");
+		}
+
+		// STICK DRET
+		if (axisCount > 2)
+		{	fprintf(stderr, "%s %f %s %f \n", "Stick dret X: ", axes[2], "Y: ", axes[3]);
+			if (axes[2] < -0.5) fprintf(stderr, "%s \n", "Cap a l'esquerra");
+			if (axes[2] > 0.5) fprintf(stderr, "%s \n", "Cap a la dreta");
+			if (axes[3] < -0.5) fprintf(stderr, "%s \n", "Cap amunt");
+			if (axes[3] > 0.5) fprintf(stderr, "%s \n", "Cap avall");
+		}
+
+		// TRIGGERS LT i RT
+		if (axisCount > 4)
+		{
+			fprintf(stderr, "%s %f \n", "Trigger esquerre (LT): ", axes[4]);
+			fprintf(stderr, "%s %f \n", "Trigger dret (RT): ", axes[5]);
+		}
+	}
+	else fprintf(stderr, "%s %i %s \n", "Joystick ", jid, " desconnectat");
+}
+*/
 
 
 /* ------------------------------------------------------------------------- */
@@ -6144,19 +6970,42 @@ void OnTimer()
 		//InvalidateRect(NULL, false);
 	}
 	else if (satelit) {	// OPCIÓ SATÈLIT: Increment OPV segons moviments mouse.
-		//OPV.R = OPV.R + m_EsfeIncEAvall.R;
-		OPV.alfa = OPV.alfa + m_EsfeIncEAvall.alfa;
-		while (OPV.alfa > 360.0) OPV.alfa = OPV.alfa - 360.0;
-		while (OPV.alfa < 0.0) OPV.alfa = OPV.alfa + 360.0;
-		OPV.beta = OPV.beta + m_EsfeIncEAvall.beta;
-		while (OPV.beta > 360.0) OPV.beta = OPV.beta - 360.0;
-		while (OPV.beta < 0.0) OPV.beta = OPV.beta + 360.0;
+		if (camera == CAM_ESFERICA)
+		{	//OPV.R = OPV.R + m_EsfeIncEAvall.R;
+			OPV.alfa = OPV.alfa + m_EsfeIncEAvall.alfa;
+			while (OPV.alfa > 360.0) OPV.alfa = OPV.alfa - 360.0;
+			while (OPV.alfa < 0.0) OPV.alfa = OPV.alfa + 360.0;
+			OPV.beta = OPV.beta + m_EsfeIncEAvall.beta;
+			while (OPV.beta > 360.0) OPV.beta = OPV.beta - 360.0;
+			while (OPV.beta < 0.0) OPV.beta = OPV.beta + 360.0;
+		}
+		else if (camera == CAM_GEODE)
+		{	//OPV.R = OPV.R + m_EsfeIncEAvall.R;
+			OPV_G.alfa = OPV_G.alfa + m_EsfeIncEAvall.alfa * 0.5;
+			while (OPV_G.alfa > 360.0) OPV_G.alfa = OPV_G.alfa - 360.0;
+			while (OPV_G.alfa < 0) OPV_G.alfa = OPV_G.alfa + 360.0;
+			OPV_G.beta = OPV_G.beta + m_EsfeIncEAvall.beta * 0.5;
+			while (OPV_G.beta > 360.0) OPV_G.beta = OPV.beta - 360.0;
+			while (OPV_G.beta < 0.0) OPV_G.beta = OPV_G.beta + 360.0;
+		}
 
 		// Crida a OnPaint() per redibuixar l'escena
 		//OnPaint();
 	}
-	//#~#~#~#
-	if (currentEscenari != nullptr) currentEscenari->updateVariables();
+	// EntornVGI. QUATERNIONS: Animació Objecte Rígid per Quaternions
+	else if (animaQ)
+	{	// CAL FER: Animació sense fi a partir qI i qF amb interpolació lineal o esfèrica.
+
+		// Crida a OnPaint() per redibuixar l'escena
+		//InvalidateRect(NULL, false);
+	}
+	// EntornVGI. ROBOT: Animació Robot Articulat
+	else if (objecte == ROBOT && animaR)
+	{	// CAL FER: Animació sense fi a partir de dues o tres posicios clau del robot.posicions
+
+		// Crida a OnPaint() per redibuixar l'escena
+		//InvalidateRect(NULL, false);
+	}
 }
 
 // ---------------- Entorn VGI: Funcions locals a main.cpp
@@ -6206,8 +7055,7 @@ int llegir_ptsC(const char* nomf)
 	//	ifstream f("altinicials.dat",ios::in);
 	//    f>>i; f>>j;
 	if ((fd = fopen(nomf, "rt")) == NULL)
-	{
-		//LPCWSTR texte1 = reinterpret_cast<LPCWSTR> ("ERROR:");
+	{	//LPCWSTR texte1 = reinterpret_cast<LPCWSTR> ("ERROR:");
 		//LPCWSTR texte2 = reinterpret_cast<LPCWSTR> ("File .crv was not opened");
 		//MessageBox(texte1, texte2, MB_OK);
 		fprintf(stderr, "ERROR: File .crv was not opened");
@@ -6221,7 +7069,6 @@ int llegir_ptsC(const char* nomf)
 			//fscanf(fd, "%f", &corbaSpline[j].y);
 			//fscanf(fd, "%f \n", &corbaSpline[j].z);
 			fscanf(fd, "%lf %lf %lf \n", &PC_t[j].x, &PC_t[j].y, &PC_t[j].z);
-
 		}
 	}
 	fclose(fd);
@@ -6238,7 +7085,8 @@ void OnFull_Screen(GLFWmonitor* monitor, GLFWwindow* window)
 
 	fullscreen = !fullscreen;
 
-	if (fullscreen) {	// backup window position and window size
+	if (fullscreen)
+	{	// backup window position and window size
 		//glfwGetWindowPos(window, &winPosX, &winPosY);
 		//glfwGetWindowSize(window, &width_old, &height_old);
 
@@ -6334,13 +7182,14 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severi
 	fprintf(stderr, "\n");
 }
 
+//COMMMMMMMMM static Escenari* escenariActual = new Escenari();
 // main(): Funció principal del programa. Inicialitza la finestra, els callbacks i el bucle principal d'operació
 int main()
 {
-    //std::cout << "Hello World!\n";
+	//	std::cout << "Hello World!\n";
 
-//    GLFWwindow* window;
-// Entorn VGI. Timer: Variables
+	//    GLFWwindow* window;
+	// Entorn VGI. Timer: Variables
 	float time = elapsedTime;
 	float now;
 	float delta;
@@ -6373,7 +7222,7 @@ int main()
 #endif
 
 	// Create a windowed mode window and its OpenGL context */
-	window = glfwCreateWindow(640, 480, "Entorn Grafic VS2022 amb GLFW i OpenGL 4.6 (Visualitzacio Grafica Interactiva - Grau en Enginyeria Informatica - Escola Enginyeria - UAB)", NULL, NULL);
+	window = glfwCreateWindow(1280, 720, "Entorn Grafic VS2022 amb GLFW i OpenGL 4.6 (Visualitzacio Grafica Interactiva - Grau en Enginyeria Informatica - Escola Enginyeria - UAB)", NULL, NULL);
 	if (!window)
 	{
 		fprintf(stderr, "Failed to open GLFW window. If you have an Intel GPU, they are not 4.6 compatible. Try the 2.1 version of the tutorials.\n");
@@ -6461,23 +7310,36 @@ int main()
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
 // Entorn VGI.ImGui: Setup Dear ImGui style
-	//ImGui::StyleColorsDark();
-	ImGui::StyleColorsLight();
+	InterficieUI::InicialitzarEstil();
 
 	// Entorn VGI.ImGui: Setup Platform/Renderer backends
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
 	ImGui_ImplOpenGL3_Init("#version 130");
 	// Entorn VGI.ImGui: End Setup Dear ImGui context
 
-	//#~#~#~#
-	Escenari escenaris[5];
-	currentEscenari = &escenaris[0];
-	currentEscenari->creaEscenari();
+	// Reserva dels 5 escenaris disponibles.
+	// L'escena del sistema solar NO es carrega ni es dibuixa mentre el selector inicial de modes estigui obert.
+	escenaris = new Escenari[5];
+	escenariActual = &escenaris[0];
+	objecte = CAP;
 
-	// Loop until the user closes the window
+	objecte = SISTEMA_SOLAR;	cosSolar = -1;
+	camera = CAM_ESFERICA;		Vis_Polar = POLARZ;
+	t_textura = TEXTURA_FITXERIMA;	tFlag_invert_Y = true;	textura = true;
+	sw_material[0] = false;		SkyBoxCube = false;
+
+	// Càmera allunyada i enlairada per veure les òrbites des de dalt
+	OPV.R = 550.0;	OPV.alfa = 65.0;	OPV.beta = 0.0;
+	cam_Esferica[0] = (float)OPV.R;	cam_Esferica[1] = (float)OPV.alfa;	cam_Esferica[2] = (float)OPV.beta;
+
+
+	escenariActual = new Escenari();
+	escenariActual->creaEscenari(shader_programID);
+
+
+// Loop until the user closes the window
 	while (!glfwWindowShouldClose(window))
-	{
-		// Poll for and process events */
+	{	// Poll for and process events */
 		//        glfwPollEvents();
 
 		// Entorn VGI. Timer: common part, do this only once
@@ -6488,6 +7350,27 @@ int main()
 		// Entorn VGI. Timer: for each timer do this
 		time -= delta;
 		if ((time <= 0.0) && (satelit || anima)) OnTimer();
+
+		// Actualització del temps de simulació i moviment orbital dels planetes
+		// (només quan s'ha tancat el selector inicial d'escenaris)
+		if (!g_EstatSimulador.mostrarSelectorModes) {
+			bool escalaReal = (g_EstatSimulador.modeActual == ModeSimulacio::ESCALA_REAL);
+			if (!g_EstatSimulador.tempsSimulacio.enPausa) {
+				// En mode didàctic el rellotge avança a ritme moderat; en escala real segons el timelapse
+				double deltaRellotge = escalaReal ? (double)delta : ((double)delta * 0.25);
+				g_EstatSimulador.tempsSimulacio.AvancarSegons(deltaRellotge);
+			}
+
+			if (escenariActual != nullptr && objecte == SISTEMA_SOLAR) {
+				escenariActual->updateVariables(
+					(double)delta,
+					g_EstatSimulador.tempsSimulacio.enPausa,
+					g_EstatSimulador.tempsSimulacio.direccioTemps,
+					escalaReal,
+					g_EstatSimulador.tempsSimulacio.factorVelocitatSegonsPerSegon
+				);
+			}
+		}
 
 		// Poll for and process events
 		glfwPollEvents();
@@ -6517,9 +7400,9 @@ int main()
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
 
-	//#~#~#~# Alliberar escenaris (VAOs) mentre el context OpenGL encara existeix
-	currentEscenari = nullptr;
-	for (Escenari& e : escenaris) e.alliberaEscenari();
+	delete[] escenaris;
+	escenaris = nullptr;
+	escenariActual = nullptr;
 
 	glfwDestroyWindow(window);
 
