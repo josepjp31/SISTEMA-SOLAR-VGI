@@ -43,6 +43,7 @@ enum CelestialBodyId {
 };
 
 const double KM_TO_AU = 1.0 / 149597870.7;
+const CelestialBodyId globalSystemOrigin = CB_SUN;
 
 struct CB {
     std::string m_name;
@@ -62,10 +63,14 @@ struct CState3D {
 };
 
 CState3D getCBstate(CelestialBodyId body, CelestialBodyId origin, double et);
+CState3D mulState(CState3D& state, double val);
+
 glm::mat4 getCBposMat(CelestialBodyId body, CelestialBodyId origin, double et);
 glm::mat4 getCBrotMat(CelestialBodyId body, double et);
+
+std::vector<CState3D> getOrbitStates(CelestialBodyId body, double et, int nStates);
+
 //glm::mat4 getCB_radii(CelestialBodyId body);
-std::vector <double> getVerticesHermiteTangents(std::vector<CState3D> states, int passes);
 
 void loadCspiceKernels();
 void unloadCspiceKernels();

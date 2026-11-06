@@ -42,13 +42,16 @@ std::string kernels[] = {
     "cbdata\\codes_300ast_20100725.bsp",
     "cbdata\\plu060.bsp",
     "cbdata\\vgr1.x2100.bsp",
-    "cbdata\\vgr2.x2100.bsp"
+    "cbdata\\vgr2.x2100.bsp",
+	"cbdata\\gm_de440.tpc"
 };
 
 void loadCspiceKernels()
 {
     for (std::string &file : kernels)
         furnsh_c(file.c_str());
+    char action[] = "RETURN";
+    erract_c("SET", 0, action);
 }
 
 void unloadCspiceKernels()
@@ -59,14 +62,31 @@ void unloadCspiceKernels()
 CState3D getCBstate(CelestialBodyId body, CelestialBodyId origin, double et)
 {
     double state[6] = {0,0,0,0,0,0}, lt;
-    spkpos_c(cbList[body].m_id.c_str(), et, "J2000", "NONE", cbList[origin].m_id.c_str(), state, &lt);
+    spkezr_c(cbList[body].m_id.c_str(), et, "J2000", "NONE", cbList[origin].m_id.c_str(), state, &lt);
     if (failed_c()) {
         reset_c();
-        return state;
+        return CState3D(state);
     }
-    state[0] *= KM_TO_AU; state[1] *= KM_TO_AU; state[2] *= KM_TO_AU;
-    state[3] *= KM_TO_AU; state[4] *= KM_TO_AU; state[5] *= KM_TO_AU;
-    return CState3D(state);
+	CState3D res = CState3D(state);
+  //  while (origin != globalSystemOrigin && origin != CB_NONE) {
+		//body = origin;
+  //      origin = cbList[origin].m_orbitedObject;
+  //      spkezr_c(cbList[body].m_id.c_str(), et, "J2000", "NONE", cbList[origin].m_id.c_str(), state, &lt);
+  //      if (failed_c()) {
+  //          reset_c();
+  //          return res;
+  //      }
+		//res.x += state[0]; res.y += state[1]; res.z += state[2];
+  //  }
+
+    return res;
+}
+
+CState3D mulState(CState3D &state, double val)
+{
+	state.x *= val; state.y *= val; state.z *= val;
+	state.vx *= val; state.vy *= val; state.vz *= val;
+	return state;
 }
 
 glm::mat4 getCBposMat(CelestialBodyId body, CelestialBodyId origin, double et)
@@ -91,33 +111,64 @@ glm::mat4 getCBrotMat(CelestialBodyId body, double et)
         return rotationMatrix;
     }
 
-	rotationMatrix = glm::transpose(glm::make_mat4(&rot[0][0]));
+	rotationMatrix = glm::mat4(glm::transpose(glm::make_mat3(&rot[0][0])));
 
     return rotationMatrix;
 }
 
-//double *getTrajectoryStates(CB &body, double et)
-//{
-//    if (body.m_orbitedObject != CB_NONE) {
-//
-//    } else {
-//
-//    }
-//}
+std::vector<CState3D> getOrbitStates(CelestialBodyId body, double et, int nStates)
+{
+	CB &props = cbList[body];
+	std::vector<CState3D> states;
 
-//glm::vec3 evalHermitte(glm::vec4 a)
-//{
-//    glm::mat4 MH = {
-//        {2.0, -3.0,  0.0,  1.0},
-//        {-2.0,  3.0,  0.0,  0.0},
-//        {1.0, -2.0,  1.0,  0.0},
-//        {1.0, -1.0,  0.0,  0.0}
-//    };
-//}
-//
-//void dibuixaTrajectoriaHermitte(std::vector<std::pair<double, double>> datapoints)
-//{
-//}
+    if (props.m_orbitedObject == CB_NONE)
+        return states;
+
+    //get orbit T
+    CState3D initialState = getCBstate(body, props.m_orbitedObject, et);
+	double actualState[6] = { initialState.x, initialState.y, initialState.z, initialState.vx, initialState.vy, initialState.vz };
+    double GM; SpiceInt dim;
+
+	bodvrd_c(cbList[props.m_orbitedObject].m_id.c_str(), "GM", 1, &dim, &GM);
+	if (failed_c())
+	{
+		reset_c();
+		return states;
+	}
+
+    double oscReturns[SPICE_OSCLTX_NELTS];
+	oscltx_c(actualState, et, GM, oscReturns);
+    if (failed_c())
+    {
+        reset_c();
+        return states;
+    }
+    //sample nStates states
+	double t = oscReturns[10] / nStates;
+    double vconst = oscReturns[10] / (nStates-1);
+    double time = et;
+    CState3D state, tmp, currentOriginState = getCBstate(cbList[body].m_orbitedObject, globalSystemOrigin, time);
+    for (int i = 0; i < nStates; i++)
+	{
+		state = getCBstate(body, props.m_orbitedObject, time); 
+        state = getCBstate(body, props.m_orbitedObject, time);// if (body == CB_MOON) {state.x *= 10.0; state.y *= 10.0; state.z *= 10.0;}
+        state.x += currentOriginState.x; state.y += currentOriginState.y; state.z += currentOriginState.z;
+		mulState(state, KM_TO_AU); 
+		state.vx *= vconst; state.vy *= vconst; state.vz *= vconst;
+		states.push_back(state);
+		time += t;
+	}
+    state = getCBstate(body, props.m_orbitedObject, time); 
+    state = getCBstate(body, props.m_orbitedObject, time);// if (body == CB_MOON) { state.x *= 10.0; state.y *= 10.0; state.z *= 10.0; }
+    state.x += currentOriginState.x; state.y += currentOriginState.y; state.z += currentOriginState.z;
+    mulState(state, KM_TO_AU);
+    state.vx *= vconst; state.vy *= vconst; state.vz *= vconst;
+    states.push_back(state);
+
+    return states;
+}
+
+
 
 //float getCB_radii(CelestialBodyId body) //Probably will get erased.
 //{
@@ -134,37 +185,4 @@ glm::mat4 getCBrotMat(CelestialBodyId body, double et)
 //    float radiusInAU = static_cast<float>(equatorialRadiusKm * KM_TO_AU);
 //
 //    return radiusInAU;
-//}
-
-//std::vector <double> getVerticesHermiteTangents(std::vector<CState3D> states, int passes)
-//{
-//	std::vector <double> vertices(states.size() * 3 * passes);
-//
-//    const double H[4][4] =
-//    {
-//        {  2.0, -3.0,  0.0, 1.0 },
-//        { -2.0,  3.0,  0.0, 0.0 },
-//        {  1.0, -2.0,  1.0, 0.0 },
-//        {  1.0, -2.0,  0.0, 0.0 }
-//    };
-//
-//	double step = 1.0 / (double)passes;
-//
-//    for (int i = 0; i < states.size() - 1; i++) {
-//        double t = 0.0;
-//        vertices.push_back(states[i].x); vertices.push_back(states[i].y); vertices.push_back(states[i].z);
-//
-//        t += step;
-//		while (t < 1.0) {
-//			glm::vec4 T(t * t * t, t * t, t, 1.0);
-//            double resultx = (2*T.x-3*T.y+1*T.w)*states[i].x + (-2*T.x+3*T.y)*states[i+1].x + (1*T.x-2*T.y+1*T.w)*states[i].vx + (1*T.x-1*T.y)*states[i+1].vx;
-//            double resulty = (2*T.x-3*T.y+1*T.w)*states[i].y + (-2*T.x+3*T.y)*states[i+1].y + (1*T.x-2*T.y+1*T.w)*states[i].vy + (1*T.x-1*T.y)*states[i+1].vy;
-//            double resultz = (2*T.x-3*T.y+1*T.w)*states[i].z + (-2*T.x+3*T.y)*states[i+1].z + (1*T.x-2*T.y+1*T.w)*states[i].vz + (1*T.x-1*T.y)*states[i+1].vz;
-//			vertices.push_back(resultx); vertices.push_back(resulty); vertices.push_back(resultz);
-//			t += step;
-//		}
-//	}
-//    vertices.push_back(states[states.size() - 1].x); vertices.push_back(states[states.size() - 1].y); vertices.push_back(states[states.size() - 1].z);
-//
-//	return vertices;
 //}
