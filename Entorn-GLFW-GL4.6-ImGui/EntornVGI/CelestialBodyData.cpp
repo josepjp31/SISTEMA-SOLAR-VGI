@@ -11,6 +11,8 @@ extern "C" {
 #include "cspice\SpiceUsr.h"
 }
 
+CelestialBodyId globalSystemOrigin = CB_SUN;
+
 std::unordered_map<CelestialBodyId, CB> cbList = {
 
 {CB_SOLAR_SYSTEM_BARYCENTER, {"SOLAR SYSTEM BARYCENTER","0", false, "", CB_NONE}},
