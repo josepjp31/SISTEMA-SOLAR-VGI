@@ -52,8 +52,8 @@ void loadCspiceKernels()
 {
     for (std::string &file : kernels)
         furnsh_c(file.c_str());
-    char action[] = "RETURN";
-    erract_c("SET", 0, action);
+    erract_c("SET", 0, (char*)"RETURN");
+    errprt_c("SET", 0, (char*)"NONE");
 }
 
 void unloadCspiceKernels()
@@ -64,6 +64,8 @@ void unloadCspiceKernels()
 CState3D getCBstate(CelestialBodyId body, CelestialBodyId origin, double et)
 {
     double state[6] = {0,0,0,0,0,0}, lt;
+
+    //spkezr_c(std::to_string(cbList[body].m_id).c_str(), et, "J2000", "NONE", std::to_string(cbList[origin].m_id).c_str(), state, &lt);
     spkezr_c(cbList[body].m_id.c_str(), et, "J2000", "NONE", cbList[origin].m_id.c_str(), state, &lt);
     if (failed_c()) {
         reset_c();
@@ -131,8 +133,9 @@ std::vector<CState3D> getOrbitStates(CelestialBodyId body, double et, int nState
 	double actualState[6] = { initialState.x, initialState.y, initialState.z, initialState.vx, initialState.vy, initialState.vz };
     double GM; SpiceInt dim;
 
-	bodvrd_c(cbList[props.m_orbitedObject].m_id.c_str(), "GM", 1, &dim, &GM);
-	if (failed_c())
+    //bodvrd_c(std::to_string(cbList[props.m_orbitedObject].m_id).c_str(), "GM", 1, &dim, &GM);
+    bodvrd_c(cbList[props.m_orbitedObject].m_id.c_str(), "GM", 1, &dim, &GM);
+    if (failed_c())
 	{
 		reset_c();
 		return states;

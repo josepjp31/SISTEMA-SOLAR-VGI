@@ -39,20 +39,21 @@ enum CelestialBodyId {
     //CB_HALLEY = 1000036,
     CB_VOYAGER1 = -31,
     //CB_VOYAGER2 = -32
-    CB_NONE
+    CB_NONE = -99999
+};
+
+struct CB {
+    std::string m_name;
+    std::string m_id;
+    //int m_id;
+    bool m_hasRotFrame = false;
+    std::string m_rotationFrame;
+    CelestialBodyId m_orbitedObject;
 };
 
 const double KM_TO_AU = 1.0 / 149597870.7;
 extern CelestialBodyId globalSystemOrigin;
 extern std::unordered_map<CelestialBodyId, CB> cbList;
-
-struct CB {
-    std::string m_name;
-    std::string m_id;
-    bool m_hasRotFrame = false;
-    std::string m_rotationFrame;
-    CelestialBodyId m_orbitedObject;
-};
 
 struct CState3D {
 	double x, y, z;
