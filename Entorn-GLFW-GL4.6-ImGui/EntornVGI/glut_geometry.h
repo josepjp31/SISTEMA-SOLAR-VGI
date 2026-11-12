@@ -2723,8 +2723,15 @@ const double H[4][4] =
 	{ -3.0,  4.0,  0.0, 0.0 },
 	{  1.0, -1.0,  0.0, 0.0 }
 };
+const double Ht[4][4] =
+{
+	{  2.0, -3.0,  0.0, 1.0 },
+	{ -2.0,  3.0,  0.0, 0.0 },
+	{  1.0, -2.0,  1.0, 0.0 },
+	{  1.0, -1.0,  0.0, 0.0 }
+};
 
-
+#include "CelestialBodyData.h"
 // corbaSH1: Vector dels punts de control de Corbes Hermitte
 const CPunt3D corbaH1[] = { { 256.0 + 16.0, 256.0, 30.0 }, { -256.0, 256.0, -10.0 }, { -256.0, 0.0, 30.0 }, { -128.0 - 16.0, 0.0, 75.0 },
 { -16.0, 64.0 + 32.0 + 32.0, 150.0 }, { 256.0 - 32.0, 64.0 - 32.0, 75.0 }, { 256.0 + 16.0, 256.0, 30.0 }, { -256.0, 256.0, -10.0 }, { -256.0, 0.0, 30.0 } };
@@ -2735,6 +2742,11 @@ const GLdouble PAS_HERMITTE = 0.10;	// Pas Hermitte. Precisió de la corba
 void draw_Hermitte_Curve(int nptsCorba, CPunt3D ctr_points[MAX_PATCH_CORBA], float pas);
 CVAO load_Hermitte_Curve_VAO(int nptsCorba, CPunt3D ctr_points[MAX_PATCH_CORBA], float pas);
 CVAO load_Hermitte_Curve_EBO(int nptsCorba, CPunt3D ctr_points[MAX_PATCH_CORBA], float pas);
+
+void draw_Hermitte_Curve(int nptsCorba, CState3D ctr_points[MAX_PATCH_CORBA], float pas);
+CVAO load_Hermitte_Curve_VAO(int nptsCorba, CState3D ctr_points[MAX_PATCH_CORBA], float pas);
+CVAO load_Hermitte_Curve_EBO(int nptsCorba, CState3D ctr_points[MAX_PATCH_CORBA], float pas);
+
 void draw_TFHermitte_Curve(GLuint sh_programID, CPunt3D* ctr_points, int nptsCorba, float pas);
 CPunt3D Punt_Corba_Hermitte(float t, CPunt3D* ctr);
 
