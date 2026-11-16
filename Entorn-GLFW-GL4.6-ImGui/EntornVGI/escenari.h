@@ -1,9 +1,6 @@
 #pragma once
 
-// IMPORTANT: framework.h s'ha d'incloure ABANS d'objLoader.h, perque objLoader.h
-// necessita els tipus d'OpenGL (GLuint, GLint, uint), CVAO (constants.h) i GLM.
 #include "framework.h"
-#include "objLoader.h"
 #include "material.h"
 #include "visualitzacio.h"
 
@@ -50,13 +47,7 @@ public:
 	Escenari& operator=(const Escenari&) = delete;
 
 	void creaEscenari(GLuint& shader_programID);
-	void dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id, CMask3D& reixa, CPunt3D& hreixa, char& objecte,
-		CColor& col_object, bool sw_mat[5],
-		bool& textur, bool& textur_map, bool& flagInvertY,
-		int& nptsU, CPunt3D PC_u[MAX_PATCH_CORBA], GLfloat& pasCS, bool& sw_PC, bool& dib_TFrenet,
-		COBJModel* objecteOBJ,
-		glm::mat4& MatriuTG,
-		bool mostrarOrbites = true);
+	void dibuixaEscenari(GLuint sh_programID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5], bool mostrarOrbites = true);
 
 	void updateVariables(double dt = 0.016, bool enPausa = false, int direccioTemps = 1, bool escalaReal = false, double factorVelocitat = 60.0);
 	// Allibera els objectes (i els seus VAO). Cal cridar-la ABANS de destruir el context OpenGL.

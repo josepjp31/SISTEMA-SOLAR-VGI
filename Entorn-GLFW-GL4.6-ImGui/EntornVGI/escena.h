@@ -8,7 +8,6 @@
 #define GLSOURCE_H
 
 #include "escenari.h"
-#include "objLoader.h"
 
 /* ------------------------------------------------------------------------- */
 /*                            Funcions de les escenes                        */
@@ -21,12 +20,7 @@ void dibuixa_Eixos(GLuint ax_programID, bool eix, GLuint axis_Id, CMask3D reixa,
 void dibuixa_Skybox(GLuint sk_programID, GLuint cmTexture, char eix_Polar, glm::mat4 MatriuProjeccio, glm::mat4 MatriuVista);
 
 // Dibuixa l'escena OpenGL principal delegant el Sistema Solar a Escenari
-void dibuixa_EscenaGL(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D reixa, CPunt3D hreixa, char objecte, CColor col_object,
-	bool sw_mat[5],
-	bool textur, GLuint texturID[NUM_MAX_TEXTURES], bool textur_map, bool flagInvertY,
-	int nptsU, CPunt3D PC_u[MAX_PATCH_CORBA], GLfloat pasCS, bool sw_PC, bool dib_TFrenet,
-	COBJModel* objecteOBJ,
-	glm::mat4 MatriuTG,
+void dibuixa_EscenaGL(GLuint sh_programID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5],
 	Escenari* escenariActual, bool mostrarOrbites = true);
 
 #endif

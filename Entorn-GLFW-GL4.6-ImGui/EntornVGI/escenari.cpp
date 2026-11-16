@@ -131,14 +131,9 @@ void Escenari::creaEscenari(GLuint& shader_programID)
 
 
 
-void Escenari::dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id, CMask3D& reixa, CPunt3D& hreixa, char& objecte,
-	CColor& col_object, bool sw_mat[5],
-	bool& textur, bool& textur_map, bool& flagInvertY,
-	int& nptsU, CPunt3D PC_u[MAX_PATCH_CORBA], GLfloat& pasCS, bool& sw_PC, bool& dib_TFrenet,
-	COBJModel* objecteOBJ,
-	glm::mat4& MatriuTG,
-	bool mostrarOrbites)
+void Escenari::dibuixaEscenari(GLuint sh_programID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5], bool mostrarOrbites)
 {
+	(void)MatriuVista;
 	CColor col_blanc, col_orbita;
 	col_blanc.r = 1.0;	col_blanc.g = 1.0;	col_blanc.b = 1.0;	col_blanc.a = 1.0;
 	col_orbita.r = 0.7;	col_orbita.g = 0.7;	col_orbita.b = 0.7;	col_orbita.a = 1.0;
@@ -171,7 +166,7 @@ void Escenari::dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id,
 	//2.Anell saturn
 		glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_TRUE);
 		glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_TRUE);
-		glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), flagInvertY);
+		glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), GL_TRUE);
 		SeleccionaColorMaterial(sh_programID, col_blanc, sw_mat_no_emisio);
 
 		if (m_texturesID[9] != 0) {
@@ -207,7 +202,7 @@ void Escenari::dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id,
 
 	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_TRUE);
 	glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_TRUE);
-	glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), flagInvertY);
+	glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), GL_TRUE);
 	SeleccionaColorMaterial(sh_programID, col_blanc, sw_mat);
 
 	GLint locModelMatCos = glGetUniformLocation(sh_programID, "modelMatrix");
@@ -238,7 +233,7 @@ void Escenari::dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id,
 
 	// Restaurar l'estat dels uniforms de material i textura
 	glUniform4i(glGetUniformLocation(sh_programID, "sw_intensity"), sw_mat[0], sw_mat[1], sw_mat[2], sw_mat[3]);
-	glUniform1i(glGetUniformLocation(sh_programID, "textur"), textur);
+	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_FALSE);
 
 }
 

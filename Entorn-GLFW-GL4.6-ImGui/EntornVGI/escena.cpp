@@ -35,9 +35,6 @@ void dibuixa_Eixos(GLuint ax_programID, bool eix, GLuint axis_Id, CMask3D reixa,
 
 	//  Dibuix dels eixos
 	if (eix) draw_Eixos(axis_Id);
-
-	// Dibuixa el grid actiu
-	if ((reixa.x) || (reixa.y) || (reixa.z) || (reixa.w)) draw_Grid(reixa, hreixa);
 }
 
 // Dibuixa Skybox en forma de Cub, activant un shader propi.
@@ -81,28 +78,16 @@ void dibuixa_Skybox(GLuint sk_programID, GLuint cmTexture, char eix_Polar, glm::
 
 
 // dibuixa_EscenaGL: Dibuix de l'escena amb comandes GL
-void dibuixa_EscenaGL(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D reixa, CPunt3D hreixa, char objecte,
-	CColor col_object, bool sw_mat[5],
-	bool textur, GLuint texturID[NUM_MAX_TEXTURES], bool textur_map, bool flagInvertY,
-	int nptsU, CPunt3D PC_u[MAX_PATCH_CORBA], GLfloat pasCS, bool sw_PC, bool dib_TFrenet,
-	COBJModel* objecteOBJ,
-	glm::mat4 MatriuTG,
+void dibuixa_EscenaGL(GLuint sh_programID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5],
 	Escenari* escenariActual, bool mostrarOrbites)
 {
 	// Shader Visualització Objectes
 	glUseProgram(sh_programID);
 
-	// Parametrització i activació/desactivació de textures
-	if (texturID[0] != 0) SetTextureParameters(0, texturID[0], true, true, textur_map, false);
-	if (textur) {
-		glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_TRUE);
-		glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_TRUE);
-	}
-	else {
-		glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_FALSE);
-		glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_FALSE);
-	}
-	glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), flagInvertY);
+	// Parametrització inicial de textures
+	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_FALSE);
+	glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_FALSE);
+	glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), GL_TRUE);
 
 	// Attribute Locations must be setup before calling glLinkProgram()
 	glBindAttribLocation(sh_programID, 0, "in_Vertex");		// Vèrtexs
@@ -110,17 +95,6 @@ void dibuixa_EscenaGL(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D rei
 	glBindAttribLocation(sh_programID, 2, "in_Normal");		// Normals
 	glBindAttribLocation(sh_programID, 3, "in_TexCoord");	// Textura
 
-	// Definició propietats de reflexió (emissió, ambient, difusa, especular) del material.
-	SeleccionaColorMaterial(sh_programID, col_object, sw_mat);
-
-	switch (objecte)
-	{
-	case SISTEMA_SOLAR:
-		if (escenariActual != nullptr)
-			escenariActual->dibuixaEscenari(sh_programID, eix, axis_Id, reixa, hreixa, objecte, col_object, sw_mat, textur, textur_map, flagInvertY, nptsU, PC_u, pasCS, sw_PC, dib_TFrenet, objecteOBJ, MatriuTG, mostrarOrbites);
-		break;
-
-	default:
-		break;
-	}
+	if (escenariActual != nullptr)
+		escenariActual->dibuixaEscenari(sh_programID, MatriuVista, MatriuTG, sw_mat, mostrarOrbites);
 }
