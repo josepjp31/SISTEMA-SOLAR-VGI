@@ -15,9 +15,6 @@
 
 #include "framework.h"
 
-// Entorn V3D. QUATERNIONS: Include per a la definició del tipus GL_QUAT i crida a les funcions de quatern.
-#include "quatern.h"
-
 #include "visualitzacio.h"
 #include "escena.h"
 
@@ -25,8 +22,7 @@ double p_near = 0.01;
 double p_far = 50000.0;
 
 // Iluminació: Configurar iluminació de l'escena
-void Iluminacio(GLint sh_programID, char ilumin, bool ifix, bool ilu2sides, bool ll_amb, LLUM* lumin, char obj, bool frnt_fcs,
-	bool bc_lin, int step)
+void Iluminacio(GLint sh_programID, char ilumin, bool ifix, bool ll_amb, LLUM* lumin)
 {
 
 // Variables per a configurar paràmetres de les fonts de llum
@@ -340,15 +336,12 @@ glm::mat4 Projeccio_Perspectiva(GLuint sh_programID, int minx,int miny,GLsizei w
 
 // Vista_Esferica: Definició gluLookAt amb possibilitat de moure el punt de vista interactivament amb el ratolí, 
 //					ilumina i dibuixa l'escena
-glm::mat4 Vista_Esferica(GLuint sh_programID,CEsfe3D opv,char VPol,bool pant,CPunt3D tr,CPunt3D trF,
-				 CColor col_fons,CColor col_object,char objecte,double mida,int step, 
-				 bool frnt_fcs, bool oculta, bool testv, bool bck_ln, 
-				 char iluminacio, bool llum_amb, LLUM* lumi, bool ifix, bool il2sides,
-				 bool eix, CMask3D reixa, CPunt3D hreixa)
+glm::mat4 Vista_Esferica(GLuint sh_programID, CEsfe3D opv, char VPol,
+				 CColor col_fons, bool oculta, bool testv,
+				 char iluminacio, bool llum_amb, LLUM* lumi, bool ifix)
 {
 	GLdouble cam[3] = { 0.0,0.0,0.0 }, up[3] = { 0.0,0.0,0.0 };
 	glm::mat4 MatriuVista(1.0);
-	glm::mat4 TransMatrix(1.0);	// Matrius Traslació
 
 // Rectificar paràmetre R si negatiu.
 	// Respectar el pla proper dinamic (p_near) sense forcar R >= 1.0
@@ -382,28 +375,20 @@ glm::mat4 Vista_Esferica(GLuint sh_programID,CEsfe3D opv,char VPol,bool pant,CPu
 					up[2]=-sin(opv.beta)*sin(opv.alfa);		}
 
 // Iluminacio movent-se amb la camara (abans glLookAt)
-	if (!ifix) Iluminacio(sh_programID,iluminacio, ifix, il2sides, llum_amb, lumi, objecte, frnt_fcs, bck_ln, step);
-
-// Opció pan: desplaçament del Centre de l'esfera (pant=1)
-	if (pant) TransMatrix = glm::translate(TransMatrix, vec3(tr.x, tr.y, tr.z));	//glTranslatef(tr.x, tr.y, tr.z);
-	TransMatrix = glm::translate(TransMatrix, vec3(trF.x, trF.y, trF.z));	// Traslació fixada amb la INSERT dins l'opció pan
+	if (!ifix) Iluminacio(sh_programID, iluminacio, ifix, llum_amb, lumi);
 
 // Especificació del punt de vista
-   //gluLookAt(cam[0],cam[1],cam[2],0.,0.,0.,up[0],up[1],up[2]);
    MatriuVista = glm::lookAt(
 	   glm::vec3(cam[0], cam[1], cam[2]),	// Camera is here
 	   glm::vec3(0, 0, 0),					// and looks here
 	   glm::vec3(up[0], up[1], up[2])		// Head is up (set to 0,-1,0 to look upside-down)
 	   );
 
-// Concatenar matrius Traslació amb la de càmera per al pan
-	MatriuVista = TransMatrix * MatriuVista;
-
 // Pas Matriu Vista a shader
    glUniformMatrix4fv(glGetUniformLocation(sh_programID, "viewMatrix"), 1, GL_FALSE, &MatriuVista[0][0]);
 
 // Iluminacio fixe respecte la camara (després glLookAt)
-   if (ifix) Iluminacio(sh_programID,iluminacio, ifix, il2sides, llum_amb, lumi, objecte, frnt_fcs, bck_ln, step);
+   if (ifix) Iluminacio(sh_programID, iluminacio, ifix, llum_amb, lumi);
 
 // Test de Visibilitat
 	if (testv) glEnable(GL_CULL_FACE);
@@ -420,40 +405,30 @@ glm::mat4 Vista_Esferica(GLuint sh_programID,CEsfe3D opv,char VPol,bool pant,CPu
 //Vista_Navega: Definició gluLookAt directament per paràmetre, sense esfèriques.
 //              amb possibilitat de moure el punt de vista interactivament amb les
 //				tecles de cursor per poder navegar.
-glm::mat4 Vista_Navega(GLuint sh_programID, CPunt3D pv, GLdouble n[3],GLdouble v[3],bool pant,CPunt3D tr,CPunt3D trF,
-				  CColor col_fons,CColor col_object,char objecte,bool color, int step,
-				  bool frnt_fcs, bool oculta, bool testv, bool bck_ln, 
-				  char iluminacio, bool llum_amb, LLUM* lumi, bool ifix, bool il2sides,
-				  bool eix, CMask3D reixa, CPunt3D hreixa)
-{   double altfar=0;
-	glm::mat4 MatriuVista(1.0), TransMatrix(1.0);
+glm::mat4 Vista_Navega(GLuint sh_programID, CPunt3D pv, GLdouble n[3], GLdouble v[3], CColor col_fons,
+				  bool oculta, bool testv,
+				  char iluminacio, bool llum_amb, LLUM* lumi, bool ifix)
+{
+	glm::mat4 MatriuVista(1.0);
 
 // Neteja dels buffers de color i profunditat
 	Fons(col_fons);
 
 // Iluminacio movent-se amb la camara (abans glLookAt)
-	if (!ifix) Iluminacio(sh_programID,iluminacio, ifix, il2sides, llum_amb, lumi, objecte, frnt_fcs, bck_ln, step);
-
-// Opció pan: desplaçament del Centre de l'esfera (pant=true)
-	if (pant) TransMatrix = glm::translate(glm::mat4(), vec3(tr.x, tr.y, tr.z)); // glTranslatef(tr.x, tr.y, tr.z);
-	TransMatrix = glm::translate(TransMatrix, vec3(trF.x, trF.y, trF.z)); //glTranslatef(trF.x,trF.y,trF.z);	// Traslació fixada amb la INSERT dins l'opció pan
+	if (!ifix) Iluminacio(sh_programID, iluminacio, ifix, llum_amb, lumi);
 
 // Especificació del punt de vista (CÀMERA)
-	//gluLookAt(pv.x,pv.y,pv.z,n[0],n[1],n[2],v[0],v[1],v[2]);
 	MatriuVista = glm::lookAt(
 		glm::vec3(pv.x, pv.y, pv.z), // Camera is here
 		glm::vec3(n[0], n[1], n[2]), // and looks here
 		glm::vec3(v[0], v[1], v[2])  // Head is up (set to 0,-1,0 to look upside-down)
 		);
 
-// Concatenar matrius Traslació amb la de càmera per al pan
-	MatriuVista = TransMatrix * MatriuVista;
-
 // Pas Matriu a shader
 	glUniformMatrix4fv(glGetUniformLocation(sh_programID, "viewMatrix"), 1, GL_FALSE, &MatriuVista[0][0]);
 
 // Iluminacio fixe respecte la camara (després glLookAt)
-	if (ifix) Iluminacio(sh_programID,iluminacio, ifix, il2sides, llum_amb, lumi, objecte, frnt_fcs, bck_ln, step);
+	if (ifix) Iluminacio(sh_programID, iluminacio, ifix, llum_amb, lumi);
 
 // Test de Visibilitat
 	if (testv) glEnable(GL_CULL_FACE);
@@ -464,44 +439,6 @@ glm::mat4 Vista_Navega(GLuint sh_programID, CPunt3D pv, GLdouble n[3],GLdouble v
 		else glDisable(GL_DEPTH_TEST);
 
 	return MatriuVista;
-}
-
-
-// instancia: Aplica Transformacions Geometriques d'instanciació, segons els parametres 
-//            definits a la persiana Transformacions
-glm::mat4 instancia(bool TR, INSTANCIA tg, INSTANCIA tgF)
-{
-	glm::mat4 MatriuTG(1.0), MatriuT(1.0);
-
-// Transformacions geometriques sobre objecte (Traslacio, Rotacions i Escalatge) amb conversió angles Euler.
-	if (TR) MatriuTG = glm::translate(MatriuTG, glm::vec3(tg.VTras.x, tg.VTras.y, tg.VTras.z));
-	MatriuTG = glm::translate(MatriuTG, glm::vec3(tgF.VTras.x, tgF.VTras.y, tgF.VTras.z));	// Traslacio fixada amb la INSERT dins l'opcio Transformacions
-
-// Convertir angles Euler tg i tgF en Matrius
-	if (TR) {	MatriuT = glm::eulerAngleX(tg.VRota.x * PI / 180.f); // Passar angle en radians
-				MatriuTG = MatriuTG * MatriuT;
-			}
-	MatriuT = glm::eulerAngleX(tgF.VRota.x * PI / 180.f); // Passar angle en radians
-	MatriuTG = MatriuTG * MatriuT;
-	if (TR) {	MatriuT = glm::eulerAngleY(tg.VRota.y * PI / 180.f); // Passar angle en radians
-				MatriuTG = MatriuTG * MatriuT;
-			}
-	MatriuT = glm::eulerAngleY(tgF.VRota.y * PI / 180.f); // Passar angle en radians
-	MatriuTG = MatriuTG * MatriuT;
-	if (TR) {	MatriuT = glm::eulerAngleZ(tg.VRota.z * PI / 180.f); // Passar angle en radians
-				MatriuTG = MatriuTG * MatriuT;
-			}
-	MatriuT = glm::eulerAngleX(tgF.VRota.z * PI / 180.f); // Passar angle en radians
-	MatriuTG = MatriuTG * MatriuT;
-
-	if (TR) MatriuTG = glm::scale(MatriuTG, vec3(tg.VScal.x, tg.VScal.y, tg.VScal.z));
-	MatriuTG = glm::scale(MatriuTG, vec3(tgF.VScal.x, tgF.VScal.y, tgF.VScal.z));	// Escalatge fixada amb la INSERT dins l'opcio Transformacions
-
-// Transformacions geometriques sobre objecte (Traslacio, Rotacions i Escalatge) amb Quaternions
-	if (TR) MatriuTG = glm::translate(MatriuTG, glm::vec3(tg.VTras.x, tg.VTras.y, tg.VTras.z));
-	MatriuTG = glm::translate(MatriuTG, glm::vec3(tgF.VTras.x, tgF.VTras.y, tgF.VTras.z));	// Traslacio fixada amb la INSERT dins l'opcio Transformacions
-
-	return MatriuTG;
 }
 
 

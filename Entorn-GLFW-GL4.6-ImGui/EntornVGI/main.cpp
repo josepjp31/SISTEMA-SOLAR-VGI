@@ -34,9 +34,9 @@ void InitGL()
 	//------ Entorn VGI: Inicialització de les variables globals de CEntornVGIView
 	int i;
 
-	// Entorn VGI: Variables de control per Menú CÀMERA: Esfèrica, Navega, Mòbil, Zoom, Satelit, Polars... 
+	// Entorn VGI: Variables de control per Menú CÀMERA: Esfèrica, Navega, Mòbil, Zoom, Polars... 
 	camera = CAM_ESFERICA;
-	mobil = true;			zzoom = true;		zzoomO = false;		satelit = false;
+	mobil = true;			zzoom = true;
 
 	// Entorn VGI: Variables de control de l'opció CAMERA->ESFÈRICA?
 	//(NOA)
@@ -54,17 +54,13 @@ void InitGL()
 	n[0] = 0.0;		n[1] = 0.0;		n[2] = 0.0;
 	opvN.x = 10.0;	opvN.y = 0.0;		opvN.z = 0.0;
 	angleZ = 0.0;
+	fact_pan = 1;
 
-	// Entorn VGI: Variables de control per Menú VISTA: Pantalla Completa, Pan, dibuixar eixos i grids 
+	// Entorn VGI: Variables de control per Menú VISTA: Pantalla Completa, dibuixar eixos i grids 
 	fullscreen = false;
-	pan = false;
 	eixos = true;	eixos_programID = 0;  eixos_Id = 0;
 	grid.x = false;	grid.y = false;		grid.z = false;		grid.w = false;
 	hgrid.x = 0.0;	hgrid.y = 0.0;		hgrid.z = 0.0;		hgrid.w = 0.0;
-
-	// Entorn VGI: Variables opció VISTA->PAN?
-	fact_pan = 1;
-	tr_cpv.x = 0;	tr_cpv.y = 0;	tr_cpv.z = 0;		tr_cpvF.x = 0;	tr_cpvF.y = 0;	tr_cpvF.z = 0;
 
 	// Entorn VGI: Variables de control per les opcions de menú Projecció, Objecte
 	projeccio = CAP;	// projeccio = PERSPECT;
@@ -77,24 +73,13 @@ void InitGL()
 	skC_VAOID.vaoId = 0;	skC_VAOID.vboId = 0;	skC_VAOID.nVertexs = 0;
 	cubemapTexture = 0;
 
-	// Entorn VGI: Variables de control del menú TRANFORMA
-	transf = false;		trasl = false;		rota = false;		escal = false;
-	fact_Tras = 1;		fact_Rota = 90;
-	TG.VTras.x = 0.0;	TG.VTras.y = 0.0;	TG.VTras.z = 0;	TGF.VTras.x = 0.0;	TGF.VTras.y = 0.0;	TGF.VTras.z = 0;
-	TG.VRota.x = 0;		TG.VRota.y = 0;		TG.VRota.z = 0;	TGF.VRota.x = 0;	TGF.VRota.y = 0;	TGF.VRota.z = 0;
-	TG.VScal.x = 1;		TG.VScal.y = 1;		TG.VScal.z = 1;	TGF.VScal.x = 1;	TGF.VScal.y = 1;	TGF.VScal.z = 1;
-	transX = false;		transY = false;		transZ = false;
-	GTMatrix = glm::mat4(1.0);		// Inicialitzar matriu a identitat
-
 	// Entorn VGI: Variables de control per les opcions de menú OCULTACIONS
-	front_faces = true;	test_vis = false;	oculta = false;		back_line = false;
+	test_vis = false;	oculta = false;
 
 	// Entorn VGI: Variables de control del menú ILUMINACIÓ
-	ifixe = false;					ilum2sides = false;				ilumina = FILFERROS;
+	ifixe = false;					ilumina = FILFERROS;
 	// Reflexions actives: Ambient [1], Difusa [2] i Especular [3]. No actives: Emission [0]. 
 	sw_material[0] = false;			sw_material[1] = true;			sw_material[2] = true;			sw_material[3] = true;	sw_material[4] = true;
-	sw_material_old[0] = false;		sw_material_old[1] = true;		sw_material_old[2] = true;		sw_material_old[3] = true;	sw_material_old[4] = true;
-	textura = false;				t_textura = CAP;
 	tFlag_invert_Y = false;
 
 	// ----------------- Entorn VGI: Variables de control del menú LLUMS
@@ -310,22 +295,13 @@ void InitGL()
 	// Entorn VGI: Variables de control dels botons de mouse
 	m_PosEAvall.x = 0;			m_PosEAvall.y = 0;			m_PosDAvall.x = 0;			m_PosDAvall.y = 0;
 	m_ButoEAvall = false;		m_ButoDAvall = false;
-	m_EsfeEAvall.R = 0.0;		m_EsfeEAvall.alfa = 0.0;	m_EsfeEAvall.beta = 0.0;
-	m_EsfeIncEAvall.R = 0.0;	m_EsfeIncEAvall.alfa = 0.0;	m_EsfeIncEAvall.beta = 0.0;
 
 	// Entorn VGI: Variables que controlen paràmetres visualització: Mides finestra Windows i PV (càmera)
 	w = 1280;			h = 720;			// Mides de la finestra Windows (w-amplada,h-alçada)
 	width_old = 1280;	height_old = 720;	// Mides de la resolució actual de la pantalla (finestra Windows)
 
-	// Entorn VGI: Color de fons i de l'objecte
-	clear_colorB = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);	// ImGui: Color de fons
-	clear_colorO = ImVec4(1.0f, 1.0f, 1.0f, 1.00f);	// ImGui: Color de l'objecte.
-	c_fons.r = clear_colorB.x;		c_fons.g = clear_colorB.y;		c_fons.b = clear_colorB.z;			c_fons.a = clear_colorB.w;
-	col_obj.r = clear_colorO.x;	col_obj.g = clear_colorO.y;	col_obj.b = clear_colorO.z;		col_obj.a = clear_colorO.w;
-
-	// Entorn VGI: Variables de visualització i altres
-	pas = 64;
-	mida = 1.0;
+	// Entorn VGI: Color de fons
+	c_fons.r = 0.0;		c_fons.g = 0.0;		c_fons.b = 0.0;		c_fons.a = 1.0;
 }
 
 
@@ -352,16 +328,8 @@ void GetGLVersion(int* major, int* minor)
 
 void OnSize(GLFWwindow* window, int width, int height)
 {
-	// TODO: Agregue aquí su código de controlador de mensajes
-
-	// A resize event occured; cx and cy are the window's new width and height.
-	// Find the OpenGL change size function given in the Lab 1 notes and call it here
-
 	// Entorn VGI: MODIFICACIÓ ->Establim les mides de la finestra actual
 	w = width;	h = height;
-
-	// Crida a OnPaint per a redibuixar la pantalla
-	//	OnPaint();
 }
 
 
@@ -395,10 +363,7 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		sw_material[1] = g_EstatSimulador.opcionsVisualitzacio.vistaClaraAmbient;
 		sw_material[2] = true;
 		sw_material[3] = false;
-		for (int k = 0; k < 5; k++) sw_material_old[k] = sw_material[k];
 
-		textura = false;
-		t_textura = TEXTURA_FITXERIMA;
 		tFlag_invert_Y = true;
 
 		llum_ambient = g_EstatSimulador.opcionsVisualitzacio.vistaClaraAmbient;
@@ -460,7 +425,7 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		if (g_EstatSimulador.cameraConfig.mode == ModeCamera::FIXA_INCLINADA_25)
 		{
 			camera = CAM_ESFERICA;
-			mobil = true;	zzoom = true;	satelit = false;	pan = false;
+			mobil = true;	zzoom = true;
 			Vis_Polar = POLARZ;
 			OPV.alfa = cfgCam.angleInclinacioInicial;
 			OPV.R = distPerDefecte;
@@ -468,7 +433,7 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		else if (g_EstatSimulador.cameraConfig.mode == ModeCamera::ORBITAL_CENTRADOR)
 		{
 			camera = CAM_ESFERICA;
-			mobil = true;	zzoom = true;	satelit = false;	pan = false;
+			mobil = true;	zzoom = true;
 			Vis_Polar = POLARZ;
 			if (OPV.alfa == 0.0) OPV.alfa = cfgCam.angleInclinacioInicial;
 			OPV.R = distPerDefecte;
@@ -476,7 +441,7 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		else if (g_EstatSimulador.cameraConfig.mode == ModeCamera::GLOBAL_SISTEMA)
 		{
 			camera = CAM_ESFERICA;
-			mobil = true;	zzoom = true;	satelit = false;	pan = false;
+			mobil = true;	zzoom = true;
 			Vis_Polar = POLARZ;
 			g_EstatSimulador.cosEnfocatId = 0;
 			OPV.R = cfgCam.globalSistemaR;
@@ -505,7 +470,6 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 // OnPaint: Funció de dibuix i visualització en frame buffer del frame
 void OnPaint(GLFWwindow* window)
 {
-	// TODO: Agregue aquí su código de controlador de mensajes
 	GLdouble vpv[3] = { 0.0, 0.0, 1.0 };
 
 	// Neteja del framebuffer durant la visualitzacio del Selector Inicial de Modes (per no mostrar el sistema)
@@ -559,10 +523,8 @@ void OnPaint(GLFWwindow* window)
 		// Entorn VGI: Definició de la càmera.
 		if (camera == CAM_ESFERICA) {
 			n[0] = 0;		n[1] = 0;		n[2] = 0;
-			ViewMatrix = Vista_Esferica(shader_programID, OPV, Vis_Polar, pan, tr_cpv, tr_cpvF, c_fons, col_obj, objecte, mida, pas,
-				front_faces, oculta, test_vis, back_line,
-				ilumina, llum_ambient, llumGL, ifixe, ilum2sides,
-				eixos, grid, hgrid);
+			ViewMatrix = Vista_Esferica(shader_programID, OPV, Vis_Polar, c_fons,
+				oculta, test_vis, ilumina, llum_ambient, llumGL, ifixe);
 
 			// Quan hi ha un astre enfocat (cosEnfocatId > 0), centrar la camera sobre la posicio 3D de l'astre
 			if (objecte == SISTEMA_SOLAR && escenariActual != nullptr &&
@@ -595,14 +557,11 @@ void OnPaint(GLFWwindow* window)
 				vpv[0] = 1.0;	vpv[1] = 0.0;	vpv[2] = 0.0;
 			}
 			ViewMatrix = Vista_Navega(shader_programID, opvN,
-				n, vpv, pan, tr_cpv, tr_cpvF, c_fons, col_obj, objecte, true, pas,
-				front_faces, oculta, test_vis, back_line,
-				ilumina, llum_ambient, llumGL, ifixe, ilum2sides,
-				eixos, grid, hgrid);
+				n, vpv, c_fons, oculta, test_vis,
+				ilumina, llum_ambient, llumGL, ifixe);
 		}
 
 		// Entorn VGI: Dibuix de l'Objecte o l'Escena
-		configura_Escena();     // Aplicar Transformacions Geometriques segons persiana Transformacio i configurar objectes.
 		dibuixa_Escena();		// Dibuix geometria de l'escena amb comandes GL.
 		break;
 
@@ -622,30 +581,17 @@ void OnPaint(GLFWwindow* window)
 	}
 }
 
-// configura_Escena: Funcio que configura els parametres de Model i dibuixa les
-//                   primitives OpenGL dins classe Model
-void configura_Escena() {
-
-	// Aplicar Transformacions Geometriques segons persiana Transformacio i Quaternions
-	GTMatrix = instancia(transf, TG, TGF);
-}
-
 // dibuixa_Escena: Funcio que crida al dibuix dels diferents elements de l'escana
 void dibuixa_Escena() {
 
-	//glUseProgram(shader_programID);
-
-//	Dibuix SkyBox Cúbic.
+	//	Dibuix SkyBox Cúbic.
 	if (SkyBoxCube) dibuixa_Skybox(skC_programID, cubemapTexture, Vis_Polar, ProjectionMatrix, ViewMatrix);
 
 	//	Dibuix Coordenades Món i Reixes.
 	dibuixa_Eixos(eixos_programID, eixos, eixos_Id, grid, hgrid, ProjectionMatrix, ViewMatrix);
 
-	// Escalat d'objectes, per adequar-los a les vistes ortogràfiques (Pràctica 2)
-	//	GTMatrix = glm::scale();
-
 	//	Dibuix geometria de l'escena amb comandes GL.
-	dibuixa_EscenaGL(shader_programID, ViewMatrix, GTMatrix, sw_material,
+	dibuixa_EscenaGL(shader_programID, ViewMatrix, glm::mat4(1.0f), sw_material,
 		escenariActual,
 		g_EstatSimulador);
 }
@@ -710,19 +656,6 @@ void draw_Menu_ImGui()
 		}
 	}
 
-	// Finestres opcionals d'EntornVGI (desactivades per defecte)
-	if (show_demo_window)
-		ImGui::ShowDemoWindow(&show_demo_window);
-
-	if (show_another_window)
-	{
-		ImGui::Begin("Another Window", &show_another_window);
-		ImGui::Text("Hello from another window!");
-		if (ImGui::Button("Close Me"))
-			show_another_window = false;
-		ImGui::End();
-	}
-
 	// Rendering ImGui Menus
 	ImGui::Render();
 	//ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -731,17 +664,11 @@ void draw_Menu_ImGui()
 // CÀMERA--> NAVEGA:  Mode de navegació sobre un pla amb botons de teclat o de mouse (nav) (opció booleana)
 void OnCameraNavega()
 {
-	// TODO: Agregue aquí su código de controlador de comandos
-	if (projeccio != ORTO || projeccio != CAP)
+	if (projeccio != CAP)
 	{
 		camera = CAM_NAVEGA;
-		// Desactivació de zoom, mobil, Transformacions Geomètriques via mouse i pan 
-		//		si navega activat
-		mobil = false;	zzoom = false;	satelit = false;
-		transX = false;	transY = false;	transZ = false;
-		//pan = false;
-		tr_cpv.x = 0.0;		tr_cpv.y = 0.0;		tr_cpv.z = 0.0;		// Inicialitzar a 0 desplaçament de pantalla
-		tr_cpvF.x = 0.0;	tr_cpvF.y = 0.0;	tr_cpvF.x = 0.0;	// Inicialitzar a 0 desplaçament de pantalla
+		// Desactivació de zoom i mòbil si navega activat
+		mobil = false;	zzoom = false;
 
 		// Incialitzar variables Navega segons configuració eixos en Polars
 		if (Vis_Polar == POLARZ) {
@@ -765,9 +692,6 @@ void OnCameraNavega()
 // SKYBOX: Visualitzar Skybox en l'escena (opció booleana)
 void OnVistaSkyBox()
 {
-	// TODO: Agregue aquí su código de controlador de comandos
-		//SkyBoxCube = !SkyBoxCube;
-
 	// Càrrega Shader Skybox
 	if (!skC_programID) skC_programID = shader_SkyBoxC.loadFileShaders(".\\shaders\\skybox.VERT", ".\\shaders\\skybox.FRAG");
 
@@ -797,9 +721,8 @@ void OnVistaSkyBox()
 // PROJECCIÓ: Perspectiva
 void OnProjeccioPerspectiva()
 {
-	// TODO: Agregue aquí su código de controlador de comandos
 	projeccio = PERSPECT;
-	mobil = true;			zzoom = true;		zzoomO = false;
+	mobil = true;			zzoom = true;
 }
 
 // SHADER PHONG
@@ -807,7 +730,6 @@ void OnShaderPhong()
 {
 	GLuint newShaderID = 0;
 
-	// TODO: Agregue aquí su código de controlador de comandos
 	shader = PHONG_SHADER;	ilumina = SUAU;
 	test_vis = false;		oculta = true;
 
@@ -949,12 +871,6 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 			Teclat_Navega(key, action);
 	}
 }
-
-void OnKeyUp(GLFWwindow* window, int key, int scancode, int action, int mods)
-{}
-
-void OnTextDown(GLFWwindow* window, unsigned int codepoint)
-{}
 
 // Teclat_Navega: Teclat pels moviments de navegació.
 void Teclat_Navega(int key, int action)
@@ -1144,7 +1060,6 @@ void Teclat_Navega(int key, int action)
 //					- action: Acció de la tecla: GLFW_PRESS (si s'ha apretat), GLFW_REPEAT, si s'ha repetit pressió i GL_RELEASE, si es deixa d'apretar.
 void OnMouseButton(GLFWwindow* window, int button, int action, int mods)
 {
-	// TODO: Agregue aquí su código de controlador de mensajes o llame al valor predeterminado
 	// Get the cursor position when the mouse key has been pressed or released.
 	double xpos, ypos;
 	glfwGetCursorPos(window, &xpos, &ypos);
@@ -1162,38 +1077,22 @@ void OnMouseButton(GLFWwindow* window, int button, int action, int mods)
 			//				mouse i ho guardem a la variable m_PosEAvall i activem flag m_ButoEAvall
 			m_ButoEAvall = true;
 			m_PosEAvall.x = xpos;	m_PosEAvall.y = ypos;
-			m_EsfeEAvall = OPV;
 		}
 		// OnLButtonUp: Funció que es crida quan deixem d'apretar el botó esquerra del mouse.
 		else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
 		{	// Entorn VGI: Desactivem flag m_ButoEAvall quan deixem d'apretar botó esquerra del mouse.
 			m_ButoEAvall = false;
-
-			// OPCIÓ VISTA-->SATÈLIT: Càlcul increment desplaçament del Punt de Vista
-			if ((satelit) && (projeccio != ORTO))
-			{	//m_EsfeIncEAvall.R = m_EsfeEAvall.R - OPV.R;
-				m_EsfeIncEAvall.alfa = 0.01f * (OPV.alfa - m_EsfeEAvall.alfa); //if (abs(m_EsfeIncEAvall.alfa)<0.01) { if ((m_EsfeIncEAvall.alfa)>0.0) m_EsfeIncEAvall.alfa = 0.01 else m_EsfeIncEAvall.alfa=0.01}
-				m_EsfeIncEAvall.beta = 0.01f * (OPV.beta - m_EsfeEAvall.beta);
-				if (abs(m_EsfeIncEAvall.beta) < 0.01)
-				{
-					if ((m_EsfeIncEAvall.beta) > 0.0) m_EsfeIncEAvall.beta = 0.01;
-					else m_EsfeIncEAvall.beta = 0.01;
-				}
-				//if ((m_EsfeIncEAvall.R == 0.0) && (m_EsfeIncEAvall.alfa == 0.0) && (m_EsfeIncEAvall.beta == 0.0)) KillTimer(WM_TIMER);
-				//else SetTimer(WM_TIMER, 10, NULL);
-			}
 		}
 		// OnRButtonDown
 		else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
-		{	// Entorn VGI: Detectem en quina posició s'ha apretat el botó esquerra del
-			//				mouse i ho guardem a la variable m_PosEAvall i activem flag m_ButoEAvall
+		{	// Entorn VGI: Detectem en quina posició s'ha apretat el botó dret del
+			//				mouse i ho guardem a la variable m_PosDAvall i activem flag m_ButoDAvall
 			m_ButoDAvall = true;
-			//m_PosDAvall = point;
 			m_PosDAvall.x = xpos;	m_PosDAvall.y = ypos;
 		}
-		// OnLButtonUp: Funció que es crida quan deixem d'apretar el botó esquerra del mouse.
+		// OnRButtonUp: Funció que es crida quan deixem d'apretar el botó dret del mouse.
 		else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE)
-		{	// Entorn VGI: Desactivem flag m_ButoEAvall quan deixem d'apretar botó esquerra del mouse.
+		{	// Entorn VGI: Desactivem flag m_ButoDAvall quan deixem d'apretar botó dret del mouse.
 			m_ButoDAvall = false;
 		}
 	}
@@ -1210,12 +1109,10 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 {
 	if (g_EstatSimulador.mostrarSelectorModes) return;
 
-	// TODO: Agregue aquí su código de controlador de mensajes o llame al valor predeterminado
 	double modul = 0;
 	GLdouble vdir[3] = { 0, 0, 0 };
-	CSize gir = { 0,0 }, girn = { 0,0 }, girT = { 0,0 }, zoomincr = { 0,0 };
+	CSize gir = { 0,0 }, girn = { 0,0 }, zoomincr = { 0,0 };
 
-	// TODO: Add your message handler code here and/or call default
 	if (m_ButoEAvall && mobil && projeccio != CAP)
 	{	// Entorn VGI: Determinació dels angles (en graus) segons l'increment
 		//				horitzontal i vertical de la posició del mouse.
@@ -1246,7 +1143,7 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 		// Crida a OnPaint() per redibuixar l'escena
 		//OnPaint(window);
 	}
-	else if (m_ButoEAvall && (camera == CAM_NAVEGA) && (projeccio != CAP && projeccio != ORTO)) // Opció Navegació
+	else if (m_ButoEAvall && (camera == CAM_NAVEGA) && (projeccio != CAP)) // Opció Navegació
 	{	// Entorn VGI: Canviar orientació en opció de Navegació
 		girn.cx = m_PosEAvall.x - xpos;		girn.cy = m_PosEAvall.y - ypos;
 		angleZ = girn.cx / 2.0;
@@ -1281,102 +1178,11 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 		}
 
 		m_PosEAvall.x = xpos;		m_PosEAvall.y = ypos;
-		// Crida a OnPaint() per redibuixar l'escena
-		//OnPaint(window);
 	}
 
-	// Entorn VGI: Transformació Geomètrica interactiva pels eixos X,Y boto esquerra del mouse.
-	else {
-		bool transE = transX || transY;
-		if (m_ButoEAvall && transE && transf)
-		{	// Calcular increment
-			girT.cx = m_PosEAvall.x - xpos;		girT.cy = m_PosEAvall.y - ypos;
-			if (transX)
-			{
-				long int incrT = girT.cx;
-				if (trasl)
-				{
-					TG.VTras.x += incrT * fact_Tras;
-					if (TG.VTras.x < -100000.0) TG.VTras.x = 100000.0;
-					if (TG.VTras.x > 100000.0) TG.VTras.x = 100000.0;
-				}
-				else if (rota)
-				{
-					TG.VRota.x += incrT * fact_Rota;
-					while (TG.VRota.x >= 360.0) TG.VRota.x -= 360.0;
-					while (TG.VRota.x < 0.0) TG.VRota.x += 360.0;
-				}
-				else if (escal)
-				{
-					if (incrT < 0) incrT = -1 / incrT;
-					TG.VScal.x = TG.VScal.x * incrT;
-					if (TG.VScal.x < 0.25) TG.VScal.x = 0.25;
-					if (TG.VScal.x > 8192.0) TG.VScal.x = 8192.0;
-				}
-			}
-			if (transY)
-			{
-				long int incrT = girT.cy;
-				if (trasl)
-				{
-					TG.VTras.y += incrT * fact_Tras;
-					if (TG.VTras.y < -100000) TG.VTras.y = 100000;
-					if (TG.VTras.y > 100000) TG.VTras.y = 100000;
-				}
-				else if (rota)
-				{
-					TG.VRota.y += incrT * fact_Rota;
-					while (TG.VRota.y >= 360.0) TG.VRota.y -= 360.0;
-					while (TG.VRota.y < 0.0) TG.VRota.y += 360.0;
-				}
-				else if (escal)
-				{
-					if (incrT <= 0.0)
-					{
-						if (incrT >= -2) incrT = -2;
-						incrT = 1 / static_cast<long int>(log2(static_cast<double>(-incrT)));
-					}
-					else incrT = static_cast<long int>(log2(static_cast<double>(incrT)));
-					TG.VScal.y = TG.VScal.y * incrT;
-					if (TG.VScal.y < 0.25) TG.VScal.y = 0.25;
-					if (TG.VScal.y > 8192.0) TG.VScal.y = 8192.0;
-				}
-			}
-			m_PosEAvall.x = xpos;	m_PosEAvall.y = ypos;
-			// Crida a OnPaint() per redibuixar l'escena
-			//InvalidateRect(NULL, false);
-			//OnPaint(windows);
-		}
-	}
-
-	// Entorn VGI: Determinació del desplaçament del pan segons l'increment
-	//				vertical de la posició del mouse (tecla dreta apretada).
-	if (m_ButoDAvall && pan && (projeccio != CAP && projeccio != ORTO))
-	{
-		//CSize zoomincr = m_PosDAvall - point;
-		zoomincr.cx = m_PosDAvall.x - xpos;		zoomincr.cy = m_PosDAvall.y - ypos;
-		long int incrx = zoomincr.cx;
-		long int incry = zoomincr.cy;
-
-		// Desplaçament pan vertical
-		tr_cpv.y -= incry * fact_pan;
-		if (tr_cpv.y > 100000.0) tr_cpv.y = 100000.0;
-		else if (tr_cpv.y < -100000.0) tr_cpv.y = -100000.0;
-
-		// Desplaçament pan horitzontal
-		tr_cpv.x += incrx * fact_pan;
-		if (tr_cpv.x > 100000.0) tr_cpv.x = 100000.0;
-		else if (tr_cpv.x < -100000.0) tr_cpv.x = -100000.0;
-
-		//m_PosDAvall = point;
-		m_PosDAvall.x = xpos;	m_PosDAvall.y = ypos;
-		// Crida a OnPaint() per redibuixar l'escena
-		//OnPaint(window);
-	}
 	// Determinació del paràmetre R segons l'increment
 	//   vertical de la posició del mouse (tecla dreta apretada)
-		//else if (m_ButoDAvall && zzoom && (projeccio!=CAP && projeccio!=ORTO))
-	else if (m_ButoDAvall && zzoom && (projeccio != CAP))
+	if (m_ButoDAvall && zzoom && (projeccio != CAP))
 	{	//CSize zoomincr = m_PosDAvall - point;
 		zoomincr.cx = m_PosDAvall.x - xpos;		zoomincr.cy = m_PosDAvall.y - ypos;
 		long int incr = zoomincr.cy / 1.0;
@@ -1402,7 +1208,7 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 		// Crida a OnPaint() per redibuixar l'escena
 		//OnPaint(window);
 	}
-	else if (m_ButoDAvall && (camera == CAM_NAVEGA) && (projeccio != CAP && projeccio != ORTO))
+	else if (m_ButoDAvall && (camera == CAM_NAVEGA) && (projeccio != CAP))
 	{	// Avançar en opció de Navegació
 		if ((m_PosDAvall.x != xpos) && (m_PosDAvall.y != ypos))
 		{
@@ -1443,44 +1249,7 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 
 			//m_PosDAvall = point;
 			m_PosDAvall.x = xpos;				m_PosDAvall.y = ypos;
-			// Crida a OnPaint() per redibuixar l'escena
-			//OnPaint(window);
 		}
-	}
-
-	// Entorn VGI: Transformació Geomètrica interactiva per l'eix Z amb boto dret del mouse.
-	else if (m_ButoDAvall && transZ && transf)
-	{	// Calcular increment
-		girT.cx = m_PosDAvall.x - xpos;		girT.cy = m_PosDAvall.y - ypos;
-		long int incrT = girT.cy;
-		if (trasl)
-		{
-			TG.VTras.z += incrT * fact_Tras;
-			if (TG.VTras.z < -100000.0) TG.VTras.z = 100000.0;
-			if (TG.VTras.z > 100000.0) TG.VTras.z = 100000.0;
-		}
-		else if (rota)
-		{
-			incrT = girT.cx;
-			TG.VRota.z += incrT * fact_Rota;
-			while (TG.VRota.z >= 360.0) TG.VRota.z -= 360.0;
-			while (TG.VRota.z < 0.0) TG.VRota.z += 360.0;
-		}
-		else if (escal)
-		{
-			if (incrT <= 0) {
-				if (incrT >= -2.0) incrT = -2.0;
-				incrT = 1.0 / static_cast<double>(static_cast<int>(log2(static_cast<double>(-incrT))));
-			}
-			else incrT = static_cast<long int>(log2(static_cast<double>(incrT)));
-			TG.VScal.z = TG.VScal.z * incrT;
-			if (TG.VScal.z < 0.25) TG.VScal.z = 0.25;
-			if (TG.VScal.z > 8192.0) TG.VScal.z = 8192.0;
-		}
-		//m_PosDAvall = point;
-		m_PosDAvall.x = xpos;	m_PosDAvall.y = ypos;
-		// Crida a OnPaint() per redibuixar l'escena
-		//OnPaint(window);
 	}
 }
 
@@ -1491,7 +1260,6 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 //							 (coord. pantalla) quan el botó s'ha apretat.
 void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 {
-	// TODO: Agregue aquí su código de controlador de mensajes o llame al valor predeterminado
 	double modul = 0;
 	GLdouble vdir[3] = { 0, 0, 0 };
 
@@ -1502,8 +1270,8 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 
 // (2) ONLY forward mouse data to your underlying app/game.
 	if (!io.WantCaptureMouse && !g_EstatSimulador.mostrarSelectorModes) { // <Tractament mouse de l'aplicació>}
-		// Funció de zoom quan està activada la funció pan o les T. Geomètriques
-		if ((zzoom || zzoomO) || (transX) || (transY) || (transZ))
+		// Funció de zoom en Càmera Esfèrica
+		if (zzoom)
 		{
 			if (camera == CAM_ESFERICA)
 			{	// Càmera Esfèrica
@@ -1785,7 +1553,6 @@ int main()
 	glfwSetCursorPosCallback(window, (GLFWcursorposfun)OnMouseMove);				// - Directly redirect GLFW mouse position events
 	glfwSetScrollCallback(window, (GLFWscrollfun)OnMouseWheel);						// - Directly redirect GLFW mouse wheel events
 	glfwSetKeyCallback(window, (GLFWkeyfun)OnKeyDown);								// - Directly redirect GLFW key events
-	//glfwSetCharCallback(window, OnTextDown);										// - Directly redirect GLFW char events
 	glfwSetErrorCallback(error_callback);											// Error callback
 	glfwSetWindowRefreshCallback(window, (GLFWwindowrefreshfun)OnPaint);			// - Callback to refresh the screen
 
@@ -1812,11 +1579,10 @@ int main()
 	escenaris[0] = new EscenariIntuitiu();
 	escenaris[1] = new EscenariRealista();
 	escenariActual = escenaris[0];
-	objecte = CAP;
 
 	objecte = SISTEMA_SOLAR;
 	camera = CAM_ESFERICA;		Vis_Polar = POLARZ;
-	t_textura = TEXTURA_FITXERIMA;	tFlag_invert_Y = true;	textura = true;
+	tFlag_invert_Y = true;
 	sw_material[0] = false;		SkyBoxCube = false;
 
 	// Càmera allunyada i enlairada per veure les òrbites des de dalt
@@ -1894,7 +1660,6 @@ int main()
 	glfwTerminate();
 
 	if (shaderLighting.getProgramID() != -1) shaderLighting.DeleteProgram();
-	if (shaderSkyBox.getProgramID() != -1) shaderSkyBox.DeleteProgram();
 	return 0;
 
 }

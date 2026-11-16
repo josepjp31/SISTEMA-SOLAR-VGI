@@ -108,14 +108,14 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>Default</LanguageStandard>
       <AdditionalIncludeDirectories>..\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PrecompiledHeaderFile>framdework.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile>framework.h</PrecompiledHeaderFile>
       <AdditionalOptions>/execution-charset:utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>..\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>cspice.lib;glfw3dll.lib;opengl32.lib;glew32.lib;glew32s.lib;SOIL2.lib;nfd_d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cspice.lib;glfw3dll.lib;opengl32.lib;glew32.lib;glew32s.lib;SOIL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>MSVCRT;LIBCMT;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
     <PostBuildEvent>
@@ -141,7 +141,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <AdditionalLibraryDirectories>..\lib\x64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>cspice.lib;glfw3.lib;opengl32.lib;glew32.lib;glew32s.lib;SOIL2.lib;nfd_d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cspice.lib;glfw3.lib;opengl32.lib;glew32.lib;glew32s.lib;SOIL2.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>LIBCMT;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
     </Link>
     <PostBuildEvent>
@@ -167,7 +167,6 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="material.cpp" />
     <ClCompile Include="objLoader.cpp" />
-    <ClCompile Include="quatern.cpp" />
     <ClCompile Include="shader.cpp" />
     <ClCompile Include="visualitzacio.cpp" />
   </ItemGroup>
@@ -198,7 +197,6 @@
       </ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="..\include\ImGui\imstb_textedit.h" />
-    <ClInclude Include="..\include\ImGui\nfd.h" />
     <ClInclude Include="CelestialBodyData.h" />
     <ClInclude Include="constants.h" />
     <ClInclude Include="escena.h" />
@@ -211,7 +209,6 @@
     <ClInclude Include="main.h" />
     <ClInclude Include="material.h" />
     <ClInclude Include="objLoader.h" />
-    <ClInclude Include="quatern.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="visualitzacio.h" />
   </ItemGroup>
