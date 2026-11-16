@@ -141,6 +141,8 @@ void EscenariIntuitiu::creaEscenari(GLuint& shader_programID)
 	m_cossos.clear();
 	m_cossos.resize(NUM_COSSOS_INTUITIU);
 
+	// Velocitat angular didàctica (3650 / T_dies): fixa la Terra (365 dies) a 10 graus/s (~36 s per òrbita completa)
+	// conservant les proporcions reals entre períodes orbitals perquè el moviment sigui observable en temps real.
 	const float factorVelocitatOrbital = 3650.0f;
 	for (int i = 0; i < NUM_COSSOS_INTUITIU; i++)
 	{
@@ -162,7 +164,9 @@ void EscenariIntuitiu::creaEscenari(GLuint& shader_programID)
 		);
 	}
 
-	// VAOs toroidals per a les 8 orbites circulars
+	// VAOs toroïdals per a les 8 òrbites circulars: cada torus es construeix amb radi major 1.0 i
+	// radi de tub (gruixOrbita / radi) perquè, en escalar-lo uniformement per `radi` al dibuix,
+	// totes les òrbites mantinguin el mateix gruix visual constant (0.03 u) sense deformar-ne la secció.
 	const float gruixOrbita = 0.03f;
 	for (int i = 1; i < NUM_COSSOS_INTUITIU; i++)
 	{
@@ -213,6 +217,8 @@ void EscenariIntuitiu::dibuixaEscenari(GLuint& sh_programID, glm::mat4 MatriuVis
 	col_orbita.r = 0.7; col_orbita.g = 0.7; col_orbita.b = 0.7; col_orbita.a = 1.0;
 
 	glm::mat4 ModelMatrix(1.0f);
+	// Desactiva el component d'emissió (sw_mat[0] = false) perquè les òrbites i els anells de Saturn
+	// només responguin a la il·luminació de l'escena i no emetin llum pròpia com el Sol.
 	bool sw_mat_no_emisio[5] = { false, sw_mat[1], sw_mat[2], sw_mat[3], sw_mat[4] };
 
 	// 1. Orbites toroidals (condicionat a mostrarOrbites)

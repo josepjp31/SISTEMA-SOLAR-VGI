@@ -991,6 +991,11 @@ static const char* kEtiquetesMarques[kNumMarquesSlider] = {
     "1 min/s", "1 h/s", "1 dia/s", "10 dies/s", "20 dies/s"
 };
 
+// Corba logarítmica per trams del slider de velocitat del timelapse:
+// assigna 5 marques equidistants u in {0.00, 0.25, 0.50, 0.75, 1.00} als valors
+// {60, 3600, 86400, 864000, 1728000} s/s. Dins de cada tram s'aplica interpolació
+// exponencial/logarítmica (v_i * (v_{i+1}/v_i)^t) per oferir control fi tant a escales
+// lentes (min/s, h/s) com ràpides (dies/s) en un rang de gairebé 5 ordres de magnitud.
 static float VelocitatANormalitzat(double vel)
 {
     if (vel <= kValMarques[0]) return 0.0f;
@@ -1004,6 +1009,7 @@ static float VelocitatANormalitzat(double vel)
     return 1.0f;
 }
 
+// Transformació inversa del slider normalitzat u in [0.0, 1.0] cap a velocitat [s_simulats / s_real].
 static double NormalitzatAVelocitat(float u)
 {
     if (u <= 0.0f) return kValMarques[0];
@@ -1916,7 +1922,11 @@ void InterficieUI::DibuixarMarcadorPlaneta(const std::string& nom, const glm::ve
     ImDrawList* drawList = ImGui::GetBackgroundDrawList();
     if (drawList == nullptr) return;
 
-    // Diametre aparent en pixels a pantalla per amagar el halo quan la esfera 3D es prou gran (> ~25 px)
+    // Diàmetre aparent en píxels a pantalla per amagar el halo 2D quan ens acostem a un astre:
+    // en projecció perspectiva, projMatrix[1][1] = 1 / tan(fovY / 2), de manera que
+    // (radiCos / distCam) * projMatrix[1][1] és el radi angular en coordenades NDC verticals [-1, 1];
+    // multiplicat per 0.5 * viewport.w (alçada en px) i per 2 dona el diàmetre en píxels.
+    // Si supera 25 px, l'esfera 3D ja és prou visible i s'oculta el halo per no embrutar el primer pla.
     glm::vec4 posCam = viewMatrix * glm::vec4(posicioMon, 1.0f);
     float distCam = glm::length(glm::vec3(posCam));
     float diametrePx = (distCam > 1e-6f)

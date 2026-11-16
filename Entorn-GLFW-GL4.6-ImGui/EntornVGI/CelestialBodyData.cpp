@@ -16,7 +16,8 @@ namespace
 {
     bool s_kernelsLoaded = false;
 
-    // Consulta en km/s i km directament a CSPICE (sense convertir a UA)
+    // Consulta directa en [km] i [km/s] a CSPICE (sense convertir a UA) perquè oscltx_c i conics_c
+    // exigeixen unitats mètriques coherents amb el paràmetre gravitatori GM [km^3/s^2] de gm_de440.tpc.
     CState3D getCBstateKm(CelestialBodyId body, CelestialBodyId origin, double et, bool* ok = nullptr)
     {
         double state[6] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
@@ -34,7 +35,9 @@ namespace
         if (failed_c())
         {
             reset_c();
-            // Fallback per a Plutó fora del rang de plu060.bsp (1800-2199): usar baricentre (9) dins de440.bsp
+            // Fallback per a Plutó fora de la finestra 1800-2199: el kernel plu060.bsp només cobreix
+            // el centre del cos (999) en aquest rang, mentre que el baricentre (9) dins de440.bsp
+            // cobreix tot el rang de dates del simulador (1550-2649) amb error negligible a escala orbital.
             if (body == CB_PLUTO)
             {
                 spkezr_c("9", et, "J2000", "NONE", itOrigin->second.m_id.c_str(), state, &lt);
@@ -184,6 +187,9 @@ glm::mat4 getCBrotMat(CelestialBodyId body, double et)
         return rotationMatrix;
     }
 
+    // CSPICE emmagatzema rot[3][3] en format row-major (C), mentre que glm::make_mat3 interpreta
+    // els 9 doubles seqüencials com a columnes (column-major); transpose converteix la disposició
+    // de memòria de row-major a column-major sense invertir la transformació física.
     rotationMatrix = glm::mat4(glm::transpose(glm::make_mat3(&rot[0][0])));
 
     return rotationMatrix;
@@ -203,7 +209,8 @@ std::vector<CState3D> getOrbitStates(CelestialBodyId body, double et, int nState
     if (props.m_orbitedObject == CB_NONE)
         return states;
 
-    // Estat inicial en km i km/s necessari per a oscltx_c juntament amb GM (km^3/s^2)
+    // Cal consultar l'estat inicial en [km] i [km/s] mitjançant getCBstateKm() perquè bodvrd_c
+    // retorna GM en [km^3/s^2] i oscltx_c necessita posició/velocitat en km per calcular el període orbital oscReturns[10].
     bool okInit = false;
     CState3D initialState = getCBstateKm(body, props.m_orbitedObject, et, &okInit);
     if (!okInit)

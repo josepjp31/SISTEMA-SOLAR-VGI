@@ -25,7 +25,9 @@ EscenariRealista::EscenariRealista()
 		m_etOrbita[i] = 0.0;
 	}
 
-	// Parametres de camera adaptats a l'escala astronomica en UA (SCALE_UNITS_PER_AU = 1000)
+	// Paràmetres de càmera adaptats a l'escala astronòmica (1 UA = 1000 unitats OpenGL):
+	// aquest factor manté els radis planetaris (Terra ~0,0426 u, Lluna ~0,0116 u) lluny dels límits
+	// de precisió float32, alhora que encabeix Neptú (~30.000 u) i Plutó (~40.000 u) dins del frustum.
 	m_configCamera.distInicialSol = 1500.0f;
 	m_configCamera.angleInclinacioInicial = 25.0f;
 	m_configCamera.globalSistemaR = 35000.0f;
@@ -47,6 +49,9 @@ EscenariRealista::EscenariRealista()
 	m_configCamera.navPosY = -900.0f;
 	m_configCamera.navPosZ = 280.0f;
 	m_configCamera.navPas = 16.0f;
+	// Atenuació quadràtica suau (1e-10) en lloc de 1/r^2 físic pur: a 30-40 UA (30.000-40.000 u),
+	// una caiguda 1/r^2 real enfosquiria completament Neptú i Plutó respecte a la Terra; amb 1e-10
+	// el factor f_att = 1 / (1 + 1e-10 * d^2) es manté prop de 0.86-0.91 per garantir visibilitat.
 	m_configCamera.atenuacioQuad = 1.0e-10f;
 }
 
@@ -210,7 +215,9 @@ glm::vec3 EscenariRealista::getPosicioVista(int idx, int cosEnfocatId, bool orig
 
 	if (origenRelatiu && cosEnfocatId > 0 && cosEnfocatId < NUM_COSSOS_REALISTA)
 	{
-		// Resta en doble precisio abans de passar a float per evitar jitter en cossos llunyans
+		// Resta en doble precisió (double, [UA]) abans de multiplicar per SCALE_UNITS_PER_AU i truncar a float32:
+		// evita pèrdua de dígits significatius (cancel·lació catastròfica) i jitter de càmera/lluna quan
+		// s'observa un planeta llunyà (p. ex. Neptú o Plutó a 30.000-40.000 u amb radis de ~0,01-0,16 u).
 		return glm::vec3((m_posicionsAU[idx] - m_posicionsAU[cosEnfocatId]) * SCALE_UNITS_PER_AU);
 	}
 
@@ -391,7 +398,9 @@ void EscenariRealista::dibuixaEscenari(GLuint& sh_programID, glm::mat4 MatriuVis
 	}
 
 	// 3. Anells de Saturn escalats respecte al radi equatorial real (60.268,0 km -> 74.732 km .. 136.808 km)
-	//    i orientats amb la matriu de rotacio 3D real de SPICE (IAU_SATURN -> J2000, inclinacio ~26.73 deg)
+	//    i orientats amb la matriu de rotació 3D real de SPICE (IAU_SATURN -> J2000, inclinació ~26.73 deg).
+	//    Es dibuixen després de totes les esferes amb glDepthMask(GL_FALSE) per respectar el Z-buffer del planeta
+	//    sense escriure profunditat des dels píxels semitransparents (evita oclusions errònies pel canal alfa).
 	bool sw_mat_no_emisio[5] = { false, sw_mat[1], sw_mat[2], sw_mat[3], sw_mat[4] };
 	glUniform1i(locTextur, GL_TRUE);
 	glUniform1i(locModulate, GL_TRUE);

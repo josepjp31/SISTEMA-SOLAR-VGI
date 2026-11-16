@@ -1,7 +1,7 @@
 //******** PRACTICA VISUALITZACIÓ GRÀFICA INTERACTIVA (Escola Enginyeria - UAB)
 //******** Entorn bàsic VS2026 MONOFINESTRA amb OpenGL 4.6, interfície GLFW 3.4, ImGui i llibreries GLM
 //******** Enric Martí Gòdia (Setembre 2026)
-// glut_geometry.h: interface de de glut_geometry.cpp.
+// glut_geometry.h — Arquitectura: Pipeline Render / Primitives Geomètriques (adaptació VAO/EBO de FreeGLUT per a esferes, discos i toros).
 
 /*
  * glut_geometry.h

@@ -1,6 +1,5 @@
-// framework.h: archivo de inclusión para archivos de inclusión estándar del sistema,
-// o archivos de inclusión específicos del proyecto utilizados frecuentemente,
-// pero cambiados rara vez
+// framework.h — Arquitectura: Framework / Capçaleres Base
+// Inclusió centralitzada de GLEW 2.1.0, GLFW 3.4, GLM, primitives VAO FreeGLUT, SOIL2, STL i constants globals.
 
 #pragma once
 

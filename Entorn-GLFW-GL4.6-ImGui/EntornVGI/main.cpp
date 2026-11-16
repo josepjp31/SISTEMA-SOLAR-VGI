@@ -333,8 +333,10 @@ void OnSize(GLFWwindow* window, int width, int height)
 }
 
 
-// SincronitzarEstatSimuladorAmbOpenGL: Sincronitza les opcions del menu ImGui (InterficieUI)
-// amb les variables internes d'OpenGL (il-luminacio del Sol, Skybox, eixos, camera i focus).
+// SincronitzarEstatSimuladorAmbOpenGL: Pont de sincronització entre la interfície ImGui (g_EstatSimulador)
+// i l'estat intern del motor OpenGL. InterficieUI només modifica flags i opcions dins d'EstatSimulacio;
+// aquesta funció tradueix aquests canvis abans del renderitzat a configuració de shaders, llums (llumGL),
+// capes visuals (Skybox, eixos) i paràmetres de càmera (OPV, opvN, camera).
 void SincronitzarEstatSimuladorAmbOpenGL()
 {
 	if (g_EstatSimulador.mostrarSelectorModes) return;
@@ -497,7 +499,10 @@ void OnPaint(GLFWwindow* window)
 		// Entorn VGI: Activar shader Visualització Escena
 		glUseProgram(shader_programID);
 
-		// Calcul dinamic de plans near/far en Escala Real per evitar near-clipping i Z-fighting
+		// Càlcul dinàmic de plans near/far en Escala Real: els radis reals (p. ex. Lluna ~0.0116 u)
+		// exigeixen p_near fins a 0.0001 u en apropar-s'hi per evitar near-clipping, mentre les òrbites
+		// exteriors necessiten p_far >= 100.000 u. Escalar p_near proporcionalment a OPV.R preserva la
+		// resolució del Z-buffer en un rang dinàmic de 8 ordres de magnitud i evita Z-fighting.
 		if (g_EstatSimulador.modeActual == ModeSimulacio::ESCALA_REAL)
 		{
 			if (camera == CAM_NAVEGA)
@@ -533,8 +538,10 @@ void OnPaint(GLFWwindow* window)
 				glm::vec3 pos = escenariActual->getPosicioCos(g_EstatSimulador.cosEnfocatId);
 				if (g_EstatSimulador.modeActual == ModeSimulacio::ESCALA_REAL)
 				{
-					// Origen relatiu al cos enfocat (evita jitter en float32 a 30.000-40.000 u):
-					// la camera orbita (0,0,0) i el Sol (Llum #0) es situa a -pos
+					// En Escala Real s'usa origen relatiu al planeta enfocat (evita jitter en float32 a 30.000-40.000 u):
+					// l'esfera enfocada queda a (0,0,0), la càmera orbita (0,0,0) i tots els cossos es traslladen -pos.
+					// Com que el Sol és a l'origen heliocèntric (0,0,0), la seva posició relativa a la nova escena
+					// és -pos, per la qual cosa cal reubicar LightSource[0].position a -pos per conservar la il·luminació real.
 					glUseProgram(shader_programID);
 					glUniform4f(glGetUniformLocation(shader_programID, "LightSource[0].position"), -pos.x, -pos.y, -pos.z, 1.0f);
 				}
@@ -1625,12 +1632,15 @@ int main()
 	cam_Esferica[0] = (float)OPV.R;	cam_Esferica[1] = (float)OPV.alfa;	cam_Esferica[2] = (float)OPV.beta;
 
 
-// Loop until the user closes the window
+// Bucle principal del simulador:
+// 1. Càlcul de delta temporal, sincronització UI->OpenGL (SincronitzarEstatSimuladorAmbOpenGL) i integració (updateVariables).
+// 2. Processament d'esdeveniments d'entrada GLFW (glfwPollEvents).
+// 3. Renderitzat 3D de l'escena i actualització de ViewMatrix/ProjectionMatrix (OnPaint).
+// 4. Construcció de la interfície ImGui i projecció de marcadors/etiquetes 2D amb les matrius del frame (draw_Menu_ImGui).
+// 5. Rasterització de la llista ImGui (ImGui_ImplOpenGL3_RenderDrawData) i presentació del framebuffer (glfwSwapBuffers).
 	while (!glfwWindowShouldClose(window))
-	{	// Poll for and process events */
-		//        glfwPollEvents();
-
-		// Entorn VGI. Timer: common part, do this only once
+	{
+		// Entorn VGI. Timer: càlcul del delta temporal respecte al frame anterior
 		now = glfwGetTime();
 		delta = now - previous;
 		previous = now;
@@ -1656,22 +1666,18 @@ int main()
 			}
 		}
 
-		// Poll for and process events
+		// Pas 2: Processar esdeveniments de teclat, ratolí i finestra
 		glfwPollEvents();
 
-		// Crida a OnPaint() per redibuixar l'escena i actualitzar ViewMatrix / ProjectionMatrix del frame actual
+		// Pas 3: Renderitzat 3D de l'escena i actualització de ViewMatrix / ProjectionMatrix del frame actual
 		OnPaint(window);
 
-		// Entorn VGI.ImGui: Dibuixa menú ImGui i projecta etiquetes/halos 2D amb les matrius actuals
+		// Pas 4: Construcció de menús/panells ImGui i projecció 2D d'etiquetes/halos amb les matrius del pas 3
 		draw_Menu_ImGui();
 
-		// Entorn VGI.ImGui: Capta dades del menú ImGui
+		// Pas 5: Rasterització de les dades de dibuix ImGui sobre el framebuffer 3D i intercanvi de buffers
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-		// Entorn VGI: Activa la finestra actual
 		glfwMakeContextCurrent(window);
-
-		// Entorn VGI: Transferència del buffer OpenGL a buffer de pantalla
 		glfwSwapBuffers(window);
 	}
 
