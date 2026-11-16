@@ -1,21 +1,21 @@
-//******** PRACTICA VISUALITZACI” GR¿FICA INTERACTIVA (Escola Enginyeria - UAB)
-//******** Entorn b‡sic VS2026 MONOFINESTRA amb OpenGL 4.6, interfÌcie GLFW 3.4, ImGui i llibreries GLM
-//******** Ferran Poveda, Marc Vivet, Carme Juli‡, DÈbora Gil, Enric MartÌ (Setembre 2026)
-// constants.h ó Arquitectura: Constants i Tipus Compartits
-// DefiniciÛ de constants simbÚliques, lÌmits de visualitzaciÛ i estructures b‡siques de c‡mera, color, VAO i il∑luminaciÛ.
+//******** PRACTICA VISUALITZACI√ì GR√ÄFICA INTERACTIVA (Escola Enginyeria - UAB)
+//******** Entorn b√†sic VS2026 MONOFINESTRA amb OpenGL 4.6, interf√≠cie GLFW 3.4, ImGui i llibreries GLM
+//******** Ferran Poveda, Marc Vivet, Carme Juli√†, D√©bora Gil, Enric Mart√≠ (Setembre 2026)
+// constants.h ‚Äî Arquitectura: Constants i Tipus Compartits
+// Definici√≥ de constants simb√≤liques, l√≠mits de visualitzaci√≥ i estructures b√†siques de c√†mera, color, VAO i il¬∑luminaci√≥.
 
 #ifndef CONST_H
 #define CONST_H
 
-//--------------- VGI: Tipus de C‡mera
+//--------------- VGI: Tipus de C√†mera
 #define CAP ' '
 #define CAM_ESFERICA 'E'
 #define CAM_NAVEGA 'N'
 
-//--------------- VGI: Tipus de ProjecciÛ
+//--------------- VGI: Tipus de Projecci√≥
 #define PERSPECT 'P'
 
-//--------------- VGI: Tipus de Polars (per la VisualitzaciÛ Interactiva)
+//--------------- VGI: Tipus de Polars (per la Visualitzaci√≥ Interactiva)
 #define POLARZ 'Z'
 #define POLARY 'Y'
 #define POLARX 'X'
@@ -29,15 +29,15 @@
 #define PLANA 'f'
 #define SUAU 's'
 
-// -------------- VGI: DefiniciÛ dels valors del pla near i far del Volum de VisualitzaciÛ en Perspectiva
-extern double p_near; // [unitats OpenGL] Dist‡ncia del pla de retall proper (> 0.0, din‡mic en Escala Real)
-extern double p_far;  // [unitats OpenGL] Dist‡ncia del pla de retall lluny‡ (> p_near)
+// -------------- VGI: Definici√≥ dels valors del pla near i far del Volum de Visualitzaci√≥ en Perspectiva
+extern double p_near; // [unitats OpenGL] Dist√†ncia del pla de retall proper (> 0.0, din√†mic en Escala Real)
+extern double p_far;  // [unitats OpenGL] Dist√†ncia del pla de retall lluny√† (> p_near)
 
 // -------------- VGI: CONSTANTS TEXTURES
-// Nombre m‡xim de textures per escenari
+// Nombre m√†xim de textures per escenari
 #define NUM_MAX_TEXTURES 15
 
-// --------------  VGI: NOMBRE DE LLUMS: Nombre de Llums de l'aplicaciÛ, les d'OpenGL
+// --------------  VGI: NOMBRE DE LLUMS: Nombre de Llums de l'aplicaci√≥, les d'OpenGL
 const int NUM_MAX_LLUMS = 8;
 
 // -------------- VGI: SHADERS --> Tipus de Shaders
@@ -46,33 +46,33 @@ const int NUM_MAX_LLUMS = 8;
 
 //--------------- VGI: Valor constant de pi
 const double PI = 3.14159;        // [radians] Constant Pi aproximada
-const double TWOPI = 2 * PI;      // [radians] 2*Pi (circumferËncia completa)
+const double TWOPI = 2 * PI;      // [radians] 2*Pi (circumfer√®ncia completa)
 const double PID2 = PI / 2;       // [radians] Pi/2 (90 graus)
 
 // --------------- VGI: Estructura tamany 2D (Pre-definida en Visual Studio 2019)
 struct CSize
 {
-	GLint cx; // [pÌxels] Amplada (>= 0)
-	GLint cy; // [pÌxels] AlÁada (>= 0)
+	GLint cx; // [p√≠xels] Amplada (>= 0)
+	GLint cy; // [p√≠xels] Al√ßada (>= 0)
 };
 
 // --------------- VGI: Estructura coordenada 2D (Ja definida en Visual Studio 2010)
 struct CPoint
 {
-	GLint x; // [pÌxels] Coordenada horitzontal de pantalla
-	GLint y; // [pÌxels] Coordenada vertical de pantalla
+	GLint x; // [p√≠xels] Coordenada horitzontal de pantalla
+	GLint y; // [p√≠xels] Coordenada vertical de pantalla
 };
 
 // --------------- VGI: Estructura coordenada 3D homogenia
 struct CPunt3D
 {
-	GLdouble x; // [unitats OpenGL] Coordenada X (o component X de direcciÛ)
-	GLdouble y; // [unitats OpenGL] Coordenada Y (o component Y de direcciÛ)
-	GLdouble z; // [unitats OpenGL] Coordenada Z (o component Z de direcciÛ)
-	GLdouble w; // [adimensional] Component homogËnia (1.0 = posiciÛ puntual, 0.0 = direcciÛ)
+	GLdouble x; // [unitats OpenGL] Coordenada X (o component X de direcci√≥)
+	GLdouble y; // [unitats OpenGL] Coordenada Y (o component Y de direcci√≥)
+	GLdouble z; // [unitats OpenGL] Coordenada Z (o component Z de direcci√≥)
+	GLdouble w; // [adimensional] Component homog√®nia (1.0 = posici√≥ puntual, 0.0 = direcci√≥)
 };
 
-// --------------- GMS: M‡scara booleana sobre coordenades 3D
+// --------------- GMS: M√†scara booleana sobre coordenades 3D
 struct CMask3D
 {
 	bool x; // Activar/desactivar component o reixa X
@@ -90,11 +90,11 @@ struct CColor
 	GLdouble a; // [0.0..1.0] Canal alfa (opacitat)
 };
 
-// --------------- VGI: Estructura coordenada EsfËrica 3D
+// --------------- VGI: Estructura coordenada Esf√®rica 3D
 struct CEsfe3D
 {
-	GLdouble R;    // [unitats OpenGL] Dist‡ncia radial de la c‡mera al centre d'Úrbita (> 0.0)
-	GLdouble alfa; // [graus] Angle d'elevaciÛ vertical [-90..90]
+	GLdouble R;    // [unitats OpenGL] Dist√†ncia radial de la c√†mera al centre d'√≤rbita (> 0.0)
+	GLdouble alfa; // [graus] Angle d'elevaci√≥ vertical [-90..90]
 	GLdouble beta; // [graus] Angle azimutal horitzontal [0..360)
 };
 
@@ -103,17 +103,17 @@ struct CVAO
 {
 	GLuint vaoId;   // Identificador del Vertex Array Object (0 = buit)
 	GLuint vboId;   // Identificador del Vertex Buffer Object (0 = buit)
-	GLuint eboId;   // Identificador de l'Element Buffer Object d'Ìndexs (0 = sense EBO)
-	GLint nVertexs; // Nombre de vËrtexs emmagatzemats (>= 0)
-	GLint nIndices; // Nombre d'Ìndexs per a glDrawElements (>= 0)
+	GLuint eboId;   // Identificador de l'Element Buffer Object d'√≠ndexs (0 = sense EBO)
+	GLint nVertexs; // Nombre de v√®rtexs emmagatzemats (>= 0)
+	GLint nIndices; // Nombre d'√≠ndexs per a glDrawElements (>= 0)
 };
 
-// --------------- VGI: Coeficients equaciÛ d'atenuaciÛ de la llum fatt=1/(ad2+bd+c)
+// --------------- VGI: Coeficients equaci√≥ d'atenuaci√≥ de la llum fatt=1/(ad2+bd+c)
 struct CAtenua
 {
-	GLdouble a; // [1/unitats^2] Coeficient d'atenuaciÛ quadr‡tica (>= 0.0)
-	GLdouble b; // [1/unitats] Coeficient d'atenuaciÛ lineal (>= 0.0)
-	GLdouble c; // [adimensional] Coeficient d'atenuaciÛ constant (>= 0.0; 1.0 sense atenuaciÛ)
+	GLdouble a; // [1/unitats^2] Coeficient d'atenuaci√≥ quadr√†tica (>= 0.0)
+	GLdouble b; // [1/unitats] Coeficient d'atenuaci√≥ lineal (>= 0.0)
+	GLdouble c; // [adimensional] Coeficient d'atenuaci√≥ constant (>= 0.0; 1.0 sense atenuaci√≥)
 };
 
 // --------------- VGI: Estructura de coeficients de reflectivitat de materials
@@ -122,7 +122,7 @@ struct MATERIAL
 	GLfloat ambient[4];  // [RGBA 0.0..1.0] Reflectivitat ambient
 	GLfloat diffuse[4];  // [RGBA 0.0..1.0] Reflectivitat difusa
 	GLfloat specular[4]; // [RGBA 0.0..1.0] Reflectivitat especular
-	GLfloat emission[4]; // [RGBA 0.0..1.0] EmissiÛ prÚpia del material
+	GLfloat emission[4]; // [RGBA 0.0..1.0] Emissi√≥ pr√≤pia del material
 	GLfloat shininess;   // [0.0..128.0] Exponent especular de Phong
 };
 
@@ -130,14 +130,14 @@ struct MATERIAL
 struct LLUM
 {
 	bool encesa;            // Estat de la font de llum [true = encesa, false = apagada]
-	CPunt3D posicio;        // [unitats OpenGL] PosiciÛ (w=1.0) o direcciÛ (w=0.0) de la llum
+	CPunt3D posicio;        // [unitats OpenGL] Posici√≥ (w=1.0) o direcci√≥ (w=0.0) de la llum
 	CColor difusa;          // [RGBA 0.0..1.0] Intensitat difusa de la font de llum
 	CColor especular;       // [RGBA 0.0..1.0] Intensitat especular de la font de llum
-	CAtenua atenuacio;      // Coeficients de l'equaciÛ d'atenuaciÛ fatt = 1 / (a*d^2 + b*d + c)
-	bool restringida;       // Booleana que indica si Ès focus focal/spot [true] o omnidireccional [false]
-	CPunt3D spotdirection;  // [vector normalitzable] Vector de direcciÛ del focus restringit
+	CAtenua atenuacio;      // Coeficients de l'equaci√≥ d'atenuaci√≥ fatt = 1 / (a*d^2 + b*d + c)
+	bool restringida;       // Booleana que indica si √©s focus focal/spot [true] o omnidireccional [false]
+	CPunt3D spotdirection;  // [vector normalitzable] Vector de direcci√≥ del focus restringit
 	GLfloat spotcoscutoff;  // [cos(theta), -1.0..1.0] Cosinus de l'angle d'obertura del focus
-	GLfloat spotexponent;   // [0.0..128.0] Exponent d'atenuaciÛ angular de Warn
+	GLfloat spotexponent;   // [0.0..128.0] Exponent d'atenuaci√≥ angular de Warn
 };
 
 #endif

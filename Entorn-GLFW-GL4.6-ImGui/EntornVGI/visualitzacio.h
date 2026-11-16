@@ -1,8 +1,8 @@
-//******** PRACTICA VISUALITZACI” GR¿FICA INTERACTIVA (Escola Enginyeria - UAB)
-//******** Entorn b‡sic VS2026 MONOFINESTRA amb OpenGL 4.6, interfÌcie GLFW 3.4, ImGui i llibreries GLM
-//******** Ferran Poveda, Marc Vivet, Carme Juli‡, DÈbora Gil, Enric MartÌ (Setembre 2026)
-// visualitzacio.h ó Arquitectura: Pipeline Render / VisualitzaciÛ
-// Funcions de c‡mera (esfËrica i navegaciÛ), projecciÛ perspectiva, il∑luminaciÛ multi-llum, eixos i c‡rrega de textures.
+//******** PRACTICA VISUALITZACI√ì GR√ÄFICA INTERACTIVA (Escola Enginyeria - UAB)
+//******** Entorn b√†sic VS2026 MONOFINESTRA amb OpenGL 4.6, interf√≠cie GLFW 3.4, ImGui i llibreries GLM
+//******** Ferran Poveda, Marc Vivet, Carme Juli√†, D√©bora Gil, Enric Mart√≠ (Setembre 2026)
+// visualitzacio.h ‚Äî Arquitectura: Pipeline Render / Visualitzaci√≥
+// Funcions de c√†mera (esf√®rica i navegaci√≥), projecci√≥ perspectiva, il¬∑luminaci√≥ multi-llum, eixos i c√†rrega de textures.
 
 #ifndef GLVIS_H
 #define GLVIS_H
@@ -11,55 +11,55 @@
 /*                                Funcions                                   */
 /* ------------------------------------------------------------------------- */
 
-// PrecondiciÛ: `sh_programID` actiu amb glUseProgram; `lumin` array de NUM_MAX_LLUMS elements.
-// Par‡metres: `sh_programID`, `ilumin` (PUNTS/FILFERROS/PLANA/SUAU), `ifix` (true=llum fixa mÛn, false=llum mÚbil),
+// Precondici√≥: `sh_programID` actiu amb glUseProgram; `lumin` array de NUM_MAX_LLUMS elements.
+// Par√†metres: `sh_programID`, `ilumin` (PUNTS/FILFERROS/PLANA/SUAU), `ifix` (true=llum fixa m√≥n, false=llum m√≤bil),
 // `ll_amb` (activa llum ambient global), `lumin` vector de fonts de llum.
 void Iluminacio(GLint sh_programID, char ilumin, bool ifix, bool ll_amb, LLUM* lumin);
 
 // ----------- Entorn VGI: PROJECCIONS
-// PrecondiciÛ: `sh_programID` actiu amb glUseProgram; `w > 0`, `h >= 0` (si h==0 s'ajusta a 1).
-// Par‡metres: `minx`, `miny`, `w`, `h` [pÌxels] del viewport; `zoom` (no usat internament, conservat per firma).
-// Retorn: matriu de projecciÛ perspectiva 4x4 (FOV vertical 60 graus, plans `p_near` i `p_far`).
+// Precondici√≥: `sh_programID` actiu amb glUseProgram; `w > 0`, `h >= 0` (si h==0 s'ajusta a 1).
+// Par√†metres: `minx`, `miny`, `w`, `h` [p√≠xels] del viewport; `zoom` (no usat internament, conservat per firma).
+// Retorn: matriu de projecci√≥ perspectiva 4x4 (FOV vertical 60 graus, plans `p_near` i `p_far`).
 glm::mat4 Projeccio_Perspectiva(GLuint sh_programID, int minx, int miny, GLsizei w, GLsizei h, double zoom);
 
-// ----------- Entorn VGI: C¿MERES
-// PrecondiciÛ: `sh_programID` actiu amb glUseProgram.
-// Par‡metres: `opv` coordenades esfËriques (R [u], alfa [graus], beta [graus]), `VPol` (POLARX/POLARY/POLARZ),
+// ----------- Entorn VGI: C√ÄMERES
+// Precondici√≥: `sh_programID` actiu amb glUseProgram.
+// Par√†metres: `opv` coordenades esf√®riques (R [u], alfa [graus], beta [graus]), `VPol` (POLARX/POLARY/POLARZ),
 // `col_fons` [RGBA 0..1], `oculta` (Z-buffer), `testv` (culling), `iluminacio`, `llum_amb`, `lumin`, `ifix`.
 // Retorn: matriu de vista 4x4 centrada a l'origen (0,0,0).
 glm::mat4 Vista_Esferica(GLuint sh_programID, CEsfe3D opv, char VPol,
 				 CColor col_fons, bool oculta, bool testv,
 				 char iluminacio, bool llum_amb, LLUM* lumin, bool ifix);
 
-// PrecondiciÛ: `sh_programID` actiu amb glUseProgram.
-// Par‡metres: `pv` posiciÛ de la c‡mera [u], `n[3]` punt objectiu [u], `v[3]` vector up, i opcions d'escena/il∑luminaciÛ.
-// Retorn: matriu de vista 4x4 en mode c‡mera lliure (Navega).
+// Precondici√≥: `sh_programID` actiu amb glUseProgram.
+// Par√†metres: `pv` posici√≥ de la c√†mera [u], `n[3]` punt objectiu [u], `v[3]` vector up, i opcions d'escena/il¬∑luminaci√≥.
+// Retorn: matriu de vista 4x4 en mode c√†mera lliure (Navega).
 glm::mat4 Vista_Navega(GLuint sh_programID, CPunt3D pv,
 				  GLdouble n[3], GLdouble v[3], CColor col_fons,
 				  bool oculta, bool testv,
 				  char iluminacio, bool llum_amb, LLUM* lumin, bool ifix);
 
-// PrecondiciÛ: context OpenGL actiu.
+// Precondici√≥: context OpenGL actiu.
 // Retorn: identificador VAO dels 3 eixos de coordenades (X vermell, Y verd, Z blau, longitud 300 u).
 GLuint deixos(void);
 
-// PrecondiciÛ: `vaoId` creat per `deixos()` i shader d'eixos actiu.
+// Precondici√≥: `vaoId` creat per `deixos()` i shader d'eixos actiu.
 void draw_Eixos(GLuint vboId);
 
 // Neteja els buffers de color i profunditat amb el color `int_fons` [RGB 0..1].
 void Fons(CColor int_fons);
 
-// PrecondiciÛ: context OpenGL actiu.
-// Par‡metres: `filename` ruta al fitxer d'imatge suportat per SOIL2.
+// Precondici√≥: context OpenGL actiu.
+// Par√†metres: `filename` ruta al fitxer d'imatge suportat per SOIL2.
 // Retorn: identificador OpenGL de la textura 2D generada (> 0), o 0 (false) si falla l'obertura.
 GLint loadIMA_SOIL(const char *filename);
 
-// PrecondiciÛ: context OpenGL actiu; `faces` amb 6 rutes (+X, -X, +Y, -Y, +Z, -Z).
+// Precondici√≥: context OpenGL actiu; `faces` amb 6 rutes (+X, -X, +Y, -Y, +Z, -Z).
 // Retorn: identificador OpenGL de la textura `GL_TEXTURE_CUBE_MAP` (> 0), o 0 si falla alguna cara.
 unsigned int loadCubemap(std::vector<std::string> faces);
 
-// PrecondiciÛ: context OpenGL actiu i textura `IDText` v‡lida.
-// Par‡metres: `num` unitat de textura [0..15], `IDText`, `extensT` (REPEAT vs CLAMP), `filterT` (LINEAR vs NEAREST),
-// `blendT` (legacy), `genMipmpT` (generaciÛ de mipmaps).
+// Precondici√≥: context OpenGL actiu i textura `IDText` v√†lida.
+// Par√†metres: `num` unitat de textura [0..15], `IDText`, `extensT` (REPEAT vs CLAMP), `filterT` (LINEAR vs NEAREST),
+// `blendT` (legacy), `genMipmpT` (generaci√≥ de mipmaps).
 void SetTextureParameters(GLint num, GLint IDText, bool extensT, bool filterT, bool blendT, bool genMipmpT);
 #endif

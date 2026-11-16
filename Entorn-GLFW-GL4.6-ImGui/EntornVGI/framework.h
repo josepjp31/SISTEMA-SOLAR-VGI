@@ -1,5 +1,5 @@
-// framework.h — Arquitectura: Framework / Capçaleres Base
-// Inclusió centralitzada de GLEW 2.1.0, GLFW 3.4, GLM, primitives VAO FreeGLUT, SOIL2, STL i constants globals.
+// framework.h â€” Arquitectura: Framework / CapÃ§aleres Base
+// InclusiÃ³ centralitzada de GLEW 2.1.0, GLFW 3.4, GLM, primitives VAO FreeGLUT, SOIL2, STL i constants globals.
 
 #pragma once
 
@@ -33,11 +33,11 @@ using namespace glm;
 // VGI: Fonts dels Objectes de la llibreria freeglut adaptats a estructures VAO, EBO i VBO
 #include "glut_geometry.h"
 
-// VGI: Llibreria SOIL2 (actualització de SOIL) per llegir imatges de diferents formats 
-//     (BMP,JPG,TIF,GIF,etc.) en la funció loadIMA (visualitzacio.cpp)
+// VGI: Llibreria SOIL2 (actualitzaciÃ³ de SOIL) per llegir imatges de diferents formats 
+//     (BMP,JPG,TIF,GIF,etc.) en la funciÃ³ loadIMA (visualitzacio.cpp)
 #include "gl/SOIL2.h"
 
-// VGI: Includes per lectura fitxers, funcions trigonomètriques i nombres aleatoris.
+// VGI: Includes per lectura fitxers, funcions trigonomÃ¨triques i nombres aleatoris.
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -46,10 +46,10 @@ using namespace glm;
 #include <string>
 //#include <iostream>
 
-// VGI: Constants de l'aplicació EntornVGI
+// VGI: Constants de l'aplicaciÃ³ EntornVGI
 #include "constants.h"
 
-// Desactivar en llistat compilació warning C4244: 'argumento': conversión de 'double' a 'GLfloat'; posible pérdida de datos
+// Desactivar en llistat compilaciÃ³ warning C4244: 'argumento': conversiÃ³n de 'double' a 'GLfloat'; posible pÃ©rdida de datos
 #  pragma warning (disable:4244)  // Disable bogus VC++ 4.2 conversion warnings.
 #  pragma warning (disable:4305)  // VC++ 5.0 version of above warning.
 #  pragma warning (disable:4473)  // Disable strpcpy deprecated command in objLoader.cpp

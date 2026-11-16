@@ -1,13 +1,13 @@
-//******** PRACTICA VISUALITZACI” GR¿FICA INTERACTIVA (Escola Enginyeria - UAB)
-//******** Entorn b‡sic VS2026 MONOFINESTRA amb OpenGL 4.6, interfÌcie GLFW 3.4, ImGui i llibreries GLM
-//******** Enric MartÌ (Setembre 2026)
-// shader.h ó Arquitectura: Pipeline Render / Shaders
-// GestiÛ del cicle de vida de programes GLSL (c‡rrega des de fitxer, compilaciÛ, enllaÁ i pas d'uniforms).
+//******** PRACTICA VISUALITZACI√ì GR√ÄFICA INTERACTIVA (Escola Enginyeria - UAB)
+//******** Entorn b√†sic VS2026 MONOFINESTRA amb OpenGL 4.6, interf√≠cie GLFW 3.4, ImGui i llibreries GLM
+//******** Enric Mart√≠ (Setembre 2026)
+// shader.h ‚Äî Arquitectura: Pipeline Render / Shaders
+// Gesti√≥ del cicle de vida de programes GLSL (c√†rrega des de fitxer, compilaci√≥, enlla√ß i pas d'uniforms).
 
 #ifndef SHADER_H
 #define SHADER_H
 
-// Entorn VGI: Constants i tipus de l'aplicaciÛ entorn VGI
+// Entorn VGI: Constants i tipus de l'aplicaci√≥ entorn VGI
 #include "framework.h"
 
 // Encapsula un programa shader OpenGL (Vertex/Fragment i opcionalment Geometry Shader)
@@ -19,37 +19,37 @@ public:
 	unsigned int programID; // Identificador OpenGL del programa GLSL (-1/UINT_MAX abans de carregar)
 //-------------- Entorn VGI: Fi De Variables globals de la classe Shader 
 
-//-------------- Entorn VGI: Funcions (mËtodes) de de la classe Shader 
+//-------------- Entorn VGI: Funcions (m√®todes) de de la classe Shader 
 	// Inicialitza `programID` a -1 sense carregar cap shader.
 	Shader();
 
 	// Allibera el programa GLSL associat amb `glDeleteProgram`.
 	~Shader();
 
-	// PrecondiciÛ: context OpenGL actiu; rutes v‡lides a fitxers GLSL.
-	// Compila i enllaÁa Vertex + Fragment shader. Retorn: `programID` del programa creat (0 si error).
+	// Precondici√≥: context OpenGL actiu; rutes v√†lides a fitxers GLSL.
+	// Compila i enlla√ßa Vertex + Fragment shader. Retorn: `programID` del programa creat (0 si error).
 	GLuint loadFileShaders(std::string file_Vert, std::string file_Frag);
 
-	// PrecondiciÛ: context OpenGL actiu; rutes v‡lides a fitxers GLSL.
-	// Compila i enllaÁa Vertex + Fragment + Geometry shader. Retorn: `programID` creat (0 si error).
+	// Precondici√≥: context OpenGL actiu; rutes v√†lides a fitxers GLSL.
+	// Compila i enlla√ßa Vertex + Fragment + Geometry shader. Retorn: `programID` creat (0 si error).
 	GLuint loadFileShadersG(std::string file_Vert, std::string file_Frag, std::string file_Geom);
 
-	// Mostra per sortida est‡ndard/error un missatge d'error de compilaciÛ o lectura del fitxer `fileShader`.
+	// Mostra per sortida est√†ndard/error un missatge d'error de compilaci√≥ o lectura del fitxer `fileShader`.
 	int DisplayMessageBox(std::string mess, std::string fileShader);
 
-	// Llegeix tot el contingut del fitxer de text `fn` en un buffer din‡mic (responsabilitat del cridador alliberar-lo).
+	// Llegeix tot el contingut del fitxer de text `fn` en un buffer din√†mic (responsabilitat del cridador alliberar-lo).
 	char* textFileRead(const char* fn);
 
-	// Allibera recursos de shaders enllaÁats al programa actual.
+	// Allibera recursos de shaders enlla√ßats al programa actual.
 	void releaseAllShaders();
 
 	// Retorn: identificador OpenGL `programID` del programa shader actual.
 	GLuint getProgramID();
 
-	// Activa el programa shader actual mitjanÁant `glUseProgram(programID)`.
+	// Activa el programa shader actual mitjan√ßant `glUseProgram(programID)`.
 	void use();
 
-	// Pas d'uniforms escalars al shader actiu (precondiciÛ: programa vinculat amb `use()`).
+	// Pas d'uniforms escalars al shader actiu (precondici√≥: programa vinculat amb `use()`).
 	void setBool(const std::string &name, bool value);
 	void setInt(const std::string &name, int value);
 	void setFloat(const std::string &name, float value);
@@ -69,9 +69,9 @@ public:
 	void setMatrix3fv(const std::string &name, glm::mat3 trans);
 	void setMatrix4fv(const std::string &name, glm::mat4 trans);
 
-	// Elimina explÌcitament el programa shader amb `glDeleteProgram(programID)`.
+	// Elimina expl√≠citament el programa shader amb `glDeleteProgram(programID)`.
 	void DeleteProgram();
 
-//-------------- Entorn VGI: Fi Funcions (mËtodes) de de la classe Shader 
+//-------------- Entorn VGI: Fi Funcions (m√®todes) de de la classe Shader 
 };
 #endif

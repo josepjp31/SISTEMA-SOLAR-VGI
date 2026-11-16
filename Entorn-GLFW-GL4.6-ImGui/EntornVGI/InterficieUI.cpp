@@ -93,7 +93,7 @@ void InterficieUI::InicialitzarEstil()
         if (rutaFontRegular != nullptr) {
             ImFontGlyphRangesBuilder builder;
             builder.AddRanges(io.Fonts->GetGlyphRangesDefault());
-            builder.AddText("ÀÁÈÉÍÏÒÓÚÜÇàáèéíïòóúüç·—°²");
+            builder.AddText("ÀÁÈÉÍÏÒÓÚÜÇàáèéíïòóúüç·—°²•");
             builder.BuildRanges(&s_rangCaractersCatala);
 
             // Font 0 per defecte a tota la interficie (menus, selector, etiquetes 2D i HUD)

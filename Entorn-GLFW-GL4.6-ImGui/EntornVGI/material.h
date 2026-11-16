@@ -1,8 +1,8 @@
-//******** PRACTICA VISUALITZACI” GR¿FICA INTERACTIVA (Escola Enginyeria - UAB)
-//******** Entorn b‡sic VS2026 MONOFINESTRA amb OpenGL 4.6, interfÌcie GLFW 3.4, ImGui i llibreries GLM
-//******** Ferran Poveda, Marc Vivet, Carme Juli‡, DÈbora Gil, Enric MartÌ (Setembre 2026)
-// material.h ó Arquitectura: Pipeline Render / VisualitzaciÛ
-// ConfiguraciÛ de les propietats de reflectivitat del material (emissiÛ, ambient, difusa, especular) al shader GLSL.
+//******** PRACTICA VISUALITZACI√ì GR√ÄFICA INTERACTIVA (Escola Enginyeria - UAB)
+//******** Entorn b√†sic VS2026 MONOFINESTRA amb OpenGL 4.6, interf√≠cie GLFW 3.4, ImGui i llibreries GLM
+//******** Ferran Poveda, Marc Vivet, Carme Juli√†, D√©bora Gil, Enric Mart√≠ (Setembre 2026)
+// material.h ‚Äî Arquitectura: Pipeline Render / Visualitzaci√≥
+// Configuraci√≥ de les propietats de reflectivitat del material (emissi√≥, ambient, difusa, especular) al shader GLSL.
 
 #ifndef GLMATERIAL_H
 #define GLMATERIAL_H
@@ -13,8 +13,8 @@
 /*                            Funcions de material                           */
 /* ------------------------------------------------------------------------- */
 
-// PrecondiciÛ: context OpenGL actiu i `sh_programID` vinculat amb glUseProgram.
-// Par‡metres:
+// Precondici√≥: context OpenGL actiu i `sh_programID` vinculat amb glUseProgram.
+// Par√†metres:
 //   - sh_programID: identificador del programa shader Phong actiu.
 //   - c_obj: color base [RGBA 0.0..1.0] aplicat a les components actives.
 //   - sw_mater[5]: interruptors [0]=emission, [1]=ambient, [2]=diffuse, [3]=specular (shininess=32), [4]=sw_material.
