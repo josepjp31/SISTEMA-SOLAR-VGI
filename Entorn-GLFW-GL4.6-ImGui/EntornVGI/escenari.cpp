@@ -145,11 +145,13 @@ void Escenari::dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id,
 
 	glm::mat4 ModelMatrix(1.0);
 	int i;
+	// Desactivar emissio per a orbites i anell de Saturn (nomes el Sol emet llum propia)
+	bool sw_mat_no_emisio[5] = { false, sw_mat[1], sw_mat[2], sw_mat[3], sw_mat[4] };
 
 	// 1. Orbites: anell fi sense textura, escalat al radi de cada orbita (condicionat a mostrarOrbites)
 	if (mostrarOrbites) {
 		glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_FALSE);
-		SeleccionaColorMaterial(sh_programID, col_orbita, sw_mat);
+		SeleccionaColorMaterial(sh_programID, col_orbita, sw_mat_no_emisio);
 		GLint locModelMatOrb = glGetUniformLocation(sh_programID, "modelMatrix");
 		for (i = 1; i < 9; i++)
 		{
@@ -168,7 +170,9 @@ void Escenari::dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id,
 	}
 	//2.Anell saturn
 		glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_TRUE);
-		SeleccionaColorMaterial(sh_programID, col_blanc, sw_mat);
+		glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_TRUE);
+		glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), flagInvertY);
+		SeleccionaColorMaterial(sh_programID, col_blanc, sw_mat_no_emisio);
 
 		if (m_texturesID[9] != 0) {
 			glActiveTexture(GL_TEXTURE0);
@@ -189,7 +193,15 @@ void Escenari::dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id,
 
 		glUniformMatrix4fv(glGetUniformLocation(sh_programID, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
 
+		// Activar alpha blending per respectar el canal alfa de la textura de l'anell
+		// i il.luminacio bilateral per rebre llum solar per ambdues cares de l'anell
+		GLint locTwoSided = glGetUniformLocation(sh_programID, "sw_twoSided");
+		if (locTwoSided != -1) glUniform1i(locTwoSided, GL_TRUE);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		draw_TriEBO_Object(GLU_DISK);
+		glDisable(GL_BLEND);
+		if (locTwoSided != -1) glUniform1i(locTwoSided, GL_FALSE);
 
 	// 3. Cossos: esfera amb la seva textura, situada sobre la seva òrbita
 

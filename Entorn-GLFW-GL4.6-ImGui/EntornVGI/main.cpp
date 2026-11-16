@@ -7333,10 +7333,6 @@ int main()
 	cam_Esferica[0] = (float)OPV.R;	cam_Esferica[1] = (float)OPV.alfa;	cam_Esferica[2] = (float)OPV.beta;
 
 
-	escenariActual = new Escenari();
-	escenariActual->creaEscenari(shader_programID);
-
-
 // Loop until the user closes the window
 	while (!glfwWindowShouldClose(window))
 	{	// Poll for and process events */
