@@ -5,6 +5,7 @@
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <cmath>
+#include <cstring>
 #include <algorithm>
 
 // Fonts sans-serif carregades per al panell de control de temps (mantenint la font per defecte com a base)
@@ -34,28 +35,11 @@ static void PopFontSegur(ImFont* f)
     if (f != nullptr) ImGui::PopFont();
 }
 
-// =========================================================================
-// CATALEG DE DADES FISIQUES DELS COSSOS DEL SISTEMA SOLAR (0: Sol .. 8: Neptu, 9: Pluto, 10: Lluna)
-// =========================================================================
-static const CosAstronomicDades kCatalegCossos[11] = {
-    { "Sol",     696340.0,  0.000, 274.00,  609.12,   0.00 },
-    { "Mercuri",   2439.7,  0.387,   3.70, 1407.60,   0.24 },
-    { "Venus",     6051.8,  0.723,   8.87, 5832.50,   0.62 },
-    { "Terra",     6371.0,  1.000,   9.81,   23.93,   1.00 },
-    { "Mart",      3389.5,  1.524,   3.72,   24.62,   1.88 },
-    { "Júpiter",  69911.0,  5.204,  24.79,    9.93,  11.86 },
-    { "Saturn",   58232.0,  9.582,  10.44,   10.70,  29.45 },
-    { "Urà",      25362.0, 19.218,   8.69,   17.24,  84.02 },
-    { "Neptú",    24622.0, 30.110,  11.15,   16.11, 164.79 },
-    { "Plutó",     1188.3, 39.482,   0.62,  153.29, 247.94 },
-    { "Lluna",     1737.4,  1.000,   1.62,  655.72,   0.07 }
-};
-
 void InterficieUI::ActualitzarDadesCosActiu(EstatSimulacio& estat)
 {
     int id = estat.cosEnfocatId;
-    if (id < 0 || id >= 11) id = 0;
-    estat.dadesCosActiu = kCatalegCossos[id];
+    if (id < 0 || id >= CatalegAstronomic::NUM_COSSOS) id = 0;
+    estat.dadesCosActiu = CatalegAstronomic::GetCos(id);
 }
 
 // =========================================================================
@@ -643,11 +627,6 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
 
     ImGui::SetWindowFontScale(factorFontMenu);
 
-    static const char* nomsPlanetesMenu[9] = {
-        "Sol (Centre)", "Mercuri", "Venus", "Terra",
-        "Mart", "Júpiter", "Saturn", "Urà", "Neptú"
-    };
-
     if (estat.modeActual == ModeSimulacio::INTUITIU)
     {
         // ==================== MENUS MODE DIDACTIC / INTUITIU ====================
@@ -689,8 +668,9 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
         {
             ImGui::SetWindowFontScale(factorFontMenu);
             for (int i = 0; i < 9; ++i) {
+                const char* etiqueta = (i == 0) ? "Sol (Centre)" : CatalegAstronomic::GetCos(i).nom;
                 bool seleccionat = (estat.cosEnfocatId == i);
-                if (ImGui::MenuItem(nomsPlanetesMenu[i], nullptr, seleccionat)) {
+                if (ImGui::MenuItem(etiqueta, nullptr, seleccionat)) {
                     estat.cosEnfocatId = i;
                     estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
                     estat.canviCameraPendent = true;
@@ -856,13 +836,9 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             }
             if (ImGui::BeginMenu("El Planeta Seleccionat")) {
                 ImGui::SetWindowFontScale(factorFontMenu);
-                static const char* nomsPlanetesRealista[11] = {
-                    "Sol (Centre)", "Mercuri", "Venus", "Terra",
-                    "Mart", "Júpiter", "Saturn", "Urà", "Neptú", "Plutó", "Lluna"
-                };
-                for (int i = 1; i < 11; ++i) {
+                for (int i = 1; i < CatalegAstronomic::NUM_COSSOS; ++i) {
                     bool seleccionat = (!estat.origenReferenciaSol && estat.cosEnfocatId == i);
-                    if (ImGui::MenuItem(nomsPlanetesRealista[i], nullptr, seleccionat)) {
+                    if (ImGui::MenuItem(CatalegAstronomic::GetCos(i).nom, nullptr, seleccionat)) {
                         estat.cosEnfocatId = i;
                         estat.origenReferenciaSol = false;
                         estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
@@ -1760,12 +1736,33 @@ void InterficieUI::DibuixarPanellDataHoraTimelapse(EstatSimulacio& estat)
 // =========================================================================
 // 2.6 FITXA DE L'ASTRE (HUD FLOTANT)
 // =========================================================================
-void InterficieUI::DibuixarFitxaAstronomicaHUD(const CosAstronomicDades& dades, bool* pObert)
+static void FormatarKmAmbPunts(double km, char* outBuf, size_t bufSize)
+{
+    long long valor = static_cast<long long>(std::llround(km));
+    if (valor < 0) valor = -valor;
+
+    char digits[32];
+    snprintf(digits, sizeof(digits), "%lld", valor);
+    size_t len = std::strlen(digits);
+
+    char formatted[48];
+    size_t outIdx = 0;
+    for (size_t i = 0; i < len && outIdx + 2 < sizeof(formatted); ++i) {
+        if (i > 0 && ((len - i) % 3 == 0)) {
+            formatted[outIdx++] = '.';
+        }
+        formatted[outIdx++] = digits[i];
+    }
+    formatted[outIdx] = '\0';
+    snprintf(outBuf, bufSize, "%s km", formatted);
+}
+
+void InterficieUI::DibuixarFitxaAstronomicaHUD(const DadesCosAstronomic& dades, bool* pObert)
 {
     if (!pObert || !*pObert) return;
 
     const ImGuiViewport* vp = ImGui::GetMainViewport();
-    const float ampleFinestra = 340.0f;
+    const float ampleFinestra = 370.0f;
     const float alcadaFinestra = 276.0f;
 
     ImVec2 pos(vp->WorkPos.x + vp->WorkSize.x - ampleFinestra - 20.0f, vp->WorkPos.y + 44.0f);
@@ -1796,11 +1793,12 @@ void InterficieUI::DibuixarFitxaAstronomicaHUD(const CosAstronomicDades& dades, 
 
         // Nom de l'astre destacat
         PushFontSegur(s_fontPanellTitol);
-        ImVec2 midaNom = ImGui::CalcTextSize(dades.nom.c_str());
+        const char* nomAstre = (dades.nom != nullptr) ? dades.nom : "";
+        ImVec2 midaNom = ImGui::CalcTextSize(nomAstre);
         dl->AddText(
             ImVec2(winPos.x + (winSize.x - midaNom.x) * 0.5f, winPos.y + alcadaCapcalera + 12.0f),
             IM_COL32(105, 225, 255, 255),
-            dades.nom.c_str()
+            nomAstre
         );
         PopFontSegur(s_fontPanellTitol);
 
@@ -1811,19 +1809,43 @@ void InterficieUI::DibuixarFitxaAstronomicaHUD(const CosAstronomicDades& dades, 
         dl->AddRectFilled(caixaMin, caixaMax, IM_COL32(12, 28, 48, 232), 9.0f);
         dl->AddRect(caixaMin, caixaMax, IM_COL32(55, 165, 220, 165), 9.0f, 0, 1.2f);
 
-        char valRadi[48], valDist[48], valGrav[48], valDia[48], valAny[48];
-        snprintf(valRadi, sizeof(valRadi), "%.0f km", dades.radiKm);
-        if (dades.distSolUA <= 0.0001) {
+        char labelDist[64];
+        const char* labelOrbita = "Volta al Sol:";
+        char valRadi[48], valDist[48], valGrav[48], valDia[64], valOrbita[48];
+
+        snprintf(valRadi, sizeof(valRadi), "%.0f km", dades.radiMitjaKm);
+
+        if (dades.parentIndex < 0) {
+            snprintf(labelDist, sizeof(labelDist), "Distància al Sol:");
             snprintf(valDist, sizeof(valDist), "Centre del sistema");
+        } else if (dades.parentIndex == 0) {
+            snprintf(labelDist, sizeof(labelDist), "Distància al Sol:");
+            snprintf(valDist, sizeof(valDist), "%.2f UA", dades.distMitjanaRefUA);
         } else {
-            snprintf(valDist, sizeof(valDist), "%.2f UA", dades.distSolUA);
+            const DadesCosAstronomic& pare = CatalegAstronomic::GetCos(dades.parentIndex);
+            snprintf(
+                labelDist, sizeof(labelDist),
+                (std::strcmp(pare.nom, "Terra") == 0) ? "Distància a la %s:" : "Distància a %s:",
+                pare.nom
+            );
+            FormatarKmAmbPunts(dades.distMitjanaRefKm, valDist, sizeof(valDist));
+            labelOrbita = "Òrbita al voltant:";
         }
-        snprintf(valGrav, sizeof(valGrav), "%.1f m/s²", dades.gravetat);
-        snprintf(valDia, sizeof(valDia), "%.1f h", dades.periodeRotacioHores);
-        if (dades.periodeOrbitalAnys <= 0.0001) {
-            snprintf(valAny, sizeof(valAny), "—");
+
+        snprintf(valGrav, sizeof(valGrav), "%.1f m/s²", dades.gravetatMS2);
+
+        if (dades.periodeRotacioHores < 0.0) {
+            snprintf(valDia, sizeof(valDia), "%.1f h (retrògrad)", std::fabs(dades.periodeRotacioHores));
         } else {
-            snprintf(valAny, sizeof(valAny), "%.2f anys", dades.periodeOrbitalAnys);
+            snprintf(valDia, sizeof(valDia), "%.1f h", dades.periodeRotacioHores);
+        }
+
+        if (dades.parentIndex < 0 || dades.periodeOrbitalDies <= 0.0001) {
+            snprintf(valOrbita, sizeof(valOrbita), "—");
+        } else if (dades.parentIndex == 0) {
+            snprintf(valOrbita, sizeof(valOrbita), "%.2f anys", dades.periodeOrbitalDies / 365.25);
+        } else {
+            snprintf(valOrbita, sizeof(valOrbita), "%.2f dies", dades.periodeOrbitalDies);
         }
 
         struct FilaDada {
@@ -1831,11 +1853,11 @@ void InterficieUI::DibuixarFitxaAstronomicaHUD(const CosAstronomicDades& dades, 
             const char* valor;
         };
         FilaDada files[5] = {
-            { "Radi:",            valRadi },
-            { "Distància al Sol:", valDist },
-            { "Gravetat:",        valGrav },
-            { "Durada del dia:",  valDia },
-            { "Volta al Sol:",    valAny }
+            { "Radi:",           valRadi },
+            { labelDist,         valDist },
+            { "Gravetat:",       valGrav },
+            { "Durada del dia:", valDia },
+            { labelOrbita,       valOrbita }
         };
 
         PushFontSegur(s_fontPanellRegular);

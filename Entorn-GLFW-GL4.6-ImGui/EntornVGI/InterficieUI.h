@@ -7,6 +7,7 @@
 #include <ctime>
 #include "framework.h"
 #include "escenari.h"
+#include "CatalegAstronomic.h"
 
 // Modes de funcionament de la simulacio
 enum class ModeSimulacio {
@@ -168,15 +169,8 @@ struct CameraConfig {
     float distZoom = 100.0f;
 };
 
-// Dades per a la fitxa astronomica HUD
-struct CosAstronomicDades {
-    std::string nom = "Sol";
-    double radiKm = 696340.0;
-    double distSolUA = 0.0;
-    double gravetat = 274.0;
-    double periodeRotacioHores = 609.12;
-    double periodeOrbitalAnys = 0.0;
-};
+// Alias de compatibilitat cap al cataleg astronomic unificat
+using CosAstronomicDades = DadesCosAstronomic;
 
 // Estat global de la interficie del simulador
 struct EstatSimulacio {
@@ -196,7 +190,7 @@ struct EstatSimulacio {
     EstatTempsSimulacio tempsSimulacio;
     OpcionsVisualitzacio opcionsVisualitzacio;
     CameraConfig cameraConfig;
-    CosAstronomicDades dadesCosActiu;
+    DadesCosAstronomic dadesCosActiu = CatalegAstronomic::GetCos(0);
 };
 
 // Classe principal d'interficie d'usuari Dear ImGui
@@ -206,7 +200,7 @@ public:
     // Inicialitzacio d'estils visuals (tema fosc espacial, arrodoniments)
     static void InicialitzarEstil();
 
-    // Actualitza les dades astronomiques del HUD segons el cos seleccionat (0..8)
+    // Actualitza les dades astronomiques del HUD segons el cos seleccionat (0..10)
     static void ActualitzarDadesCosActiu(EstatSimulacio& estat);
 
     // Renderitzador principal que coordina tots els components
@@ -222,7 +216,7 @@ public:
     static void DibuixarPanellDataHoraTimelapse(EstatSimulacio& estat);
 
     // 2.6 Panell d'Informacio i Telemetria Astronomica (HUD Flotant)
-    static void DibuixarFitxaAstronomicaHUD(const CosAstronomicDades& dades, bool* pObert);
+    static void DibuixarFitxaAstronomicaHUD(const DadesCosAstronomic& dades, bool* pObert);
 
     // 2.7 Projeccio d'Etiquetes i Marcadors 3D a Pantalla 2D amb ImDrawList
     static void DibuixarEtiquetaPlaneta(const std::string& nom, const glm::vec3& posicioMon, 
