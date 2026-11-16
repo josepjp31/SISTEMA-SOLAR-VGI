@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <string>
 
 #include <glm/glm.hpp>
@@ -9,6 +10,48 @@
 // NASA CSPICE C API
 extern "C" {
 #include "cspice\SpiceUsr.h"
+}
+
+namespace
+{
+    bool s_kernelsLoaded = false;
+
+    // Consulta en km/s i km directament a CSPICE (sense convertir a UA)
+    CState3D getCBstateKm(CelestialBodyId body, CelestialBodyId origin, double et, bool* ok = nullptr)
+    {
+        double state[6] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+        double lt = 0.0;
+
+        auto itBody = cbList.find(body);
+        auto itOrigin = cbList.find(origin);
+        if (itBody == cbList.end() || itOrigin == cbList.end())
+        {
+            if (ok) *ok = false;
+            return CState3D();
+        }
+
+        spkezr_c(itBody->second.m_id.c_str(), et, "J2000", "NONE", itOrigin->second.m_id.c_str(), state, &lt);
+        if (failed_c())
+        {
+            reset_c();
+            // Fallback per a Plutó fora del rang de plu060.bsp (1800-2199): usar baricentre (9) dins de440.bsp
+            if (body == CB_PLUTO)
+            {
+                spkezr_c("9", et, "J2000", "NONE", itOrigin->second.m_id.c_str(), state, &lt);
+                if (!failed_c())
+                {
+                    if (ok) *ok = true;
+                    return CState3D(state);
+                }
+                reset_c();
+            }
+            if (ok) *ok = false;
+            return CState3D();
+        }
+
+        if (ok) *ok = true;
+        return CState3D(state);
+    }
 }
 
 CelestialBodyId globalSystemOrigin = CB_SUN;
@@ -27,7 +70,7 @@ std::unordered_map<CelestialBodyId, CB> cbList = {
 {CB_SATURN, {"SATURN","6", true, "IAU_SATURN", CB_SUN}},
 {CB_URANUS, {"URANUS","7", true, "IAU_URANUS", CB_SUN}},
 {CB_NEPTUNE, {"NEPTUNE","8", true, "IAU_NEPTUNE", CB_SUN}},
-{CB_PLUTO, {"PLUTO","999", true, "IAU_PLUTO", CB_PLUTO_BARYCENTER}},
+{CB_PLUTO, {"PLUTO","999", true, "IAU_PLUTO", CB_SUN}},
 {CB_CERES, {"CERES","2000001", true, "IAU_CERES", CB_SUN}},
 {CB_MOON, {"MOON","301", true, "IAU_MOON", CB_EARTH}},
 {CB_CHARON, {"CHARON","901", true, "IAU_CHARON", CB_PLUTO_BARYCENTER}},
@@ -45,45 +88,69 @@ std::string kernels[] = {
     "cbdata\\plu060.bsp",
     "cbdata\\vgr1.x2100.bsp",
     "cbdata\\vgr2.x2100.bsp",
-	"cbdata\\gm_de440.tpc"
+    "cbdata\\gm_de440.tpc"
 };
 
 void loadCspiceKernels()
 {
-    for (std::string &file : kernels)
-        furnsh_c(file.c_str());
+    if (s_kernelsLoaded)
+        return;
+
     erract_c("SET", 0, (char*)"RETURN");
     errprt_c("SET", 0, (char*)"NONE");
+
+    for (const std::string& file : kernels)
+    {
+        furnsh_c(file.c_str());
+        if (failed_c())
+        {
+            reset_c();
+            std::string fallback = "..\\..\\" + file;
+            furnsh_c(fallback.c_str());
+            if (failed_c())
+                reset_c();
+        }
+    }
+
+    s_kernelsLoaded = true;
 }
 
 void unloadCspiceKernels()
 {
+    if (!s_kernelsLoaded)
+        return;
+
     kclear_c();
+    if (failed_c())
+        reset_c();
+
+    s_kernelsLoaded = false;
+}
+
+double utcToET(int any, int mes, int dia, int hora, int minut, int segon)
+{
+    if (!s_kernelsLoaded)
+        loadCspiceKernels();
+
+    char utcStr[32];
+    std::snprintf(utcStr, sizeof(utcStr), "%04d-%02d-%02dT%02d:%02d:%02d",
+                  any, mes, dia, hora, minut, segon);
+
+    double et = 0.0;
+    str2et_c(utcStr, &et);
+    if (failed_c())
+    {
+        reset_c();
+        return 0.0;
+    }
+
+    return et;
 }
 
 CState3D getCBstate(CelestialBodyId body, CelestialBodyId origin, double et)
 {
-    double state[6] = {0,0,0,0,0,0}, lt;
-
-    //spkezr_c(std::to_string(cbList[body].m_id).c_str(), et, "J2000", "NONE", std::to_string(cbList[origin].m_id).c_str(), state, &lt);
-    spkezr_c(cbList[body].m_id.c_str(), et, "J2000", "NONE", cbList[origin].m_id.c_str(), state, &lt);
-    if (failed_c()) {
-        reset_c();
-        return CState3D(state);
-    }
-	CState3D res = CState3D(state);
-  //  while (origin != globalSystemOrigin && origin != CB_NONE) {
-		//body = origin;
-  //      origin = cbList[origin].m_orbitedObject;
-  //      spkezr_c(cbList[body].m_id.c_str(), et, "J2000", "NONE", cbList[origin].m_id.c_str(), state, &lt);
-  //      if (failed_c()) {
-  //          reset_c();
-  //          return res;
-  //      }
-		//res.x += state[0]; res.y += state[1]; res.z += state[2];
-  //  }
-
-    return res;
+    CState3D res = getCBstateKm(body, origin, et);
+    return mulState(res, KM_TO_AU);
 }
 
 CState3D mulState(CState3D &state, double val)
@@ -104,69 +171,91 @@ glm::mat4 getCBrotMat(CelestialBodyId body, double et)
 {
     double rot[3][3] = {};
     glm::mat4 rotationMatrix = glm::mat4(1.0f);
-    
-    if (!cbList[body].m_hasRotFrame)
+
+    auto it = cbList.find(body);
+    if (it == cbList.end() || !it->second.m_hasRotFrame)
         return rotationMatrix;
 
-    pxform_c("J2000", cbList[body].m_rotationFrame.c_str(), et, rot);
+    // Transformacio de vectors del marc propi (IAU_*) cap al marc inercial J2000
+    pxform_c(it->second.m_rotationFrame.c_str(), "J2000", et, rot);
     if (failed_c())
     {
         reset_c();
         return rotationMatrix;
     }
 
-	rotationMatrix = glm::mat4(glm::transpose(glm::make_mat3(&rot[0][0])));
+    rotationMatrix = glm::mat4(glm::transpose(glm::make_mat3(&rot[0][0])));
 
     return rotationMatrix;
 }
 
 std::vector<CState3D> getOrbitStates(CelestialBodyId body, double et, int nStates)
 {
-	CB &props = cbList[body];
-	std::vector<CState3D> states;
+    std::vector<CState3D> states;
+    if (nStates <= 0)
+        return states;
 
+    auto it = cbList.find(body);
+    if (it == cbList.end())
+        return states;
+
+    const CB& props = it->second;
     if (props.m_orbitedObject == CB_NONE)
         return states;
 
-    //get orbit T
-    CState3D initialState = getCBstate(body, props.m_orbitedObject, et);
-	double actualState[6] = { initialState.x, initialState.y, initialState.z, initialState.vx, initialState.vy, initialState.vz };
-    double GM; SpiceInt dim;
+    // Estat inicial en km i km/s necessari per a oscltx_c juntament amb GM (km^3/s^2)
+    bool okInit = false;
+    CState3D initialState = getCBstateKm(body, props.m_orbitedObject, et, &okInit);
+    if (!okInit)
+        return states;
 
-    //bodvrd_c(std::to_string(cbList[props.m_orbitedObject].m_id).c_str(), "GM", 1, &dim, &GM);
+    double actualState[6] = {
+        initialState.x, initialState.y, initialState.z,
+        initialState.vx, initialState.vy, initialState.vz
+    };
+    double GM = 0.0;
+    SpiceInt dim = 0;
+
     bodvrd_c(cbList[props.m_orbitedObject].m_id.c_str(), "GM", 1, &dim, &GM);
-    if (failed_c())
-	{
-		reset_c();
-		return states;
-	}
-
-    double oscReturns[SPICE_OSCLTX_NELTS];
-	oscltx_c(actualState, et, GM, oscReturns);
     if (failed_c())
     {
         reset_c();
         return states;
     }
-    //sample nStates states
-	double t = oscReturns[10] / nStates;
-    double vconst = oscReturns[10] / (nStates-1);
+
+    double oscReturns[SPICE_OSCLTX_NELTS];
+    oscltx_c(actualState, et, GM, oscReturns);
+    if (failed_c() || oscReturns[10] <= 0.0)
+    {
+        reset_c();
+        return states;
+    }
+
+    // Mostreig d'un periode orbital complet en UA relatiu al cos orbitat (Sol o Terra per a la Lluna)
+    double tStep = oscReturns[10] / static_cast<double>(nStates);
     double time = et;
-    CState3D state, tmp, currentOriginState = getCBstate(cbList[body].m_orbitedObject, globalSystemOrigin, time);
-    for (int i = 0; i < nStates; i++)
-	{
-		state = getCBstate(body, props.m_orbitedObject, time); 
-        state.x += currentOriginState.x; state.y += currentOriginState.y; state.z += currentOriginState.z;
-		mulState(state, KM_TO_AU); 
-		state.vx *= vconst; state.vy *= vconst; state.vz *= vconst;
-		states.push_back(state);
-		time += t;
-	}
-    state = getCBstate(body, props.m_orbitedObject, time); 
-    state.x += currentOriginState.x; state.y += currentOriginState.y; state.z += currentOriginState.z;
-    mulState(state, KM_TO_AU);
-    state.vx *= vconst; state.vy *= vconst; state.vz *= vconst;
-    states.push_back(state);
+    states.reserve(static_cast<size_t>(nStates) + 1);
+
+    for (int i = 0; i <= nStates; i++)
+    {
+        bool okSample = false;
+        CState3D state = getCBstateKm(body, props.m_orbitedObject, time, &okSample);
+        if (!okSample)
+        {
+            double conicState[6] = { 0.0 };
+            conics_c(oscReturns, time, conicState);
+            if (failed_c())
+            {
+                reset_c();
+                continue;
+            }
+            state = CState3D(conicState);
+        }
+
+        mulState(state, KM_TO_AU);
+        states.push_back(state);
+        time += tStep;
+    }
 
     return states;
 }

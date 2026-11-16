@@ -1,6 +1,9 @@
 #pragma once
 
+#include <string>
 #include <unordered_map>
+#include <vector>
+#include <glm/glm.hpp>
 
 enum CelestialBodyId {
     CB_SOLAR_SYSTEM_BARYCENTER = 0,
@@ -76,3 +79,4 @@ std::vector<CState3D> getOrbitStates(CelestialBodyId body, double et, int nState
 
 void loadCspiceKernels();
 void unloadCspiceKernels();
+double utcToET(int any, int mes, int dia, int hora, int minut, int segon);

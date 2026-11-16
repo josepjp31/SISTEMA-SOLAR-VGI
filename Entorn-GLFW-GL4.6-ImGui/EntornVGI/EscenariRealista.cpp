@@ -12,78 +12,47 @@ namespace
 		float nx, ny, nz;
 		float u, v;
 	};
-
-	// Aproximacio de segons transcorreguts des de J2000 (2000-01-01 12:00:00 UTC)
-	// fins que a la Fase 5 es connecti amb str2et_c de CSPICE.
-	double calculaSegonsDesDeJ2000(const DataHoraSimulacio& dh)
-	{
-		int a = dh.any;
-		int m = dh.mes;
-		if (m <= 2)
-		{
-			a -= 1;
-			m += 12;
-		}
-		long long A = a / 100;
-		long long B = 2 - A + (A / 4);
-		double jd = std::floor(365.25 * (a + 4716))
-			+ std::floor(30.6001 * (m + 1))
-			+ static_cast<double>(dh.dia)
-			+ static_cast<double>(B)
-			- 1524.5;
-		double fraccioDia = (dh.hora - 12.0) / 24.0 + dh.minut / 1440.0 + dh.segon / 86400.0;
-		return ((jd + fraccioDia) - 2451545.0) * 86400.0;
-	}
-
-	glm::vec3 calculaPosicioOrbital3D(double radiUA, double inclinacioGraus, double angleRad, double scaleUnitsPerAU)
-	{
-		double r = radiUA * scaleUnitsPerAU;
-		double incRad = glm::radians(inclinacioGraus);
-		double x = r * std::cos(angleRad);
-		double yOrb = r * std::sin(angleRad);
-		double y = yOrb * std::cos(incRad);
-		double z = yOrb * std::sin(incRad);
-		return glm::vec3(static_cast<float>(x), static_cast<float>(y), static_cast<float>(z));
-	}
 }
 
-// Taula de metadades reals: Sol, 8 planetes, Pluto i Lluna
+// Taula de metadades reals (radis mitjans en km segons docs/planetes/planetes.json):
+// Sol, 8 planetes, Pluto i Lluna
 const CosRealMetadata EscenariRealista::kMetadadesReals[NUM_COSSOS_REALISTA] = {
-	{ CB_SUN,     "Sol",     696340.0,   7.25,  0.000000,  0.000,     0.00,    609.12,  ".\\textures\\sun\\2k_sun.jpg",                   glm::vec3(1.00f, 0.90f, 0.40f) },
-	{ CB_MERCURY, "Mercuri",   2439.7,   0.03,  0.387098,  7.005,    87.97,   1407.60,  ".\\textures\\planet\\Mercury\\2k_mercury.jpg",   glm::vec3(0.65f, 0.65f, 0.70f) },
-	{ CB_VENUS,   "Venus",     6051.8, 177.36,  0.723332,  3.395,   224.70,  -5832.50,  ".\\textures\\planet\\Venus\\2k_venus_surface.jpg", glm::vec3(0.90f, 0.75f, 0.45f) },
-	{ CB_EARTH,   "Terra",     6371.0,  23.44,  1.000000,  0.000,   365.25,     23.93,  ".\\textures\\planet\\Earth\\2k_earth_daymap.jpg",  glm::vec3(0.30f, 0.68f, 0.95f) },
-	{ CB_MARS,    "Mart",      3389.5,  25.19,  1.523679,  1.850,   686.98,     24.62,  ".\\textures\\planet\\Mars\\2k_mars.jpg",         glm::vec3(0.88f, 0.42f, 0.30f) },
-	{ CB_JUPITER, "Júpiter",  69911.0,   3.13,  5.204400,  1.303,  4332.59,      9.93,  ".\\textures\\planet\\Jupiter\\2k_jupiter.jpg",   glm::vec3(0.85f, 0.70f, 0.55f) },
-	{ CB_SATURN,  "Saturn",   58232.0,  26.73,  9.582600,  2.485, 10759.22,     10.70,  ".\\textures\\planet\\Saturn\\2k_saturn.jpg",     glm::vec3(0.90f, 0.82f, 0.58f) },
-	{ CB_URANUS,  "Urà",      25362.0,  97.77, 19.218400,  0.773, 30688.50,    -17.24,  ".\\textures\\planet\\Uranus\\2k_uranus.jpg",     glm::vec3(0.55f, 0.85f, 0.90f) },
-	{ CB_NEPTUNE, "Neptú",    24622.0,  28.32, 30.110387,  1.770, 60195.00,     16.11,  ".\\textures\\planet\\Neptune\\2k_neptune.jpg",   glm::vec3(0.35f, 0.55f, 0.95f) },
-	{ CB_PLUTO,   "Plutó",     1188.3, 122.53, 39.482000, 17.160, 90560.00,   -153.29,  nullptr,                                          glm::vec3(0.72f, 0.66f, 0.60f) },
-	{ CB_MOON,    "Lluna",     1737.4,   6.68,  0.002570,  5.145,    27.32,    655.72,  nullptr,                                          glm::vec3(0.78f, 0.78f, 0.82f) }
+	{ CB_SUN,     "Sol",     695700.0,    7.25,  0.000000,  0.000,     0.00,    609.12,  ".\\textures\\sun\\2k_sun.jpg",                   glm::vec3(1.00f, 0.90f, 0.40f) },
+	{ CB_MERCURY, "Mercuri",   2439.4,    0.03,  0.387098,  7.005,    87.97,   1407.60,  ".\\textures\\planet\\Mercury\\2k_mercury.jpg",   glm::vec3(0.65f, 0.65f, 0.70f) },
+	{ CB_VENUS,   "Venus",     6051.8,  177.36,  0.723332,  3.395,   224.70,  -5832.50,  ".\\textures\\planet\\Venus\\2k_venus_surface.jpg", glm::vec3(0.90f, 0.75f, 0.45f) },
+	{ CB_EARTH,   "Terra",     6371.0084, 23.44, 1.000000,  0.000,   365.25,     23.93,  ".\\textures\\planet\\Earth\\2k_earth_daymap.jpg",  glm::vec3(0.30f, 0.68f, 0.95f) },
+	{ CB_MARS,    "Mart",      3389.5,   25.19,  1.523679,  1.850,   686.98,     24.62,  ".\\textures\\planet\\Mars\\2k_mars.jpg",         glm::vec3(0.88f, 0.42f, 0.30f) },
+	{ CB_JUPITER, "Júpiter",  69911.0,    3.13,  5.204400,  1.303,  4332.59,      9.93,  ".\\textures\\planet\\Jupiter\\2k_jupiter.jpg",   glm::vec3(0.85f, 0.70f, 0.55f) },
+	{ CB_SATURN,  "Saturn",   58232.0,   26.73,  9.582600,  2.485, 10759.22,     10.70,  ".\\textures\\planet\\Saturn\\2k_saturn.jpg",     glm::vec3(0.90f, 0.82f, 0.58f) },
+	{ CB_URANUS,  "Urà",      25362.0,   97.77, 19.218400,  0.773, 30688.50,    -17.24,  ".\\textures\\planet\\Uranus\\2k_uranus.jpg",     glm::vec3(0.55f, 0.85f, 0.90f) },
+	{ CB_NEPTUNE, "Neptú",    24622.0,   28.32, 30.110387,  1.770, 60195.00,     16.11,  ".\\textures\\planet\\Neptune\\2k_neptune.jpg",   glm::vec3(0.35f, 0.55f, 0.95f) },
+	{ CB_PLUTO,   "Plutó",     1188.3,  122.53, 39.482000, 17.160, 90560.00,   -153.29,  nullptr,                                          glm::vec3(0.72f, 0.66f, 0.60f) },
+	{ CB_MOON,    "Lluna",     1737.4,    6.68,  0.002570,  5.145,    27.32,    655.72,  nullptr,                                          glm::vec3(0.78f, 0.78f, 0.82f) }
 };
 
 EscenariRealista::EscenariRealista()
 	: m_ephemerisTimeET(0.0)
 	, m_kernelsCarregats(false)
+	, m_primerFrame(true)
 {
-	// Parametres de camera adaptats a l'escala astronomica en UA (SCALE_UNITS_PER_AU = 500)
-	m_configCamera.distInicialSol = 380.0f;
+	// Parametres de camera adaptats a l'escala astronomica en UA (SCALE_UNITS_PER_AU = 1000)
+	m_configCamera.distInicialSol = 760.0f;
 	m_configCamera.angleInclinacioInicial = 25.0f;
-	m_configCamera.distGlobal = 6500.0f;
+	m_configCamera.distGlobal = 13000.0f;
 	m_configCamera.angleGlobal = 65.0f;
-	m_configCamera.minDistSol = 5.0f;
-	m_configCamera.maxDistCamera = 42000.0f;
+	m_configCamera.minDistSol = 10.0f;
+	m_configCamera.maxDistCamera = 48000.0f;
 	m_configCamera.factorFocusPlaneta = 5.0f;
 	m_configCamera.minDistFocusPlaneta = 0.04f;
 	m_configCamera.minDistFocusZoom = 0.02f;
 	m_configCamera.factorRadiMinZoom = 2.2f;
-	m_configCamera.pasZoomSol = 15.0f;
+	m_configCamera.pasZoomSol = 30.0f;
 	m_configCamera.minPasZoomPlaneta = 0.01f;
 	m_configCamera.factorPasZoomPlaneta = 0.45f;
-	m_configCamera.navPosX = 450.0f;
-	m_configCamera.navPosY = -450.0f;
-	m_configCamera.navPosZ = 140.0f;
-	m_configCamera.navPas = 8.0f;
+	m_configCamera.navPosX = 900.0f;
+	m_configCamera.navPosY = -900.0f;
+	m_configCamera.navPosZ = 280.0f;
+	m_configCamera.navPas = 16.0f;
 }
 
 EscenariRealista::~EscenariRealista()
@@ -116,28 +85,33 @@ void EscenariRealista::alliberaEscenari()
 	deleteVAOList(GLU_DISK);
 	alliberaOrbitesLineStrip();
 	Escenari::alliberaEscenari();
+	if (m_kernelsCarregats)
+	{
+		unloadCspiceKernels();
+		m_kernelsCarregats = false;
+	}
 }
 
-void EscenariRealista::generaOrbitesLineStrip()
+void EscenariRealista::recalcularOrbites3D(double et)
 {
 	alliberaOrbitesLineStrip();
 
-	const int numSegments = 256;
 	for (int i = 1; i < NUM_COSSOS_REALISTA; i++)
 	{
 		const CosRealMetadata& meta = kMetadadesReals[i];
+		std::vector<CState3D> estatsOrbita = getOrbitStates(meta.spiceId, et, NUM_ORBIT_SEGMENTS);
+		if (estatsOrbita.empty())
+			continue;
+
 		std::vector<VertexOrbitaLine> vertexs;
-		vertexs.reserve(numSegments + 1);
+		vertexs.reserve(estatsOrbita.size());
 
-		for (int s = 0; s <= numSegments; s++)
+		for (const CState3D& st : estatsOrbita)
 		{
-			double ang = (2.0 * PI * static_cast<double>(s)) / static_cast<double>(numSegments);
-			glm::vec3 p = calculaPosicioOrbital3D(meta.semieixMajorUA, meta.inclinacioOrbitalGraus, ang, SCALE_UNITS_PER_AU);
-
 			VertexOrbitaLine v{};
-			v.x = p.x;
-			v.y = p.y;
-			v.z = p.z;
+			v.x = static_cast<float>(st.x * SCALE_UNITS_PER_AU);
+			v.y = static_cast<float>(st.y * SCALE_UNITS_PER_AU);
+			v.z = static_cast<float>(st.z * SCALE_UNITS_PER_AU);
 			v.r = meta.colorOrbita.r;
 			v.g = meta.colorOrbita.g;
 			v.b = meta.colorOrbita.b;
@@ -152,7 +126,7 @@ void EscenariRealista::generaOrbitesLineStrip()
 
 		OrbitaLineVAO orb;
 		orb.nVertexs = static_cast<GLint>(vertexs.size());
-		orb.cosPareIdx = (meta.spiceId == CB_MOON) ? 3 : 0;
+		orb.cosPareIdx = (meta.spiceId == CB_MOON) ? 3 : 0; // 3 = Terra
 		orb.color = meta.colorOrbita;
 
 		glGenVertexArrays(1, &orb.vaoId);
@@ -181,50 +155,41 @@ void EscenariRealista::generaOrbitesLineStrip()
 	}
 }
 
-void EscenariRealista::actualitzaPosicionsEsquelet(double et)
+void EscenariRealista::actualitzaCossosSPICE(double et)
 {
 	if (static_cast<int>(m_cossos.size()) < NUM_COSSOS_REALISTA) return;
+
+	// Posicio heliocentrica de la Terra per situar la Lluna calculada relativament a CB_EARTH
+	CState3D stTerra = getCBstate(CB_EARTH, CB_SUN, et);
 
 	for (int i = 0; i < NUM_COSSOS_REALISTA; i++)
 	{
 		const CosRealMetadata& meta = kMetadadesReals[i];
-		if (i == 0)
+		if (meta.spiceId == CB_SUN)
 		{
 			m_cossos[i].m_posicio = glm::vec3(0.0f);
-			m_cossos[i].m_angleOrbita = 0.0f;
+		}
+		else if (meta.spiceId == CB_MOON)
+		{
+			CState3D stMoonRel = getCBstate(CB_MOON, CB_EARTH, et);
+			m_cossos[i].m_posicio = glm::vec3(
+				static_cast<float>((stTerra.x + stMoonRel.x) * SCALE_UNITS_PER_AU),
+				static_cast<float>((stTerra.y + stMoonRel.y) * SCALE_UNITS_PER_AU),
+				static_cast<float>((stTerra.z + stMoonRel.z) * SCALE_UNITS_PER_AU)
+			);
 		}
 		else
 		{
-			double periodeSegons = meta.periodeOrbitalDies * 86400.0;
-			double angRad = (periodeSegons > 0.0) ? ((2.0 * PI * et) / periodeSegons) : 0.0;
-			glm::vec3 posRel = calculaPosicioOrbital3D(meta.semieixMajorUA, meta.inclinacioOrbitalGraus, angRad, SCALE_UNITS_PER_AU);
-
-			if (meta.spiceId == CB_MOON)
-			{
-				// La Lluna orbita al voltant de la Terra (index 3)
-				m_cossos[i].m_posicio = m_cossos[3].m_posicio + posRel;
-			}
-			else
-			{
-				m_cossos[i].m_posicio = posRel;
-			}
-
-			double angGraus = std::fmod(glm::degrees(angRad), 360.0);
-			if (angGraus < 0.0) angGraus += 360.0;
-			m_cossos[i].m_angleOrbita = static_cast<float>(angGraus);
+			CState3D st = getCBstate(meta.spiceId, CB_SUN, et);
+			m_cossos[i].m_posicio = glm::vec3(
+				static_cast<float>(st.x * SCALE_UNITS_PER_AU),
+				static_cast<float>(st.y * SCALE_UNITS_PER_AU),
+				static_cast<float>(st.z * SCALE_UNITS_PER_AU)
+			);
 		}
 
-		if (std::fabs(meta.periodeRotacioHores) > 1e-4)
-		{
-			double rotSegons = meta.periodeRotacioHores * 3600.0;
-			double rotGraus = std::fmod((360.0 * et) / rotSegons, 360.0);
-			if (rotGraus < 0.0) rotGraus += 360.0;
-			m_cossos[i].m_angleRotacio = static_cast<float>(rotGraus);
-		}
-		else
-		{
-			m_cossos[i].m_angleRotacio = 0.0f;
-		}
+		// Rotacio 3D real en J2000 (oblicuitat axial real + rotacio siderea exacta a l'instant et)
+		m_cossos[i].m_mMatrix = getCBrotMat(meta.spiceId, et);
 	}
 }
 
@@ -261,33 +226,49 @@ void EscenariRealista::creaEscenari(GLuint& shader_programID)
 	{
 		const CosRealMetadata& meta = kMetadadesReals[i];
 		m_cossos[i].m_nom = meta.nom;
-		m_cossos[i].m_radiCos = static_cast<float>(meta.radiEquatorialKm * KM_TO_AU * SCALE_UNITS_PER_AU);
+		float radiVisual = static_cast<float>((meta.radiEquatorialKm / KM_PER_AU) * SCALE_UNITS_PER_AU);
+		if (radiVisual < MIN_RADI_VISUAL) radiVisual = MIN_RADI_VISUAL;
+		m_cossos[i].m_radiCos = radiVisual;
 		m_cossos[i].m_radiOrbita = static_cast<float>(meta.semieixMajorUA * SCALE_UNITS_PER_AU);
 		m_cossos[i].m_angleOrbita = 0.0f;
 		m_cossos[i].m_angleRotacio = 0.0f;
 		m_cossos[i].m_velAngular = 0.0f;
 		m_cossos[i].m_velRotacio = 0.0f;
+		m_cossos[i].m_mMatrix = glm::mat4(1.0f);
 	}
 
-	// Esquelet de Fase 4: els kernels CSPICE complets es connectaran a la Fase 5
-	m_kernelsCarregats = false;
-	m_ephemerisTimeET = 0.0;
-	actualitzaPosicionsEsquelet(m_ephemerisTimeET);
-	generaOrbitesLineStrip();
+	// Carrega de kernels NASA CSPICE i inicialitzacio d'efemerides/orbites per al primer frame visible
+	loadCspiceKernels();
+	m_kernelsCarregats = true;
+	m_ephemerisTimeET = utcToET(2026, 10, 18, 12, 0, 0);
+	actualitzaCossosSPICE(m_ephemerisTimeET);
+	recalcularOrbites3D(m_ephemerisTimeET);
+	m_primerFrame = true;
 }
 
 void EscenariRealista::updateVariables(double dt, EstatSimulacio& estat)
 {
-	(void)dt;
 	if (m_cossos.empty()) return;
 
-	m_ephemerisTimeET = calculaSegonsDesDeJ2000(estat.tempsSimulacio.dataHora);
-	actualitzaPosicionsEsquelet(m_ephemerisTimeET);
-
-	if (estat.recalculEfemeridesNecessari)
+	if (m_primerFrame || estat.recalculEfemeridesNecessari)
 	{
+		const DataHoraSimulacio& dh = estat.tempsSimulacio.dataHora;
+		m_ephemerisTimeET = utcToET(dh.any, dh.mes, dh.dia, dh.hora, dh.minut, dh.segon);
+		recalcularOrbites3D(m_ephemerisTimeET);
 		estat.recalculEfemeridesNecessari = false;
+		m_primerFrame = false;
 	}
+	else if (!estat.tempsSimulacio.enPausa)
+	{
+		double dtClamped = dt;
+		if (dtClamped < 0.0) dtClamped = 0.0;
+		if (dtClamped > 0.25) dtClamped = 0.25;
+		m_ephemerisTimeET += dtClamped
+			* static_cast<double>(estat.tempsSimulacio.direccioTemps)
+			* estat.tempsSimulacio.factorVelocitatSegonsPerSegon;
+	}
+
+	actualitzaCossosSPICE(m_ephemerisTimeET);
 }
 
 void EscenariRealista::dibuixaEscenari(GLuint& sh_programID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5], const EstatSimulacio& estat)
@@ -302,7 +283,7 @@ void EscenariRealista::dibuixaEscenari(GLuint& sh_programID, glm::mat4 MatriuVis
 	GLint locModulate = glGetUniformLocation(sh_programID, "modulate");
 	GLint locInvertY = glGetUniformLocation(sh_programID, "flag_invert_y");
 
-	// 1. Orbites 3D amb GL_LINE_STRIP
+	// 1. Orbites 3D reals amb GL_LINE_STRIP
 	if (estat.opcionsVisualitzacio.mostrarOrbites)
 	{
 		glUniform1i(locTextur, GL_FALSE);
@@ -329,6 +310,7 @@ void EscenariRealista::dibuixaEscenari(GLuint& sh_programID, glm::mat4 MatriuVis
 	}
 
 	// 2. Anells de Saturn escalats proporcionalment al radi real de Saturn (index 6)
+	//    i orientats amb la matriu de rotacio 3D real de SPICE (IAU_SATURN -> J2000)
 	bool sw_mat_no_emisio[5] = { false, sw_mat[1], sw_mat[2], sw_mat[3], sw_mat[4] };
 	glUniform1i(locTextur, GL_TRUE);
 	glUniform1i(locModulate, GL_TRUE);
@@ -343,7 +325,7 @@ void EscenariRealista::dibuixaEscenari(GLuint& sh_programID, glm::mat4 MatriuVis
 
 	float escalaAnellSaturn = m_cossos[6].m_radiCos / 7.5f;
 	glm::mat4 ModelAnell = glm::translate(MatriuTG, m_cossos[6].m_posicio);
-	ModelAnell = glm::rotate(ModelAnell, glm::radians(static_cast<float>(kMetadadesReals[6].oblicuitatGraus)), vec3(1.0f, 0.0f, 0.0f));
+	ModelAnell = ModelAnell * m_cossos[6].m_mMatrix;
 	ModelAnell = glm::scale(ModelAnell, vec3(escalaAnellSaturn, escalaAnellSaturn, escalaAnellSaturn));
 	glUniformMatrix4fv(locModelMat, 1, GL_FALSE, &ModelAnell[0][0]);
 
@@ -377,8 +359,7 @@ void EscenariRealista::dibuixaEscenari(GLuint& sh_programID, glm::mat4 MatriuVis
 		}
 
 		glm::mat4 ModelMatrix = glm::translate(MatriuTG, m_cossos[i].m_posicio);
-		ModelMatrix = glm::rotate(ModelMatrix, glm::radians(static_cast<float>(kMetadadesReals[i].oblicuitatGraus)), vec3(1.0f, 0.0f, 0.0f));
-		ModelMatrix = glm::rotate(ModelMatrix, glm::radians(m_cossos[i].m_angleRotacio), vec3(0.0f, 0.0f, 1.0f));
+		ModelMatrix = ModelMatrix * m_cossos[i].m_mMatrix;
 		ModelMatrix = glm::scale(ModelMatrix, vec3(m_cossos[i].m_radiCos, m_cossos[i].m_radiCos, m_cossos[i].m_radiCos));
 
 		glUniformMatrix4fv(locModelMat, 1, GL_FALSE, &ModelMatrix[0][0]);

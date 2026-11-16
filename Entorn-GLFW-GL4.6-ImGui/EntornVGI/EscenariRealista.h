@@ -29,13 +29,18 @@ struct OrbitaLineVAO
 };
 
 // Escenari del Mode a Escala Real (Cientific):
-// Sol, 8 planetes, Pluto i la Lluna amb factors d'escala en UA, metadades reals
-// i estructura preparada per a la connexio completa amb efemerides SPICE (Fase 5).
+// Sol, 8 planetes, Pluto i la Lluna connectats amb efemerides reals NASA CSPICE,
+// orbites 3D reals (GL_LINE_STRIP), rotacio siderea + oblicuitat axial (IAU_*) i temps real.
 class EscenariRealista : public Escenari
 {
 public:
-	static constexpr double SCALE_UNITS_PER_AU = 500.0;
+	// Unitats astronomiques i factor d'escala espacial OpenGL:
+	// 1 UA = 149.597.870,7 km equival a 1.000,0 unitats d'escena (Terra a ~1.000 u, Neptu a ~30.000 u).
+	static constexpr double KM_PER_AU = 149597870.7;
+	static constexpr double SCALE_UNITS_PER_AU = 1000.0;
+	static constexpr float MIN_RADI_VISUAL = 1e-4f;
 	static constexpr int NUM_COSSOS_REALISTA = 11; // Sol + 8 planetes + Pluto + Lluna
+	static constexpr int NUM_ORBIT_SEGMENTS = 240;
 
 	EscenariRealista();
 	virtual ~EscenariRealista() override;
@@ -49,12 +54,13 @@ public:
 	bool areKernelsCarregats() const { return m_kernelsCarregats; }
 
 private:
-	void generaOrbitesLineStrip();
+	void recalcularOrbites3D(double et);
 	void alliberaOrbitesLineStrip();
-	void actualitzaPosicionsEsquelet(double et);
+	void actualitzaCossosSPICE(double et);
 
 	double m_ephemerisTimeET;
 	bool m_kernelsCarregats;
+	bool m_primerFrame;
 
 	std::vector<OrbitaLineVAO> m_orbitesVAO;
 	static const CosRealMetadata kMetadadesReals[NUM_COSSOS_REALISTA];
