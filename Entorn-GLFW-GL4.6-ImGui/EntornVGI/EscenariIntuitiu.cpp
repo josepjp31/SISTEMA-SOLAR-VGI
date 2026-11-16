@@ -238,32 +238,7 @@ void EscenariIntuitiu::dibuixaEscenari(GLuint& sh_programID, glm::mat4 MatriuVis
 		}
 	}
 
-	// 2. Anell de Saturn
-	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_TRUE);
-	glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_TRUE);
-	glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), GL_TRUE);
-	SeleccionaColorMaterial(sh_programID, col_blanc, sw_mat_no_emisio);
-
-	if (m_texturesID[9] != 0)
-	{
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, m_texturesID[9]);
-	}
-
-	ModelMatrix = glm::translate(MatriuTG, m_cossos[6].m_posicio);
-	ModelMatrix = glm::rotate(ModelMatrix, glm::radians(20.0f), vec3(1.0f, 0.0f, 0.0f));
-	ModelMatrix = glm::scale(ModelMatrix, vec3(1.0f, 1.0f, 1.0f));
-	glUniformMatrix4fv(glGetUniformLocation(sh_programID, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
-
-	GLint locTwoSided = glGetUniformLocation(sh_programID, "sw_twoSided");
-	if (locTwoSided != -1) glUniform1i(locTwoSided, GL_TRUE);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	draw_TriEBO_Object(GLU_DISK);
-	glDisable(GL_BLEND);
-	if (locTwoSided != -1) glUniform1i(locTwoSided, GL_FALSE);
-
-	// 3. Cossos: esfera amb textura situada sobre la seva orbita
+	// 2. Cossos: esfera amb textura situada sobre la seva orbita
 	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_TRUE);
 	glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_TRUE);
 	glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), GL_TRUE);
@@ -288,6 +263,33 @@ void EscenariIntuitiu::dibuixaEscenari(GLuint& sh_programID, glm::mat4 MatriuVis
 		glUniform4i(locSwInt, (i == 0 && sw_mat[0]), sw_mat[1], sw_mat[2], sw_mat[3]);
 		draw_TriEBO_Object(GLU_SPHERE);
 	}
+
+	// 3. Anell de Saturn (despres de les esferes per oclusio correcta i sense escriure al Z-buffer)
+	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_TRUE);
+	glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_TRUE);
+	glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), GL_TRUE);
+	SeleccionaColorMaterial(sh_programID, col_blanc, sw_mat_no_emisio);
+
+	if (m_texturesID[9] != 0)
+	{
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, m_texturesID[9]);
+	}
+
+	ModelMatrix = glm::translate(MatriuTG, m_cossos[6].m_posicio);
+	ModelMatrix = glm::rotate(ModelMatrix, glm::radians(20.0f), vec3(1.0f, 0.0f, 0.0f));
+	ModelMatrix = glm::scale(ModelMatrix, vec3(1.0f, 1.0f, 1.0f));
+	glUniformMatrix4fv(locModelMatCos, 1, GL_FALSE, &ModelMatrix[0][0]);
+
+	GLint locTwoSided = glGetUniformLocation(sh_programID, "sw_twoSided");
+	if (locTwoSided != -1) glUniform1i(locTwoSided, GL_TRUE);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDepthMask(GL_FALSE);
+	draw_TriEBO_Object(GLU_DISK);
+	glDepthMask(GL_TRUE);
+	glDisable(GL_BLEND);
+	if (locTwoSided != -1) glUniform1i(locTwoSided, GL_FALSE);
 
 	// Restaurar estat de uniforms
 	glUniform4i(locSwInt, sw_mat[0], sw_mat[1], sw_mat[2], sw_mat[3]);

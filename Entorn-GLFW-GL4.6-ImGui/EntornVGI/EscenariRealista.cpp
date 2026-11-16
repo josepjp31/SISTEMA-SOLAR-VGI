@@ -267,12 +267,9 @@ void EscenariRealista::creaEscenari(GLuint& shader_programID)
 		m_cossos[i].m_mMatrix = glm::mat4(1.0f);
 	}
 
-	// Carrega de kernels NASA CSPICE i inicialitzacio d'efemerides/orbites per al primer frame visible
+	// Carrega de kernels NASA CSPICE; el calcul inicial d'efemerides i orbites 3D es fa una sola vegada a updateVariables()
 	loadCspiceKernels();
 	m_kernelsCarregats = true;
-	m_ephemerisTimeET = utcToET(2026, 10, 18, 12, 0, 0);
-	actualitzaCossosSPICE(m_ephemerisTimeET);
-	recalcularOrbites3D(m_ephemerisTimeET);
 	m_primerFrame = true;
 }
 
@@ -388,7 +385,7 @@ void EscenariRealista::dibuixaEscenari(GLuint& sh_programID, glm::mat4 MatriuVis
 	float radiSaturn = m_cossos[6].m_radiCos;
 	glm::vec3 posSaturn = getPosicioVista(6, estat.cosEnfocatId, origenRelatiu);
 	glm::mat4 ModelAnell = glm::translate(MatriuTG, posSaturn);
-	ModelAnell = ModelAnell * getCBrotMat(CB_SATURN, m_ephemerisTimeET);
+	ModelAnell = ModelAnell * m_cossos[6].m_mMatrix;
 	ModelAnell = glm::scale(ModelAnell, vec3(radiSaturn, radiSaturn, radiSaturn));
 	glUniformMatrix4fv(locModelMat, 1, GL_FALSE, &ModelAnell[0][0]);
 	glUniform4i(locSwInt, GL_FALSE, sw_mat[1], sw_mat[2], sw_mat[3]);

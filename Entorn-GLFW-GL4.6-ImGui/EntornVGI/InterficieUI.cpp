@@ -356,6 +356,7 @@ static void DibuixarPuntLlista(const char* text)
 // =========================================================================
 void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari* escenaris[2], GLuint& shader_programID)
 {
+    (void)shader_programID;
     if (!estat.mostrarSelectorModes) return;
 
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -521,11 +522,10 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
                 estat.canviCameraPendent = true;
                 ActualitzarDadesCosActiu(estat);
 
-                // Creacio de l'escenari corresponent (index 0: Mode Didactic)
+                // Assignacio de l'escenari corresponent (index 0: Mode Didactic)
                 if (escenaris != nullptr && escenaris[0] != nullptr)
                 {
                     currentEscenari = escenaris[0];
-                    currentEscenari->creaEscenari(shader_programID);
                 }
             }
             ImGui::PopStyleColor(4);
@@ -596,11 +596,10 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
                 estat.canviCameraPendent = true;
                 ActualitzarDadesCosActiu(estat);
 
-                // Creacio de l'escenari corresponent (index 1: Mode a Escala Real)
+                // Assignacio de l'escenari corresponent (index 1: Mode a Escala Real)
                 if (escenaris != nullptr && escenaris[1] != nullptr)
                 {
                     currentEscenari = escenaris[1];
-                    currentEscenari->creaEscenari(shader_programID);
                 }
             }
             ImGui::PopStyleColor(4);
@@ -619,6 +618,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
 // =========================================================================
 void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari* escenaris[2], GLuint& shader_programID)
 {
+    (void)shader_programID;
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     float viewW = vp->WorkSize.x;
 
@@ -664,7 +664,6 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 estat.canviCameraPendent = true;
                 if (escenaris != nullptr && escenaris[1] != nullptr) {
                     currentEscenari = escenaris[1];
-                    currentEscenari->creaEscenari(shader_programID);
                 }
             }
             ImGui::Separator();
@@ -786,7 +785,6 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 }
                 if (escenaris != nullptr && escenaris[0] != nullptr) {
                     currentEscenari = escenaris[0];
-                    currentEscenari->creaEscenari(shader_programID);
                 }
             }
             ImGui::Separator();
@@ -1316,6 +1314,11 @@ static void DibuixarPopupSelectorData(EstatSimulacio& estat, bool& canviDataSoll
         if (ImGui::Button("Tancar", ImVec2(88, 26))) {
             ImGui::CloseCurrentPopup();
         }
+
+        ImGui::Spacing();
+        PushFontSegur(s_fontPanellPetit);
+        ImGui::TextColored(ImVec4(0.62f, 0.76f, 0.90f, 0.85f), "Efemèrides disponibles (DE440): 1550 - 2649");
+        PopFontSegur(s_fontPanellPetit);
 
         PopFontSegur(s_fontPanellRegular);
         ImGui::EndPopup();

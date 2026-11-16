@@ -604,6 +604,8 @@ void dibuixa_Escena() {
 // Entorn VGI: Dibuixa el menú principal ImGui del Simulador del Sistema Solar
 void draw_Menu_ImGui()
 {
+	const bool escenaRenderitzada = !g_EstatSimulador.mostrarSelectorModes;
+
 	// Start the Dear ImGui frame
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
@@ -612,8 +614,10 @@ void draw_Menu_ImGui()
 	// Renderitzar la interficie principal del Simulador del Sistema Solar (Selector inicial, barra superior, panell de temps, HUD)
 	InterficieUI::Renderitzar(g_EstatSimulador, escenariActual, escenaris, shader_programID);
 
-	// Projeccio de les etiquetes i marcadors 2D dels astres sobre la pantalla quan la simulacio esta activa
-	if (!g_EstatSimulador.mostrarSelectorModes &&
+	// Projeccio de les etiquetes i marcadors 2D dels astres sobre la pantalla quan l'escena 3D ja s'ha renderitzat en aquest frame
+	if (escenaRenderitzada &&
+		!g_EstatSimulador.mostrarSelectorModes &&
+		!g_EstatSimulador.configuracioInicialPendent &&
 		objecte == SISTEMA_SOLAR &&
 		escenariActual != nullptr)
 	{
@@ -664,28 +668,25 @@ void draw_Menu_ImGui()
 // CÀMERA--> NAVEGA:  Mode de navegació sobre un pla amb botons de teclat o de mouse (nav) (opció booleana)
 void OnCameraNavega()
 {
-	if (projeccio != CAP)
-	{
-		camera = CAM_NAVEGA;
-		// Desactivació de zoom i mòbil si navega activat
-		mobil = false;	zzoom = false;
+	camera = CAM_NAVEGA;
+	// Desactivació de zoom i mòbil si navega activat
+	mobil = false;	zzoom = false;
 
-		// Incialitzar variables Navega segons configuració eixos en Polars
-		if (Vis_Polar == POLARZ) {
-			opvN.x = 10.0;	opvN.y = 0.0;	opvN.z = 0.0; // opvN = (10,0,0)
-			n[0] = 0.0;		n[1] = 0.0;		n[2] = 0.0;
-			angleZ = 0.0;
-		}
-		else if (Vis_Polar == POLARY) {
-			opvN.x = 0.0;	opvN.y = 0.0;	opvN.z = 10.0; // opvN = (10,0,0)
-			n[0] = 0.0;		n[1] = 0.0;		n[2] = 0.0;
-			angleZ = 0.0;
-		}
-		else if (Vis_Polar == POLARX) {
-			opvN.x = 0.0;	opvN.y = 10.0;	opvN.z = 0.0;	 // opvN = (0,10,0)
-			n[0] = 0.0;		n[1] = 0.0;		n[2] = 0.0;
-			angleZ = 0.0;
-		}
+	// Incialitzar variables Navega segons configuració eixos en Polars
+	if (Vis_Polar == POLARZ) {
+		opvN.x = 10.0;	opvN.y = 0.0;	opvN.z = 0.0; // opvN = (10,0,0)
+		n[0] = 0.0;		n[1] = 0.0;		n[2] = 0.0;
+		angleZ = 0.0;
+	}
+	else if (Vis_Polar == POLARY) {
+		opvN.x = 0.0;	opvN.y = 0.0;	opvN.z = 10.0; // opvN = (10,0,0)
+		n[0] = 0.0;		n[1] = 0.0;		n[2] = 0.0;
+		angleZ = 0.0;
+	}
+	else if (Vis_Polar == POLARX) {
+		opvN.x = 0.0;	opvN.y = 10.0;	opvN.z = 0.0;	 // opvN = (0,10,0)
+		n[0] = 0.0;		n[1] = 0.0;		n[2] = 0.0;
+		angleZ = 0.0;
 	}
 }
 
@@ -883,6 +884,7 @@ void Teclat_Navega(int key, int action)
 	vdir[1] = n[1] - opvN.y;
 	vdir[2] = n[2] - opvN.z;
 	modul = sqrt(vdir[0] * vdir[0] + vdir[1] * vdir[1] + vdir[2] * vdir[2]);
+	if (modul < 1e-6) return;
 	vdir[0] = vdir[0] / modul;
 	vdir[1] = vdir[1] / modul;
 	vdir[2] = vdir[2] / modul;
@@ -1144,37 +1146,68 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 		//OnPaint(window);
 	}
 	else if (m_ButoEAvall && (camera == CAM_NAVEGA) && (projeccio != CAP)) // Opció Navegació
-	{	// Entorn VGI: Canviar orientació en opció de Navegació
+	{	// Entorn VGI: Canviar orientació en opció de Navegació (yaw i pitch angulars preservant |n - opvN|)
 		girn.cx = m_PosEAvall.x - xpos;		girn.cy = m_PosEAvall.y - ypos;
 		angleZ = girn.cx / 2.0;
 		// Entorn VGI: Control per evitar el creixement desmesurat dels angles.
 		while (angleZ >= 360.0) angleZ = angleZ - 360.0;
 		while (angleZ < 0.0)	angleZ = angleZ + 360.0;
 
+		auto aplicaYawPitch = [](double& a, double& b, double& upComp, double yawDeg, double pitchDeltaDeg)
+		{
+			const double yawRad = yawDeg * PI / 180.0;
+			const double a1 = a * cos(yawRad) - b * sin(yawRad);
+			const double b1 = a * sin(yawRad) + b * cos(yawRad);
+			const double horiz = sqrt(a1 * a1 + b1 * b1);
+			const double distMira = sqrt(horiz * horiz + upComp * upComp);
+			if (distMira < 1e-6 || horiz < 1e-9)
+			{
+				a = a1;
+				b = b1;
+				return;
+			}
+			const double maxPitch = 85.0 * PI / 180.0;
+			double pitch = atan2(upComp, horiz) + (pitchDeltaDeg * PI / 180.0);
+			if (pitch > maxPitch) pitch = maxPitch;
+			if (pitch < -maxPitch) pitch = -maxPitch;
+			const double scaleH = (distMira * cos(pitch)) / horiz;
+			a = a1 * scaleH;
+			b = b1 * scaleH;
+			upComp = distMira * sin(pitch);
+		};
+
+		const double deltaPitchDeg = static_cast<double>(girn.cy) * 0.2;
+
 		// Entorn VGI: Segons orientació dels eixos Polars (Vis_Polar)
 		if (Vis_Polar == POLARZ)
 		{ // (X,Y,Z)
 			double dx = n[0] - opvN.x;
 			double dy = n[1] - opvN.y;
-			n[0] = (dx * cos(angleZ * PI / 180.0) - dy * sin(angleZ * PI / 180.0)) + opvN.x;
-			n[1] = (dx * sin(angleZ * PI / 180.0) + dy * cos(angleZ * PI / 180.0)) + opvN.y;
-			n[2] = n[2] + girn.cy * 0.01;
+			double dz = n[2] - opvN.z;
+			aplicaYawPitch(dx, dy, dz, angleZ, deltaPitchDeg);
+			n[0] = opvN.x + dx;
+			n[1] = opvN.y + dy;
+			n[2] = opvN.z + dz;
 		}
 		else if (Vis_Polar == POLARY)
 		{ //(X,Y,Z) --> (Z,X,Y)
 			double dz = n[2] - opvN.z;
 			double dx = n[0] - opvN.x;
-			n[2] = (dz * cos(angleZ * PI / 180.0) - dx * sin(angleZ * PI / 180.0)) + opvN.z;
-			n[0] = (dz * sin(angleZ * PI / 180.0) + dx * cos(angleZ * PI / 180.0)) + opvN.x;
-			n[1] = n[1] + girn.cy * 0.01;
+			double dy = n[1] - opvN.y;
+			aplicaYawPitch(dz, dx, dy, angleZ, deltaPitchDeg);
+			n[2] = opvN.z + dz;
+			n[0] = opvN.x + dx;
+			n[1] = opvN.y + dy;
 		}
 		else if (Vis_Polar == POLARX)
 		{ //(X,Y,Z) --> (Y,Z,X)
 			double dy = n[1] - opvN.y;
 			double dz = n[2] - opvN.z;
-			n[1] = (dy * cos(angleZ * PI / 180.0) - dz * sin(angleZ * PI / 180.0)) + opvN.y;
-			n[2] = (dy * sin(angleZ * PI / 180.0) + dz * cos(angleZ * PI / 180.0)) + opvN.z;
-			n[0] = n[0] + girn.cy * 0.01;
+			double dx = n[0] - opvN.x;
+			aplicaYawPitch(dy, dz, dx, angleZ, deltaPitchDeg);
+			n[1] = opvN.y + dy;
+			n[2] = opvN.z + dz;
+			n[0] = opvN.x + dx;
 		}
 
 		m_PosEAvall.x = xpos;		m_PosEAvall.y = ypos;
@@ -1220,6 +1253,7 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 			vdir[1] = n[1] - opvN.y;
 			vdir[2] = n[2] - opvN.z;
 			modul = sqrt(vdir[0] * vdir[0] + vdir[1] * vdir[1] + vdir[2] * vdir[2]);
+			if (modul < 1e-6) return;
 			vdir[0] = vdir[0] / modul;
 			vdir[1] = vdir[1] / modul;
 			vdir[2] = vdir[2] / modul;
@@ -1305,6 +1339,7 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 			vdir[1] = n[1] - opvN.y;
 			vdir[2] = n[2] - opvN.z;
 			modul = sqrt(vdir[0] * vdir[0] + vdir[1] * vdir[1] + vdir[2] * vdir[2]);
+			if (modul < 1e-6) return;
 			vdir[0] = vdir[0] / modul;
 			vdir[1] = vdir[1] / modul;
 			vdir[2] = vdir[2] / modul;
@@ -1604,6 +1639,8 @@ int main()
 		// Actualització del temps de simulació i moviment orbital dels planetes
 		// (només quan s'ha tancat el selector inicial d'escenaris)
 		if (!g_EstatSimulador.mostrarSelectorModes) {
+			SincronitzarEstatSimuladorAmbOpenGL();
+
 			bool escalaReal = (g_EstatSimulador.modeActual == ModeSimulacio::ESCALA_REAL);
 			if (!g_EstatSimulador.tempsSimulacio.enPausa) {
 				// En mode didàctic el rellotge avança a ritme moderat; en escala real segons el timelapse
@@ -1622,13 +1659,13 @@ int main()
 		// Poll for and process events
 		glfwPollEvents();
 
-		// Entorn VGI.ImGui: Dibuixa menú ImGui
-		draw_Menu_ImGui();
-
-		// Crida a OnPaint() per redibuixar l'escena
+		// Crida a OnPaint() per redibuixar l'escena i actualitzar ViewMatrix / ProjectionMatrix del frame actual
 		OnPaint(window);
 
-		// Entorn VGI.ImGui: Capta dades del menú InGui
+		// Entorn VGI.ImGui: Dibuixa menú ImGui i projecta etiquetes/halos 2D amb les matrius actuals
+		draw_Menu_ImGui();
+
+		// Entorn VGI.ImGui: Capta dades del menú ImGui
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 		// Entorn VGI: Activa la finestra actual
@@ -1654,12 +1691,15 @@ int main()
 	}
 	escenariActual = nullptr;
 
+	if (shaderLighting.getProgramID() != static_cast<GLuint>(-1)) shaderLighting.DeleteProgram();
+	if (shader_SkyBoxC.getProgramID() != static_cast<GLuint>(-1)) shader_SkyBoxC.DeleteProgram();
+	if (shaderEixos.getProgramID() != static_cast<GLuint>(-1)) shaderEixos.DeleteProgram();
+
 	glfwDestroyWindow(window);
 
 	// Terminating GLFW: Destroy the windows, monitors and cursor objects
 	glfwTerminate();
 
-	if (shaderLighting.getProgramID() != -1) shaderLighting.DeleteProgram();
 	return 0;
 
 }

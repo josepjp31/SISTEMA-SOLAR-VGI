@@ -53,6 +53,7 @@ struct DataHoraSimulacio {
     }
 
     void Validar() {
+        if (any < 1550) any = 1550; if (any > 2649) any = 2649;
         if (mes < 1) mes = 1; if (mes > 12) mes = 12;
         int maxD = DiesAlMes(mes, any);
         if (dia < 1) dia = 1; if (dia > maxD) dia = maxD;
