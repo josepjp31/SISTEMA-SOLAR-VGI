@@ -42,6 +42,16 @@ struct DataHoraSimulacio {
         return 31;
     }
 
+    // Retorna 0 (Dilluns) .. 6 (Diumenge) per a una data gregoriana
+    static int DiaDeLaSetmana(int d, int m, int a) {
+        static const int t[12] = { 0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4 };
+        int y = a;
+        if (m < 3) y -= 1;
+        int dowSun0 = (y + y / 4 - y / 100 + y / 400 + t[m - 1] + d) % 7;
+        if (dowSun0 < 0) dowSun0 += 7;
+        return (dowSun0 + 6) % 7;
+    }
+
     void Validar() {
         if (mes < 1) mes = 1; if (mes > 12) mes = 12;
         int maxD = DiesAlMes(mes, any);
@@ -88,23 +98,36 @@ struct EstatTempsSimulacio {
 
     void AvancarSegons(double deltaSegons) {
         if (enPausa) return;
+        if (deltaSegons > 0.25) deltaSegons = 0.25;
         acumulatSegons += (double)direccioTemps * factorVelocitatSegonsPerSegon * deltaSegons;
-        int segonsPassats = (int)acumulatSegons;
+        long long segonsPassats = (long long)acumulatSegons;
         if (segonsPassats != 0) {
-            acumulatSegons -= segonsPassats;
+            acumulatSegons -= (double)segonsPassats;
             AvancarSegonsInt(segonsPassats);
         }
     }
 
 private:
-    void AvancarSegonsInt(int s) {
-        dataHora.segon += s;
-        while (dataHora.segon >= 60) { dataHora.segon -= 60; dataHora.minut++; }
-        while (dataHora.segon < 0)   { dataHora.segon += 60; dataHora.minut--; }
-        while (dataHora.minut >= 60) { dataHora.minut -= 60; dataHora.hora++; }
-        while (dataHora.minut < 0)   { dataHora.minut += 60; dataHora.hora--; }
-        while (dataHora.hora >= 24)  { dataHora.hora -= 24; dataHora.dia++; }
-        while (dataHora.hora < 0)    { dataHora.hora += 24; dataHora.dia--; }
+    void AvancarSegonsInt(long long s) {
+        long long totalSeg = (long long)dataHora.segon + s;
+        long long extraMin = totalSeg / 60;
+        long long remSeg = totalSeg % 60;
+        if (remSeg < 0) { remSeg += 60; extraMin--; }
+        dataHora.segon = (int)remSeg;
+
+        long long totalMin = (long long)dataHora.minut + extraMin;
+        long long extraHores = totalMin / 60;
+        long long remMin = totalMin % 60;
+        if (remMin < 0) { remMin += 60; extraHores--; }
+        dataHora.minut = (int)remMin;
+
+        long long totalHores = (long long)dataHora.hora + extraHores;
+        long long extraDies = totalHores / 24;
+        long long remHores = totalHores % 24;
+        if (remHores < 0) { remHores += 24; extraDies--; }
+        dataHora.hora = (int)remHores;
+
+        dataHora.dia += (int)extraDies;
 
         while (true) {
             int dMes = DataHoraSimulacio::DiesAlMes(dataHora.mes, dataHora.any);

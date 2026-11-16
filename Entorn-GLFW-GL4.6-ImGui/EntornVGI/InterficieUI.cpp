@@ -1,10 +1,38 @@
-// InterficieUI.cpp : Implementacio dels components visuals (Selector de modes, Menus, Panells)
+﻿// InterficieUI.cpp : Implementacio dels components visuals (Selector de modes, Menus, Panells)
 
 #include "InterficieUI.h"
 #include "ImGui/imgui.h"
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <cmath>
+#include <algorithm>
+
+// Fonts sans-serif carregades per al panell de control de temps (mantenint la font per defecte com a base)
+static ImFont* s_fontPanellRegular = nullptr;
+static ImFont* s_fontPanellPetit   = nullptr;
+static ImFont* s_fontPanellTitol   = nullptr;
+static ImFont* s_fontPanellDigital = nullptr;
+static ImVector<ImWchar> s_rangCaractersCatala;
+
+static bool FitxerExisteix(const char* ruta)
+{
+    FILE* f = nullptr;
+    if (fopen_s(&f, ruta, "rb") == 0 && f != nullptr) {
+        fclose(f);
+        return true;
+    }
+    return false;
+}
+
+static void PushFontSegur(ImFont* f)
+{
+    if (f != nullptr) ImGui::PushFont(f);
+}
+
+static void PopFontSegur(ImFont* f)
+{
+    if (f != nullptr) ImGui::PopFont();
+}
 
 // =========================================================================
 // CATALEG DE DADES FISIQUES DELS 9 COSSOS DEL SISTEMA SOLAR (0: Sol .. 8: Neptu)
@@ -15,10 +43,10 @@ static const CosAstronomicDades kCatalegCossos[9] = {
     { "Venus",     6051.8,  0.723,   8.87, 5832.50,   0.62 },
     { "Terra",     6371.0,  1.000,   9.81,   23.93,   1.00 },
     { "Mart",      3389.5,  1.524,   3.72,   24.62,   1.88 },
-    { "Jupiter",  69911.0,  5.204,  24.79,    9.93,  11.86 },
+    { "Júpiter",  69911.0,  5.204,  24.79,    9.93,  11.86 },
     { "Saturn",   58232.0,  9.582,  10.44,   10.70,  29.45 },
-    { "Ura",      25362.0, 19.218,   8.69,   17.24,  84.02 },
-    { "Neptu",    24622.0, 30.110,  11.15,   16.11, 164.79 }
+    { "Urà",      25362.0, 19.218,   8.69,   17.24,  84.02 },
+    { "Neptú",    24622.0, 30.110,  11.15,   16.11, 164.79 }
 };
 
 void InterficieUI::ActualitzarDadesCosActiu(EstatSimulacio& estat)
@@ -58,6 +86,225 @@ void InterficieUI::InicialitzarEstil()
     colors[ImGuiCol_TitleBg]            = ImVec4(0.06f, 0.08f, 0.12f, 1.00f);
     colors[ImGuiCol_TitleBgActive]      = ImVec4(0.10f, 0.18f, 0.30f, 1.00f);
     colors[ImGuiCol_MenuBarBg]          = ImVec4(0.07f, 0.09f, 0.13f, 0.96f);
+
+    // Carregar font sans-serif neta amb suport complet de caracters catalans (com a font principal)
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.Fonts != nullptr && io.Fonts->Fonts.Size == 0) {
+        const char* rutaFontRegular = nullptr;
+        const char* rutaFontNegreta = nullptr;
+        if (FitxerExisteix("C:\\Windows\\Fonts\\segoeui.ttf")) {
+            rutaFontRegular = "C:\\Windows\\Fonts\\segoeui.ttf";
+            rutaFontNegreta = FitxerExisteix("C:\\Windows\\Fonts\\segoeuib.ttf")
+                ? "C:\\Windows\\Fonts\\segoeuib.ttf"
+                : rutaFontRegular;
+        } else if (FitxerExisteix("C:\\Windows\\Fonts\\arial.ttf")) {
+            rutaFontRegular = "C:\\Windows\\Fonts\\arial.ttf";
+            rutaFontNegreta = FitxerExisteix("C:\\Windows\\Fonts\\arialbd.ttf")
+                ? "C:\\Windows\\Fonts\\arialbd.ttf"
+                : rutaFontRegular;
+        }
+
+        if (rutaFontRegular != nullptr) {
+            ImFontGlyphRangesBuilder builder;
+            builder.AddRanges(io.Fonts->GetGlyphRangesDefault());
+            builder.AddText("ÀÁÈÉÍÏÒÓÚÜÇàáèéíïòóúüç·—°²");
+            builder.BuildRanges(&s_rangCaractersCatala);
+
+            // Font 0 per defecte a tota la interficie (menus, selector, etiquetes 2D i HUD)
+            io.Fonts->AddFontFromFileTTF(rutaFontRegular, 15.5f, nullptr, s_rangCaractersCatala.Data);
+            s_fontPanellPetit   = io.Fonts->AddFontFromFileTTF(rutaFontRegular, 13.5f, nullptr, s_rangCaractersCatala.Data);
+            s_fontPanellRegular = io.Fonts->AddFontFromFileTTF(rutaFontRegular, 16.0f, nullptr, s_rangCaractersCatala.Data);
+            s_fontPanellTitol   = io.Fonts->AddFontFromFileTTF(rutaFontNegreta, 17.5f, nullptr, s_rangCaractersCatala.Data);
+            s_fontPanellDigital = io.Fonts->AddFontFromFileTTF(rutaFontRegular, 24.5f, nullptr, s_rangCaractersCatala.Data);
+        } else {
+            io.Fonts->AddFontDefault();
+        }
+    }
+}
+
+// =========================================================================
+// HELPERS VISUALS COMPARTITS (ESTIL FOSC ESPACIAL CIAN)
+// =========================================================================
+static void DibuixarIconaPausaReproduccio(ImDrawList* dl, ImVec2 centre, float alt, bool enPausa)
+{
+    float escala = alt / 46.0f;
+    float hBar = 11.0f * escala;
+    if (enPausa) {
+        // Estat pausat: mostra unicament la icona de reprendre (>)
+        ImU32 colPlay = IM_COL32(55, 245, 185, 255);
+        float wPlay = 16.0f * escala;
+        dl->AddTriangleFilled(
+            ImVec2(centre.x + wPlay * 0.60f, centre.y),
+            ImVec2(centre.x - wPlay * 0.45f, centre.y - hBar),
+            ImVec2(centre.x - wPlay * 0.45f, centre.y + hBar),
+            colPlay
+        );
+    } else {
+        // Estat actiu: mostra unicament la icona de pausa (||)
+        ImU32 colPausa = IM_COL32(255, 165, 55, 255);
+        float wBar = 4.6f * escala;
+        float sep = 4.2f * escala;
+        dl->AddRectFilled(
+            ImVec2(centre.x - sep - wBar, centre.y - hBar),
+            ImVec2(centre.x - sep, centre.y + hBar),
+            colPausa, 1.5f
+        );
+        dl->AddRectFilled(
+            ImVec2(centre.x + sep, centre.y - hBar),
+            ImVec2(centre.x + sep + wBar, centre.y + hBar),
+            colPausa, 1.5f
+        );
+    }
+}
+
+static void DibuixarMarcFinestraEspacial(ImDrawList* dl, ImVec2 winPos, ImVec2 winSize, const char* titol, bool* pObert, const char* idBotoTancar, float alcadaCapcalera = 42.0f)
+{
+    ImVec2 winMax(winPos.x + winSize.x, winPos.y + winSize.y);
+
+    // Resplendor exterior i vora lluminosa cian
+    dl->PushClipRectFullScreen();
+    dl->AddRect(ImVec2(winPos.x - 6.0f, winPos.y - 6.0f), ImVec2(winMax.x + 6.0f, winMax.y + 6.0f), IM_COL32(0, 195, 255, 16), 18.0f, 0, 3.0f);
+    dl->AddRect(ImVec2(winPos.x - 3.0f, winPos.y - 3.0f), ImVec2(winMax.x + 3.0f, winMax.y + 3.0f), IM_COL32(0, 200, 255, 36), 16.0f, 0, 2.5f);
+    dl->AddRect(winPos, winMax, IM_COL32(60, 205, 255, 225), 14.0f, 0, 1.6f);
+    dl->PopClipRect();
+
+    // Capcalera integrada
+    dl->AddRectFilled(
+        winPos,
+        ImVec2(winMax.x, winPos.y + alcadaCapcalera),
+        IM_COL32(22, 48, 78, 175),
+        14.0f,
+        ImDrawFlags_RoundCornersTop
+    );
+    dl->AddLine(
+        ImVec2(winPos.x + 1.0f, winPos.y + alcadaCapcalera),
+        ImVec2(winMax.x - 1.0f, winPos.y + alcadaCapcalera),
+        IM_COL32(60, 190, 245, 145),
+        1.2f
+    );
+
+    PushFontSegur(s_fontPanellTitol);
+    ImVec2 midaTitol = ImGui::CalcTextSize(titol);
+    dl->AddText(
+        ImVec2(winPos.x + (winSize.x - midaTitol.x) * 0.5f, winPos.y + (alcadaCapcalera - midaTitol.y) * 0.5f),
+        IM_COL32(195, 238, 255, 255),
+        titol
+    );
+    PopFontSegur(s_fontPanellTitol);
+
+    // Boto de tancament ("X") a la cantonada superior dreta
+    const float midaClose = 28.0f;
+    ImVec2 posClose(winMax.x - midaClose - 10.0f, winPos.y + (alcadaCapcalera - midaClose) * 0.5f);
+    ImGui::SetCursorScreenPos(posClose);
+    if (ImGui::InvisibleButton(idBotoTancar, ImVec2(midaClose, midaClose))) {
+        if (pObert != nullptr) *pObert = false;
+    }
+    bool hoverClose = ImGui::IsItemHovered();
+    if (hoverClose) {
+        dl->AddRectFilled(posClose, ImVec2(posClose.x + midaClose, posClose.y + midaClose), IM_COL32(45, 130, 185, 95), 6.0f);
+    }
+    ImVec2 cClose(posClose.x + midaClose * 0.5f, posClose.y + midaClose * 0.5f);
+    ImU32 colClose = hoverClose ? IM_COL32(255, 255, 255, 255) : IM_COL32(175, 225, 250, 235);
+    dl->AddLine(ImVec2(cClose.x - 5.5f, cClose.y - 5.5f), ImVec2(cClose.x + 5.5f, cClose.y + 5.5f), colClose, 2.0f);
+    dl->AddLine(ImVec2(cClose.x + 5.5f, cClose.y - 5.5f), ImVec2(cClose.x - 5.5f, cClose.y + 5.5f), colClose, 2.0f);
+}
+
+static void DibuixarDialegQuantA(bool* pObert)
+{
+    if (!pObert || !*pObert) return;
+
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    const float ampleFinestra = 460.0f;
+    const float alcadaFinestra = 270.0f;
+
+    ImVec2 posInicial(
+        vp->WorkPos.x + (vp->WorkSize.x - ampleFinestra) * 0.5f,
+        vp->WorkPos.y + (vp->WorkSize.y - alcadaFinestra) * 0.5f
+    );
+
+    ImGui::SetNextWindowPos(posInicial, ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(ampleFinestra, alcadaFinestra), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.90f);
+
+    ImGuiWindowFlags flagsFinestra = ImGuiWindowFlags_NoTitleBar |
+                                     ImGuiWindowFlags_NoResize |
+                                     ImGuiWindowFlags_NoScrollbar |
+                                     ImGuiWindowFlags_NoScrollWithMouse |
+                                     ImGuiWindowFlags_NoCollapse |
+                                     ImGuiWindowFlags_NoSavedSettings;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 14.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(10, 22, 40, 230));
+
+    if (ImGui::Begin("QuantAlSimulador##PopUpEspacial", pObert, flagsFinestra))
+    {
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImVec2 winPos = ImGui::GetWindowPos();
+        ImVec2 winSize = ImGui::GetWindowSize();
+        const float alcadaCapcalera = 42.0f;
+
+        DibuixarMarcFinestraEspacial(dl, winPos, winSize, "QUANT AL SIMULADOR", pObert, "##TancarQuantA", alcadaCapcalera);
+
+        // Caixa interior informativa
+        const float padLat = 22.0f;
+        ImVec2 caixaMin(winPos.x + padLat, winPos.y + alcadaCapcalera + 16.0f);
+        ImVec2 caixaMax(winPos.x + winSize.x - padLat, winPos.y + winSize.y - 62.0f);
+        dl->AddRectFilled(caixaMin, caixaMax, IM_COL32(12, 28, 48, 232), 9.0f);
+        dl->AddRect(caixaMin, caixaMax, IM_COL32(55, 165, 220, 165), 9.0f, 0, 1.2f);
+
+        PushFontSegur(s_fontPanellRegular);
+        const char* titolApp = "SIMULADOR DEL SISTEMA SOLAR";
+        ImVec2 mTitolApp = ImGui::CalcTextSize(titolApp);
+        dl->AddText(
+            ImVec2(winPos.x + (winSize.x - mTitolApp.x) * 0.5f, caixaMin.y + 14.0f),
+            IM_COL32(115, 225, 255, 255),
+            titolApp
+        );
+
+        const char* linia1 = "Explora els planetes i les seves òrbites en 3D.";
+        const char* linia2 = "• Mode Didàctic: vista clara de tot el sistema.";
+        const char* linia3 = "• Mode a Escala Real: distàncies reals i control del temps.";
+        const char* linia4 = "Projecte educatiu — Escola d'Enginyeria (UAB)";
+
+        dl->AddText(ImVec2(caixaMin.x + 16.0f, caixaMin.y + 44.0f), IM_COL32(235, 245, 255, 250), linia1);
+        dl->AddText(ImVec2(caixaMin.x + 16.0f, caixaMin.y + 72.0f), IM_COL32(195, 228, 250, 240), linia2);
+        dl->AddText(ImVec2(caixaMin.x + 16.0f, caixaMin.y + 96.0f), IM_COL32(195, 228, 250, 240), linia3);
+
+        PushFontSegur(s_fontPanellPetit);
+        ImVec2 mLinia4 = ImGui::CalcTextSize(linia4);
+        dl->AddText(
+            ImVec2(winPos.x + (winSize.x - mLinia4.x) * 0.5f, caixaMax.y - mLinia4.y - 10.0f),
+            IM_COL32(150, 195, 225, 210),
+            linia4
+        );
+        PopFontSegur(s_fontPanellPetit);
+
+        // Boto Tancar centrat a la base
+        const float wBtn = 130.0f;
+        const float hBtn = 32.0f;
+        ImVec2 pBtn(winPos.x + (winSize.x - wBtn) * 0.5f, winPos.y + winSize.y - hBtn - 15.0f);
+        ImVec2 pBtnMax(pBtn.x + wBtn, pBtn.y + hBtn);
+        ImGui::SetCursorScreenPos(pBtn);
+        if (ImGui::InvisibleButton("##BotoTancarQuantAFooter", ImVec2(wBtn, hBtn))) {
+            *pObert = false;
+        }
+        bool hoverBtn = ImGui::IsItemHovered();
+        dl->AddRectFilled(pBtn, pBtnMax, hoverBtn ? IM_COL32(24, 58, 94, 235) : IM_COL32(14, 36, 62, 220), 7.0f);
+        dl->AddRect(pBtn, pBtnMax, hoverBtn ? IM_COL32(85, 225, 255, 245) : IM_COL32(55, 165, 220, 195), 7.0f, 0, 1.4f);
+        ImVec2 mBtn = ImGui::CalcTextSize("Tancar");
+        dl->AddText(
+            ImVec2(pBtn.x + (wBtn - mBtn.x) * 0.5f, pBtn.y + (hBtn - mBtn.y) * 0.5f),
+            IM_COL32(235, 248, 255, 255),
+            "Tancar"
+        );
+        PopFontSegur(s_fontPanellRegular);
+    }
+    ImGui::End();
+
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(3);
 }
 
 // =========================================================================
@@ -80,32 +327,14 @@ void InterficieUI::Renderitzar(EstatSimulacio& estat, Escenari*& currentEscenari
         DibuixarPanellDataHoraTimelapse(estat);
     }
 
-    // 4. Fitxa astronomica HUD (telemetria de l'astre actiu)
+    // 4. Fitxa de l'astre (HUD flotant)
     if (estat.mostrarFitxaHUD) {
         DibuixarFitxaAstronomicaHUD(estat.dadesCosActiu, &estat.mostrarFitxaHUD);
     }
 
     // 5. Dialeg "Quant al Simulador"
     if (estat.mostrarDialegQuantA) {
-        ImGui::SetNextWindowSize(ImVec2(480, 260), ImGuiCond_FirstUseEver);
-        if (ImGui::Begin("Quant al Simulador Interactiu del Sistema Solar", &estat.mostrarDialegQuantA, ImGuiWindowFlags_NoResize))
-        {
-            ImGui::TextColored(ImVec4(0.3f, 0.8f, 1.0f, 1.0f), "SIMULADOR INTERACTIU DEL SISTEMA SOLAR");
-            ImGui::Separator();
-            ImGui::Spacing();
-            ImGui::TextWrapped("Projecte de Visualitzacio Grafica Interactiva (VGI) - Escola d'Enginyeria UAB.");
-            ImGui::Spacing();
-            ImGui::BulletText("Modes: Didactic / Intuitiu i Cientific a Escala Real.");
-            ImGui::BulletText("Motor 3D: C++, OpenGL 4.6 Core Profile, GLFW 3.4, GLEW, GLM.");
-            ImGui::BulletText("Interficie d'usuari: Dear ImGui v1.89+ (Immediate Mode GUI).");
-            ImGui::BulletText("Efemerides astronomiques: NASA SPICE Toolkit / Algorismes Keplerians.");
-            ImGui::Spacing();
-            ImGui::Separator();
-            if (ImGui::Button("Tancar", ImVec2(100, 28))) {
-                estat.mostrarDialegQuantA = false;
-            }
-        }
-        ImGui::End();
+        DibuixarDialegQuantA(&estat.mostrarDialegQuantA);
     }
 }
 
@@ -198,9 +427,9 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
 
         ImGui::Spacing();
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(185, 215, 250, 255));
-        float ampleSub = ImGui::CalcTextSize("Trieu el mode de representacio per iniciar la simulacio").x;
+        float ampleSub = ImGui::CalcTextSize("Trieu el mode de representació per iniciar la simulació").x;
         ImGui::SetCursorPosX((midaModal.x - ampleSub) * 0.5f);
-        ImGui::Text("Trieu el mode de representacio per iniciar la simulacio");
+        ImGui::Text("Trieu el mode de representació per iniciar la simulació");
         ImGui::PopStyleColor();
 
         ImGui::Spacing();
@@ -240,7 +469,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
             ImGui::SetWindowFontScale(factorEscala);
             ImGui::Spacing();
             ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 225, 255, 255));
-            ImGui::Text("   MODE DIDACTIC / INTUITIU");
+            ImGui::Text("   MODE DIDÀCTIC / INTUÏTIU");
             ImGui::PopStyleColor();
 
             ImGui::PushStyleColor(ImGuiCol_Separator, IM_COL32(0, 170, 230, 150));
@@ -249,16 +478,16 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
             ImGui::Spacing();
 
             ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(210, 230, 255, 255));
-            ImGui::TextWrapped("Exploracio visual adaptada per a l'aprenentatge:");
+            ImGui::TextWrapped("Exploració visual adaptada per a l'aprenentatge:");
             ImGui::PopStyleColor();
             ImGui::Spacing();
 
             ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(235, 245, 255, 255));
-            DibuixarPuntLlista("Orbites circulars coplanars.");
-            DibuixarPuntLlista("Distancies i radis ajustats visualment.");
-            DibuixarPuntLlista("Tots els planetes visibles simultaniament.");
-            DibuixarPuntLlista("Velocitats d'orbita proporcionals.");
-            DibuixarPuntLlista("Camera orbital inicial a 25 graus.");
+            DibuixarPuntLlista("Òrbites circulars coplanars.");
+            DibuixarPuntLlista("Distàncies i radis ajustats visualment.");
+            DibuixarPuntLlista("Tots els planetes visibles simultàniament.");
+            DibuixarPuntLlista("Velocitats d'òrbita proporcionals.");
+            DibuixarPuntLlista("Càmera orbital inicial a 25 graus.");
             DibuixarPuntLlista("Focus directe a qualsevol planeta.");
             ImGui::PopStyleColor();
 
@@ -278,7 +507,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(0, 90, 180, 255));
 
             ImGui::SetCursorPosX((midaTargeta.x - ampleBoto) * 0.5f);
-            if (ImGui::Button("INICIAR MODE DIDACTIC", ImVec2(ampleBoto, alcadaBoto)))
+            if (ImGui::Button("INICIAR MODE DIDÀCTIC", ImVec2(ampleBoto, alcadaBoto)))
             {
                 estat.modeActual = ModeSimulacio::INTUITIU;
                 estat.mostrarSelectorModes = false;
@@ -316,7 +545,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
             ImGui::SetWindowFontScale(factorEscala);
             ImGui::Spacing();
             ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 195, 45, 255));
-            ImGui::Text("   MODE A ESCALA REAL (CIENTIFIC)");
+            ImGui::Text("   MODE A ESCALA REAL");
             ImGui::PopStyleColor();
 
             ImGui::PushStyleColor(ImGuiCol_Separator, IM_COL32(255, 165, 2, 150));
@@ -325,17 +554,17 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
             ImGui::Spacing();
 
             ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 230, 205, 255));
-            ImGui::TextWrapped("Simulacio astronomica fidel a la fisica real:");
+            ImGui::TextWrapped("Simulació astronòmica fidel a la realitat:");
             ImGui::PopStyleColor();
             ImGui::Spacing();
 
             ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 245, 230, 255));
-            DibuixarPuntLlista("Distancies i radis astronomics reals.");
-            DibuixarPuntLlista("Orbites el-liptiques precises (SPICE).");
-            DibuixarPuntLlista("Selector complet de Data, Hora i Efemerides.");
-            DibuixarPuntLlista("Timelapse regulable: 1 min/s a 20 dies/s.");
-            DibuixarPuntLlista("Possibilitat d'avancar o rebobinar.");
-            DibuixarPuntLlista("Camera coet en 1a persona i marcadors.");
+            DibuixarPuntLlista("Distàncies i mides reals dels planetes.");
+            DibuixarPuntLlista("Òrbites reals amb inclinació natural.");
+            DibuixarPuntLlista("Control complet de Data, Hora i Velocitat.");
+            DibuixarPuntLlista("Velocitat regulable: 1 min/s a 20 dies/s.");
+            DibuixarPuntLlista("Possibilitat d'avançar o rebobinar.");
+            DibuixarPuntLlista("Vista en 1a persona i focus a cada astre.");
             ImGui::PopStyleColor();
 
             float padY = 16.0f * factorEscala;
@@ -414,7 +643,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
 
     static const char* nomsPlanetesMenu[9] = {
         "Sol (Centre)", "Mercuri", "Venus", "Terra",
-        "Mart", "Jupiter", "Saturn", "Ura", "Neptu"
+        "Mart", "Júpiter", "Saturn", "Urà", "Neptú"
     };
 
     if (estat.modeActual == ModeSimulacio::INTUITIU)
@@ -423,10 +652,10 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
         if (ImGui::BeginMenu("Escenari"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
-            if (ImGui::MenuItem("Canviar de Mode (Selector inicial)...")) {
+            if (ImGui::MenuItem("Canviar de Mode...")) {
                 estat.mostrarSelectorModes = true;
             }
-            if (ImGui::MenuItem("Commutar a Mode a Escala Real")) {
+            if (ImGui::MenuItem("Canviar a Mode a Escala Real")) {
                 estat.modeActual = ModeSimulacio::ESCALA_REAL;
                 estat.mostrarPanellTemps = true;
                 estat.configuracioInicialPendent = true;
@@ -437,10 +666,10 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 }
             }
             ImGui::Separator();
-            if (ImGui::MenuItem(estat.tempsSimulacio.enPausa ? "Reprendre Moviment Orbital" : "Pausar Moviment Orbital", "Espai")) {
+            if (ImGui::MenuItem(estat.tempsSimulacio.enPausa ? "Reprendre Moviment" : "Pausar Moviment", "Espai")) {
                 estat.tempsSimulacio.enPausa = !estat.tempsSimulacio.enPausa;
             }
-            if (ImGui::MenuItem("Reiniciar Vista Didactica", "R")) {
+            if (ImGui::MenuItem("Reiniciar Vista", "R")) {
                 estat.cosEnfocatId = 0;
                 estat.cameraConfig.angleInclinacio = 25.0f;
                 estat.cameraConfig.mode = ModeCamera::FIXA_INCLINADA_25;
@@ -468,7 +697,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 }
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Tornar a la Vista Global del Sol", "Home")) {
+            if (ImGui::MenuItem("Vista Global del Sol", "Home")) {
                 estat.cosEnfocatId = 0;
                 estat.cameraConfig.mode = ModeCamera::GLOBAL_SISTEMA;
                 estat.canviCameraPendent = true;
@@ -477,20 +706,16 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("Camera"))
+        if (ImGui::BeginMenu("Càmera"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
-            if (ImGui::MenuItem("Camera Orbital Centrada (Esferica)", nullptr, estat.cameraConfig.mode == ModeCamera::ORBITAL_CENTRADOR)) {
+            if (ImGui::MenuItem("Càmera Orbital", nullptr, estat.cameraConfig.mode == ModeCamera::ORBITAL_CENTRADOR)) {
                 estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
                 estat.canviCameraPendent = true;
             }
-            if (ImGui::MenuItem("Camera Fixa Inicial (Inclinada 25 graus)", nullptr, estat.cameraConfig.mode == ModeCamera::FIXA_INCLINADA_25)) {
+            if (ImGui::MenuItem("Vista Inclinada (25°)", nullptr, estat.cameraConfig.mode == ModeCamera::FIXA_INCLINADA_25)) {
                 estat.cameraConfig.mode = ModeCamera::FIXA_INCLINADA_25;
                 estat.cameraConfig.angleInclinacio = 25.0f;
-                estat.canviCameraPendent = true;
-            }
-            if (ImGui::MenuItem("Camera Lliure (Navega)", nullptr, estat.cameraConfig.mode == ModeCamera::COET_PRIMERA_PERSONA)) {
-                estat.cameraConfig.mode = ModeCamera::COET_PRIMERA_PERSONA;
                 estat.canviCameraPendent = true;
             }
             if (ImGui::MenuItem("Vista Global del Sistema", nullptr, estat.cameraConfig.mode == ModeCamera::GLOBAL_SISTEMA)) {
@@ -499,43 +724,38 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 estat.canviCameraPendent = true;
                 ActualitzarDadesCosActiu(estat);
             }
-            ImGui::Separator();
-            ImGui::TextDisabled("Controls de moviment:");
-            ImGui::BulletText("Ratoli (Clic Esquerre) / Fletxes: Gir orbital");
-            ImGui::BulletText("Roda del Ratoli / Amunt-Avall: Zoom");
-            ImGui::BulletText("Mode Lliure (Navega): Fletxes + W/S/A/D");
             ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("Visualitzacio"))
+        if (ImGui::BeginMenu("Visualització"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
-            ImGui::MenuItem("Dibuixar Orbites Circulars", nullptr, &estat.opcionsVisualitzacio.mostrarOrbites);
-            ImGui::MenuItem("Mostrar Noms i Etiquetes 2D", nullptr, &estat.opcionsVisualitzacio.mostrarEtiquetes);
-            ImGui::MenuItem("Il-luminacio Solar Directa", nullptr, &estat.opcionsVisualitzacio.iluminacioSolarDirecta);
-            ImGui::MenuItem("Vista Clara (Llum Ambient)", nullptr, &estat.opcionsVisualitzacio.vistaClaraAmbient);
+            ImGui::MenuItem("Mostrar Òrbites", nullptr, &estat.opcionsVisualitzacio.mostrarOrbites);
+            ImGui::MenuItem("Mostrar Noms dels Planetes", nullptr, &estat.opcionsVisualitzacio.mostrarEtiquetes);
+            ImGui::MenuItem("Llum del Sol", nullptr, &estat.opcionsVisualitzacio.iluminacioSolarDirecta);
+            ImGui::MenuItem("Vista Clara (Sense ombres)", nullptr, &estat.opcionsVisualitzacio.vistaClaraAmbient);
             ImGui::Separator();
 
-            if (ImGui::BeginMenu("Model d'Anells de Saturn")) {
+            if (ImGui::BeginMenu("Anells de Saturn")) {
                 ImGui::SetWindowFontScale(factorFontMenu);
-                if (ImGui::MenuItem("Disc pla amb textura", nullptr, !estat.opcionsVisualitzacio.anellsSaturnParticules)) {
+                if (ImGui::MenuItem("Disc llis amb textura", nullptr, !estat.opcionsVisualitzacio.anellsSaturnParticules)) {
                     estat.opcionsVisualitzacio.anellsSaturnParticules = false;
                 }
-                if (ImGui::MenuItem("Particules instanciades (gluDisc)", nullptr, estat.opcionsVisualitzacio.anellsSaturnParticules)) {
+                if (ImGui::MenuItem("Anells amb partícules", nullptr, estat.opcionsVisualitzacio.anellsSaturnParticules)) {
                     estat.opcionsVisualitzacio.anellsSaturnParticules = true;
                 }
                 ImGui::EndMenu();
             }
 
-            ImGui::MenuItem("Fons Espacial (Skybox d'estrelles)", nullptr, &estat.opcionsVisualitzacio.mostrarSkybox);
-            ImGui::MenuItem("Eixos de Coordenades", nullptr, &estat.opcionsVisualitzacio.mostrarEixos);
+            ImGui::MenuItem("Fons d'Estrelles", nullptr, &estat.opcionsVisualitzacio.mostrarSkybox);
+            ImGui::MenuItem("Mostrar Eixos de Guia", nullptr, &estat.opcionsVisualitzacio.mostrarEixos);
             ImGui::EndMenu();
         }
 
         if (ImGui::BeginMenu("Ajuda"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
-            ImGui::MenuItem("Mostrar Fitxa de l'Astre (HUD)", nullptr, &estat.mostrarFitxaHUD);
+            ImGui::MenuItem("Mostrar Fitxa de l'Astre", nullptr, &estat.mostrarFitxaHUD);
             ImGui::Separator();
             if (ImGui::MenuItem("Quant al Simulador...")) {
                 estat.mostrarDialegQuantA = true;
@@ -549,10 +769,10 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
         if (ImGui::BeginMenu("Escenari"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
-            if (ImGui::MenuItem("Canviar de Mode (Selector inicial)...")) {
+            if (ImGui::MenuItem("Canviar de Mode...")) {
                 estat.mostrarSelectorModes = true;
             }
-            if (ImGui::MenuItem("Commutar a Mode Didactic")) {
+            if (ImGui::MenuItem("Canviar a Mode Didàctic")) {
                 estat.modeActual = ModeSimulacio::INTUITIU;
                 estat.mostrarPanellTemps = false;
                 estat.cameraConfig.mode = ModeCamera::FIXA_INCLINADA_25;
@@ -564,8 +784,9 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 }
             }
             ImGui::Separator();
-            if (ImGui::MenuItem("Reiniciar Simulacio a Escala", "R")) {
+            if (ImGui::MenuItem("Reiniciar Vista", "R")) {
                 estat.cosEnfocatId = 0;
+                estat.origenReferenciaSol = true;
                 estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
                 estat.canviCameraPendent = true;
                 ActualitzarDadesCosActiu(estat);
@@ -578,88 +799,64 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("Efemerides & Temps"))
+        if (ImGui::BeginMenu("Temps & Data"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
-            ImGui::MenuItem("Mostrar Panell Data/Hora (Dreta Inferior)", nullptr, &estat.mostrarPanellTemps);
+            ImGui::MenuItem("Mostrar Control del Temps", nullptr, &estat.mostrarPanellTemps);
             ImGui::Separator();
-            if (ImGui::MenuItem(estat.tempsSimulacio.enPausa ? "Reprendre Temps" : "Pausar Temps", "Espai")) {
+            if (ImGui::MenuItem(estat.tempsSimulacio.enPausa ? "Reprendre Simulació" : "Pausar Simulació", "Espai")) {
                 estat.tempsSimulacio.enPausa = !estat.tempsSimulacio.enPausa;
             }
-            if (ImGui::MenuItem("Invertir Sentit (Enrere / Endavant)", "Backspace")) {
+            if (ImGui::MenuItem("Invertir Sentit del Temps", "Backspace")) {
                 estat.tempsSimulacio.direccioTemps *= -1;
             }
             ImGui::Separator();
-            if (ImGui::BeginMenu("Dreceres de Data")) {
+            if (ImGui::BeginMenu("Dates Destacades")) {
                 ImGui::SetWindowFontScale(factorFontMenu);
-                if (ImGui::MenuItem("Data Actual del Sistema (Ara)")) {
+                if (ImGui::MenuItem("Data i Hora Actual")) {
                     estat.tempsSimulacio.EstablirDataActual();
+                    estat.recalculEfemeridesNecessari = true;
                 }
-                if (ImGui::MenuItem("Epoca J2000.0 (1 Gen 2000 12:00 UTC)")) {
+                if (ImGui::MenuItem("Any 2000 (1 Gen 2000)")) {
                     estat.tempsSimulacio.EstablirJ2000();
+                    estat.recalculEfemeridesNecessari = true;
                 }
-                if (ImGui::MenuItem("Eclipsi Solar Total (12 Agost 2026)")) {
+                if (ImGui::MenuItem("Eclipsi Solar Total (12 Ago 2026)")) {
                     estat.tempsSimulacio.dataHora = { 2026, 8, 12, 17, 30, 0 };
+                    estat.recalculEfemeridesNecessari = true;
                 }
                 ImGui::EndMenu();
             }
-            if (ImGui::BeginMenu("Velocitats Rapides de Timelapse")) {
+            if (ImGui::BeginMenu("Velocitats Ràpides")) {
                 ImGui::SetWindowFontScale(factorFontMenu);
-                if (ImGui::MenuItem("Minim: 1 min/s")) estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 60.0;
-                if (ImGui::MenuItem("1 hora/s")) estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 3600.0;
-                if (ImGui::MenuItem("1 dia/s")) estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 86400.0;
-                if (ImGui::MenuItem("5 dies/s")) estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 432000.0;
-                if (ImGui::MenuItem("Maxim: 20 dies/s")) estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 1728000.0;
+                if (ImGui::MenuItem("1 minut / s")) estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 60.0;
+                if (ImGui::MenuItem("1 hora / s"))  estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 3600.0;
+                if (ImGui::MenuItem("1 dia / s"))   estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 86400.0;
+                if (ImGui::MenuItem("10 dies / s")) estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 864000.0;
+                if (ImGui::MenuItem("20 dies / s")) estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 1728000.0;
                 ImGui::EndMenu();
             }
             ImGui::EndMenu();
         }
 
-        if (ImGui::BeginMenu("Origen & Cameres"))
+        if (ImGui::BeginMenu("Origen & Càmeres"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
-            ImGui::TextDisabled("Punt d'Origen de Referencia:");
-            if (ImGui::RadioButton("Heliocentric (Sol al centre)", estat.origenReferenciaSol)) {
+            ImGui::TextDisabled("Centrar Vista en:");
+            if (ImGui::MenuItem("El Sol", nullptr, estat.origenReferenciaSol && estat.cosEnfocatId == 0)) {
                 estat.origenReferenciaSol = true;
                 estat.cosEnfocatId = 0;
-                estat.canviCameraPendent = true;
-                ActualitzarDadesCosActiu(estat);
-            }
-            if (ImGui::RadioButton("Planeta Seleccionat com a Centre", !estat.origenReferenciaSol)) {
-                estat.origenReferenciaSol = false;
-                estat.canviCameraPendent = true;
-            }
-
-            ImGui::Separator();
-            ImGui::TextDisabled("Modes de Camera:");
-            if (ImGui::MenuItem("Camera Orbital Centrada", nullptr, estat.cameraConfig.mode == ModeCamera::ORBITAL_CENTRADOR)) {
                 estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
                 estat.canviCameraPendent = true;
-            }
-            if (ImGui::MenuItem("Camera Fixa Inclinada (25 graus)", nullptr, estat.cameraConfig.mode == ModeCamera::FIXA_INCLINADA_25)) {
-                estat.cameraConfig.mode = ModeCamera::FIXA_INCLINADA_25;
-                estat.cameraConfig.angleInclinacio = 25.0f;
-                estat.canviCameraPendent = true;
-            }
-            if (ImGui::MenuItem("Camera Coet en 1a Persona (Navega)", nullptr, estat.cameraConfig.mode == ModeCamera::COET_PRIMERA_PERSONA)) {
-                estat.cameraConfig.mode = ModeCamera::COET_PRIMERA_PERSONA;
-                estat.canviCameraPendent = true;
-            }
-            if (ImGui::MenuItem("Vista Global del Sistema", nullptr, estat.cameraConfig.mode == ModeCamera::GLOBAL_SISTEMA)) {
-                estat.cosEnfocatId = 0;
-                estat.cameraConfig.mode = ModeCamera::GLOBAL_SISTEMA;
-                estat.canviCameraPendent = true;
                 ActualitzarDadesCosActiu(estat);
             }
-
-            ImGui::Separator();
-            if (ImGui::BeginMenu("Centrar Camera a...")) {
+            if (ImGui::BeginMenu("El Planeta Seleccionat")) {
                 ImGui::SetWindowFontScale(factorFontMenu);
-                for (int i = 0; i < 9; ++i) {
-                    bool seleccionat = (estat.cosEnfocatId == i);
+                for (int i = 1; i < 9; ++i) {
+                    bool seleccionat = (!estat.origenReferenciaSol && estat.cosEnfocatId == i);
                     if (ImGui::MenuItem(nomsPlanetesMenu[i], nullptr, seleccionat)) {
                         estat.cosEnfocatId = i;
-                        estat.origenReferenciaSol = (i == 0);
+                        estat.origenReferenciaSol = false;
                         estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
                         estat.canviCameraPendent = true;
                         ActualitzarDadesCosActiu(estat);
@@ -667,31 +864,49 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 }
                 ImGui::EndMenu();
             }
-            ImGui::EndMenu();
-        }
 
-        if (ImGui::BeginMenu("Visualitzacio Realista"))
-        {
-            ImGui::SetWindowFontScale(factorFontMenu);
-            ImGui::MenuItem("Orbites El-liptiques Reals (SPICE)", nullptr, &estat.opcionsVisualitzacio.mostrarOrbites);
-            ImGui::MenuItem("Mostrar Noms i Etiquetes 2D", nullptr, &estat.opcionsVisualitzacio.mostrarEtiquetes);
-            ImGui::MenuItem("Marcadors Lluminosos (Halos Cossos Petits)", nullptr, &estat.opcionsVisualitzacio.mostrarMarcadorsPetits);
-            ImGui::MenuItem("Il-luminacio Solar Directa", nullptr, &estat.opcionsVisualitzacio.iluminacioSolarDirecta);
-            ImGui::MenuItem("Vista Clara (Llum Ambient)", nullptr, &estat.opcionsVisualitzacio.vistaClaraAmbient);
-            ImGui::MenuItem("Cinturo d'Asteroides (Instancing)", nullptr, &estat.opcionsVisualitzacio.mostrarCinturoAsteroides);
-            ImGui::MenuItem("Punts de Lagrange (L1 - L5)", nullptr, &estat.opcionsVisualitzacio.mostrarPuntsLagrange);
-            ImGui::MenuItem("Fons Espacial (Skybox)", nullptr, &estat.opcionsVisualitzacio.mostrarSkybox);
-            ImGui::MenuItem("Eixos de l'Ecliptica", nullptr, &estat.opcionsVisualitzacio.mostrarEixos);
-            ImGui::EndMenu();
-        }
-
-        if (ImGui::BeginMenu("Dades Cientifiques"))
-        {
-            ImGui::SetWindowFontScale(factorFontMenu);
-            ImGui::TextDisabled("Font d'Efemerides:");
-            ImGui::BulletText("NASA SPICE Toolkit for C");
             ImGui::Separator();
-            ImGui::MenuItem("Fitxa Tecnica i Telemetria (HUD)", nullptr, &estat.mostrarFitxaHUD);
+            ImGui::TextDisabled("Tipus de Càmera:");
+            if (ImGui::MenuItem("Càmera Orbital", nullptr, estat.cameraConfig.mode == ModeCamera::ORBITAL_CENTRADOR)) {
+                estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
+                estat.canviCameraPendent = true;
+            }
+            if (ImGui::MenuItem("Vista Inclinada (25°)", nullptr, estat.cameraConfig.mode == ModeCamera::FIXA_INCLINADA_25)) {
+                estat.cameraConfig.mode = ModeCamera::FIXA_INCLINADA_25;
+                estat.cameraConfig.angleInclinacio = 25.0f;
+                estat.canviCameraPendent = true;
+            }
+            if (ImGui::MenuItem("Vista en 1a Persona", nullptr, estat.cameraConfig.mode == ModeCamera::COET_PRIMERA_PERSONA)) {
+                estat.cameraConfig.mode = ModeCamera::COET_PRIMERA_PERSONA;
+                estat.canviCameraPendent = true;
+            }
+            if (ImGui::MenuItem("Vista Global del Sistema", nullptr, estat.cameraConfig.mode == ModeCamera::GLOBAL_SISTEMA)) {
+                estat.cosEnfocatId = 0;
+                estat.origenReferenciaSol = true;
+                estat.cameraConfig.mode = ModeCamera::GLOBAL_SISTEMA;
+                estat.canviCameraPendent = true;
+                ActualitzarDadesCosActiu(estat);
+            }
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Visualització"))
+        {
+            ImGui::SetWindowFontScale(factorFontMenu);
+            ImGui::MenuItem("Mostrar Òrbites", nullptr, &estat.opcionsVisualitzacio.mostrarOrbites);
+            ImGui::MenuItem("Mostrar Noms dels Planetes", nullptr, &estat.opcionsVisualitzacio.mostrarEtiquetes);
+            ImGui::MenuItem("Llum del Sol", nullptr, &estat.opcionsVisualitzacio.iluminacioSolarDirecta);
+            ImGui::MenuItem("Vista Clara (Sense ombres)", nullptr, &estat.opcionsVisualitzacio.vistaClaraAmbient);
+            ImGui::Separator();
+            ImGui::MenuItem("Fons d'Estrelles", nullptr, &estat.opcionsVisualitzacio.mostrarSkybox);
+            ImGui::MenuItem("Mostrar Eixos de Guia", nullptr, &estat.opcionsVisualitzacio.mostrarEixos);
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Ajuda"))
+        {
+            ImGui::SetWindowFontScale(factorFontMenu);
+            ImGui::MenuItem("Mostrar Fitxa de l'Astre", nullptr, &estat.mostrarFitxaHUD);
             ImGui::Separator();
             if (ImGui::MenuItem("Quant al Simulador...")) {
                 estat.mostrarDialegQuantA = true;
@@ -700,12 +915,12 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
         }
     }
 
-    // ==================== ZONA DRETA: INDICADOR DE MODE I RENDIMENT ====================
+    // ==================== ZONA DRETA: MODE, PAUSA/REPRENDRE, CANVIAR I FPS ====================
     float ampleTotal = ImGui::GetWindowWidth();
 
     const char* etiquetaMode = (estat.modeActual == ModeSimulacio::INTUITIU) 
-        ? "[MODE DIDACTIC / INTUITIU]" 
-        : "[MODE A ESCALA REAL]";
+        ? "[MODE DIDÀCTIC]" 
+        : "[ESCALA REAL]";
     ImVec4 colorMode = (estat.modeActual == ModeSimulacio::INTUITIU)
         ? ImVec4(0.2f, 0.9f, 0.4f, 1.0f)
         : ImVec4(1.0f, 0.75f, 0.2f, 1.0f);
@@ -714,12 +929,19 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
     char bufferFps[32];
     snprintf(bufferFps, sizeof(bufferFps), "%.1f FPS", fps);
 
+    float frameH = ImGui::GetFrameHeight();
+    float textH = ImGui::GetTextLineHeight();
+    float altBtnPausa = textH + 6.0f;
+    if (altBtnPausa > frameH - 4.0f) altBtnPausa = frameH - 4.0f;
+    if (altBtnPausa < 18.0f) altBtnPausa = 18.0f;
+    float ampleBtnPausa = altBtnPausa * 1.25f;
+
     float ampleEtiqueta = ImGui::CalcTextSize(etiquetaMode).x;
     float ampleBotoCanviar = ImGui::CalcTextSize("Canviar").x + (padX * 2.0f) + 12.0f;
     float ampleFps = ImGui::CalcTextSize(bufferFps).x;
-    float espaiSeparadors = padX * 3.0f;
+    float espaiSeparadors = padX * 4.2f;
 
-    float ampleWidgetsDreta = ampleEtiqueta + ampleBotoCanviar + ampleFps + espaiSeparadors + 20.0f;
+    float ampleWidgetsDreta = ampleEtiqueta + ampleBtnPausa + ampleBotoCanviar + ampleFps + espaiSeparadors + 24.0f;
 
     float xActual = ImGui::GetCursorPosX();
     float xDesti = ampleTotal - ampleWidgetsDreta;
@@ -731,6 +953,34 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
     }
 
     ImGui::TextColored(colorMode, "%s", etiquetaMode);
+    ImGui::SameLine();
+
+    // Boto compacte de Pausa / Reprendre a la barra superior abans de "Canviar"
+    ImGui::BeginGroup();
+    ImVec2 posSlot = ImGui::GetCursorScreenPos();
+    ImGui::Dummy(ImVec2(ampleBtnPausa, frameH));
+    ImVec2 pPausaMin(posSlot.x, posSlot.y + (frameH - altBtnPausa) * 0.5f);
+    ImVec2 pPausaMax(pPausaMin.x + ampleBtnPausa, pPausaMin.y + altBtnPausa);
+    ImGui::SetCursorScreenPos(pPausaMin);
+    if (ImGui::InvisibleButton("##BotoPausaBarraMenu", ImVec2(ampleBtnPausa, altBtnPausa))) {
+        estat.tempsSimulacio.enPausa = !estat.tempsSimulacio.enPausa;
+    }
+    bool hoverPausaBar = ImGui::IsItemHovered();
+    if (hoverPausaBar) {
+        ImGui::SetTooltip(estat.tempsSimulacio.enPausa ? "Reprendre simulació (Espai)" : "Pausar simulació (Espai)");
+    }
+    ImDrawList* dlBar = ImGui::GetWindowDrawList();
+    ImU32 bgPausaBar = hoverPausaBar ? IM_COL32(22, 68, 76, 238) : IM_COL32(16, 48, 60, 225);
+    dlBar->AddRectFilled(pPausaMin, pPausaMax, bgPausaBar, 5.5f);
+    dlBar->AddRect(pPausaMin, pPausaMax, IM_COL32(55, 238, 180, 240), 5.5f, 0, 1.3f);
+    DibuixarIconaPausaReproduccio(
+        dlBar,
+        ImVec2((pPausaMin.x + pPausaMax.x) * 0.5f, (pPausaMin.y + pPausaMax.y) * 0.5f),
+        altBtnPausa * 1.15f,
+        estat.tempsSimulacio.enPausa
+    );
+    ImGui::EndGroup();
+
     ImGui::SameLine();
 
     if (ImGui::Button("Canviar")) {
@@ -747,227 +997,856 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
 }
 
 // =========================================================================
-// 2.3 SELECTOR DE DATA, HORA I TIMELAPSE (CANTONADA INFERIOR DRETA)
+// HELPERS DEL PANELL DE CONTROL DE TEMPS I VELOCITAT
 // =========================================================================
-void InterficieUI::DibuixarPanellDataHoraTimelapse(EstatSimulacio& estat)
+static const int kNumMarquesSlider = 5;
+static const float kPosMarques[kNumMarquesSlider] = { 0.00f, 0.25f, 0.50f, 0.75f, 1.00f };
+static const double kValMarques[kNumMarquesSlider] = { 60.0, 3600.0, 86400.0, 864000.0, 1728000.0 };
+static const char* kEtiquetesMarques[kNumMarquesSlider] = {
+    "1 min/s", "1 h/s", "1 dia/s", "10 dies/s", "20 dies/s"
+};
+
+static float VelocitatANormalitzat(double vel)
 {
-    if (estat.modeActual != ModeSimulacio::ESCALA_REAL || !estat.mostrarPanellTemps) return;
+    if (vel <= kValMarques[0]) return 0.0f;
+    if (vel >= kValMarques[kNumMarquesSlider - 1]) return 1.0f;
+    for (int i = 0; i < kNumMarquesSlider - 1; ++i) {
+        if (vel <= kValMarques[i + 1]) {
+            double ratio = std::log(vel / kValMarques[i]) / std::log(kValMarques[i + 1] / kValMarques[i]);
+            return kPosMarques[i] + (float)ratio * (kPosMarques[i + 1] - kPosMarques[i]);
+        }
+    }
+    return 1.0f;
+}
 
-    const ImGuiViewport* vp = ImGui::GetMainViewport();
-    float ampleFinestra = 420.0f;
-    float alcadaFinestra = 390.0f;
-    float marge = 15.0f;
+static double NormalitzatAVelocitat(float u)
+{
+    if (u <= 0.0f) return kValMarques[0];
+    if (u >= 1.0f) return kValMarques[kNumMarquesSlider - 1];
+    for (int i = 0; i < kNumMarquesSlider - 1; ++i) {
+        if (u <= kPosMarques[i + 1]) {
+            double localT = (double)((u - kPosMarques[i]) / (kPosMarques[i + 1] - kPosMarques[i]));
+            return kValMarques[i] * std::pow(kValMarques[i + 1] / kValMarques[i], localT);
+        }
+    }
+    return kValMarques[kNumMarquesSlider - 1];
+}
 
-    ImVec2 pos(vp->WorkPos.x + vp->WorkSize.x - ampleFinestra - marge,
-               vp->WorkPos.y + vp->WorkSize.y - alcadaFinestra - marge);
+static void FormatarVelocitatActual(double vel, bool enPausa, int direccioTemps, char* outBuf, size_t bufSize)
+{
+    char base[96];
+    if (vel >= 86400.0 - 1.0) {
+        double dies = vel / 86400.0;
+        if (std::fabs(dies - 1.0) < 0.02) {
+            snprintf(base, sizeof(base), "1 DIA PER SEGON");
+        } else if (std::fabs(dies - std::round(dies)) < 0.08) {
+            snprintf(base, sizeof(base), "%.0f DIES PER SEGON", std::round(dies));
+        } else {
+            snprintf(base, sizeof(base), "%.1f DIES PER SEGON", dies);
+        }
+    } else if (vel >= 3600.0 - 1.0) {
+        double hores = vel / 3600.0;
+        if (std::fabs(hores - 1.0) < 0.02) {
+            snprintf(base, sizeof(base), "1 HORA PER SEGON");
+        } else if (std::fabs(hores - std::round(hores)) < 0.08) {
+            snprintf(base, sizeof(base), "%.0f HORES PER SEGON", std::round(hores));
+        } else {
+            snprintf(base, sizeof(base), "%.1f HORES PER SEGON", hores);
+        }
+    } else {
+        double mins = vel / 60.0;
+        if (std::fabs(mins - 1.0) < 0.02) {
+            snprintf(base, sizeof(base), "1 MINUT PER SEGON");
+        } else if (std::fabs(mins - std::round(mins)) < 0.08) {
+            snprintf(base, sizeof(base), "%.0f MINUTS PER SEGON", std::round(mins));
+        } else {
+            snprintf(base, sizeof(base), "%.1f MINUTS PER SEGON", mins);
+        }
+    }
 
-    ImGui::SetNextWindowPos(pos, ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImVec2(ampleFinestra, alcadaFinestra), ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.88f);
+    const char* estatTxt = "";
+    if (enPausa) {
+        estatTxt = " (PAUSADA)";
+    } else if (direccioTemps < 0) {
+        estatTxt = " (ENRERE)";
+    }
+    snprintf(outBuf, bufSize, "VELOCITAT ACTUAL: %s%s", base, estatTxt);
+}
 
-    ImGuiWindowFlags flagsFinestra = ImGuiWindowFlags_NoMove | 
-                                     ImGuiWindowFlags_NoResize | 
-                                     ImGuiWindowFlags_NoSavedSettings;
+static ImU32 InterpolarColor(ImU32 colA, ImU32 colB, float t)
+{
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
+    int rA = (colA >> IM_COL32_R_SHIFT) & 0xFF;
+    int gA = (colA >> IM_COL32_G_SHIFT) & 0xFF;
+    int bA = (colA >> IM_COL32_B_SHIFT) & 0xFF;
+    int aA = (colA >> IM_COL32_A_SHIFT) & 0xFF;
+    int rB = (colB >> IM_COL32_R_SHIFT) & 0xFF;
+    int gB = (colB >> IM_COL32_G_SHIFT) & 0xFF;
+    int bB = (colB >> IM_COL32_B_SHIFT) & 0xFF;
+    int aB = (colB >> IM_COL32_A_SHIFT) & 0xFF;
+    int r = (int)(rA + (rB - rA) * t);
+    int g = (int)(gA + (gB - gA) * t);
+    int b = (int)(bA + (bB - bA) * t);
+    int a = (int)(aA + (aB - aA) * t);
+    return IM_COL32(r, g, b, a);
+}
 
-    if (ImGui::Begin("Efemerides i Control de Temps##PanellDretaInferior", &estat.mostrarPanellTemps, flagsFinestra))
-    {
+static void DibuixarIconaRellotge(ImDrawList* dl, ImVec2 centre, float radi, ImU32 col)
+{
+    dl->AddCircle(centre, radi, col, 28, 2.2f);
+    dl->AddLine(centre, ImVec2(centre.x, centre.y - radi * 0.56f), col, 2.2f);
+    dl->AddLine(centre, ImVec2(centre.x + radi * 0.45f, centre.y + radi * 0.25f), col, 2.2f);
+    dl->AddCircleFilled(centre, 1.8f, col);
+}
+
+static void DibuixarIconaCalendari(ImDrawList* dl, ImVec2 centre, float mida, ImU32 col)
+{
+    float hw = mida * 0.50f;
+    float hh = mida * 0.46f;
+    ImVec2 pMin(centre.x - hw, centre.y - hh + 2.0f);
+    ImVec2 pMax(centre.x + hw, centre.y + hh + 2.0f);
+
+    dl->AddRect(pMin, pMax, col, 3.0f, 0, 2.0f);
+    float yBar = pMin.y + mida * 0.28f;
+    dl->AddLine(ImVec2(pMin.x, yBar), ImVec2(pMax.x, yBar), col, 1.8f);
+
+    // Anelles superiors
+    dl->AddLine(ImVec2(centre.x - hw * 0.48f, pMin.y - 3.5f), ImVec2(centre.x - hw * 0.48f, pMin.y + 3.0f), col, 2.0f);
+    dl->AddLine(ImVec2(centre.x + hw * 0.48f, pMin.y - 3.5f), ImVec2(centre.x + hw * 0.48f, pMin.y + 3.0f), col, 2.0f);
+
+    // Graella de dies (3x2)
+    float startX = pMin.x + mida * 0.24f;
+    float stepX  = (pMax.x - pMin.x - mida * 0.48f) / 2.0f;
+    float startY = yBar + (pMax.y - yBar) * 0.34f;
+    float stepY  = (pMax.y - yBar) * 0.36f;
+    for (int r = 0; r < 2; ++r) {
+        for (int c = 0; c < 3; ++c) {
+            ImVec2 pDot(startX + c * stepX, startY + r * stepY);
+            dl->AddRectFilled(ImVec2(pDot.x - 1.7f, pDot.y - 1.7f), ImVec2(pDot.x + 1.7f, pDot.y + 1.7f), col, 0.5f);
+        }
+    }
+}
+
+static void DibuixarIconaFletxesDobles(ImDrawList* dl, ImVec2 centre, float mida, int dir, ImU32 col)
+{
+    float s = (float)dir; // -1 esquerra, +1 dreta
+    float wTri = mida * 0.42f;
+    float hTri = mida * 0.48f;
+    float offset = mida * 0.22f;
+
+    for (int k = 0; k < 2; ++k) {
+        float cx = centre.x + (k == 0 ? -offset : offset) * s;
+        ImVec2 tip(cx + wTri * 0.55f * s, centre.y);
+        ImVec2 top(cx - wTri * 0.55f * s, centre.y - hTri);
+        ImVec2 bot(cx - wTri * 0.55f * s, centre.y + hTri);
+        dl->AddTriangleFilled(tip, top, bot, col);
+    }
+}
+
+static void DibuixarPopupSelectorHora(EstatSimulacio& estat, bool& canviDataSollicitat)
+{
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, IM_COL32(12, 26, 46, 248));
+    ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(50, 200, 255, 220));
+    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 10.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14.0f, 12.0f));
+
+    if (ImGui::BeginPopup("PopupSelectorHora")) {
+        PushFontSegur(s_fontPanellRegular);
         DataHoraSimulacio& dt = estat.tempsSimulacio.dataHora;
-        bool canviDataSollicitat = false;
 
-        // SECCIO 1: DATA DE SIMULACIO
-        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(100, 200, 255, 255));
-        ImGui::Text("DATA DE SIMULACIO (Efemerides UTC)");
-        ImGui::PopStyleColor();
+        ImGui::TextColored(ImVec4(0.35f, 0.88f, 1.0f, 1.0f), "SELECCIONAR HORA");
         ImGui::Separator();
+        ImGui::Spacing();
 
-        static const char* nomsMesos[] = {
-            "Gener", "Febrer", "Marc", "Abril", "Maig", "Juny",
-            "Juliol", "Agost", "Setembre", "Octubre", "Novembre", "Desembre"
-        };
+        ImGui::Text("Hora:"); ImGui::SameLine(85.0f);
+        ImGui::SetNextItemWidth(110.0f);
+        if (ImGui::InputInt("##HoraInput", &dt.hora, 1, 3)) { dt.Validar(); canviDataSollicitat = true; }
 
-        ImGui::SetNextItemWidth(80.0f);
-        if (ImGui::InputInt("##Any", &dt.any, 1, 10)) { dt.Validar(); canviDataSollicitat = true; }
+        ImGui::Text("Minut:"); ImGui::SameLine(85.0f);
+        ImGui::SetNextItemWidth(110.0f);
+        if (ImGui::InputInt("##MinutInput", &dt.minut, 1, 5)) { dt.Validar(); canviDataSollicitat = true; }
+
+        ImGui::Text("Segon:"); ImGui::SameLine(85.0f);
+        ImGui::SetNextItemWidth(110.0f);
+        if (ImGui::InputInt("##SegonInput", &dt.segon, 1, 10)) { dt.Validar(); canviDataSollicitat = true; }
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        if (ImGui::Button("00:00:00", ImVec2(72, 26))) {
+            dt.hora = 0; dt.minut = 0; dt.segon = 0; canviDataSollicitat = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("12:00:00", ImVec2(72, 26))) {
+            dt.hora = 12; dt.minut = 0; dt.segon = 0; canviDataSollicitat = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Ara", ImVec2(50, 26))) {
+            estat.tempsSimulacio.EstablirDataActual(); canviDataSollicitat = true;
+        }
+
+        ImGui::Spacing();
+        if (ImGui::Button("Tancar", ImVec2(206, 26))) {
+            ImGui::CloseCurrentPopup();
+        }
+        PopFontSegur(s_fontPanellRegular);
+        ImGui::EndPopup();
+    }
+
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(2);
+}
+
+static void DibuixarPopupSelectorData(EstatSimulacio& estat, bool& canviDataSollicitat)
+{
+    static const char* nomsMesosComplets[12] = {
+        "Gener", "Febrer", "Març", "Abril", "Maig", "Juny",
+        "Juliol", "Agost", "Setembre", "Octubre", "Novembre", "Desembre"
+    };
+
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, IM_COL32(12, 26, 46, 248));
+    ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(245, 155, 50, 220));
+    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 10.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14.0f, 12.0f));
+
+    if (ImGui::BeginPopup("PopupSelectorData")) {
+        PushFontSegur(s_fontPanellRegular);
+        DataHoraSimulacio& dt = estat.tempsSimulacio.dataHora;
+
+        ImGui::TextColored(ImVec4(1.0f, 0.70f, 0.25f, 1.0f), "SELECCIONAR DATA");
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        if (ImGui::Button("<##MesPrev", ImVec2(26, 26))) {
+            dt.mes--;
+            if (dt.mes < 1) { dt.mes = 12; dt.any--; }
+            dt.Validar();
+            canviDataSollicitat = true;
+        }
         ImGui::SameLine();
 
         ImGui::SetNextItemWidth(105.0f);
         int mesIdx = dt.mes - 1;
-        if (ImGui::Combo("##Mes", &mesIdx, nomsMesos, IM_ARRAYSIZE(nomsMesos))) {
+        if (ImGui::Combo("##MesCombo", &mesIdx, nomsMesosComplets, IM_ARRAYSIZE(nomsMesosComplets))) {
             dt.mes = mesIdx + 1;
             dt.Validar();
             canviDataSollicitat = true;
         }
         ImGui::SameLine();
 
-        ImGui::SetNextItemWidth(65.0f);
-        if (ImGui::InputInt("##Dia", &dt.dia, 1, 5)) { dt.Validar(); canviDataSollicitat = true; }
+        if (ImGui::Button(">##MesSeg", ImVec2(26, 26))) {
+            dt.mes++;
+            if (dt.mes > 12) { dt.mes = 1; dt.any++; }
+            dt.Validar();
+            canviDataSollicitat = true;
+        }
         ImGui::SameLine();
 
-        if (ImGui::Button("Calendari...")) {
-            ImGui::OpenPopup("PopupCalendariMes");
+        ImGui::SetNextItemWidth(86.0f);
+        if (ImGui::InputInt("##AnyInput", &dt.any, 1, 10)) {
+            dt.Validar();
+            canviDataSollicitat = true;
         }
 
-        if (ImGui::BeginPopup("PopupCalendariMes")) {
-            ImGui::TextColored(ImVec4(0.3f, 0.8f, 1.0f, 1.0f), "%s %d", nomsMesos[dt.mes - 1], dt.any);
-            ImGui::Separator();
-            ImGui::TextDisabled(" Dl  Dt  Dc  Dj  Dv  Ds  Dg");
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(0.65f, 0.85f, 0.98f, 1.0f), "  Dl    Dt    Dc    Dj    Dv    Ds    Dg");
 
-            int diesMes = DataHoraSimulacio::DiesAlMes(dt.mes, dt.any);
-            for (int d = 1; d <= diesMes; ++d) {
-                char bId[8];
-                snprintf(bId, sizeof(bId), "%2d", d);
-                if (d == dt.dia) ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(30, 144, 255, 255));
+        int primerDiaSetmana = DataHoraSimulacio::DiaDeLaSetmana(1, dt.mes, dt.any);
+        int diesMes = DataHoraSimulacio::DiesAlMes(dt.mes, dt.any);
 
-                if (ImGui::Button(bId, ImVec2(24, 22))) {
-                    dt.dia = d;
-                    canviDataSollicitat = true;
-                    ImGui::CloseCurrentPopup();
-                }
-                if (d == dt.dia) ImGui::PopStyleColor();
-
-                if (d % 7 != 0 && d < diesMes) ImGui::SameLine();
+        int col = 0;
+        for (int b = 0; b < primerDiaSetmana; ++b) {
+            ImGui::Dummy(ImVec2(32.0f, 24.0f));
+            ImGui::SameLine(0.0f, 4.0f);
+            col++;
+        }
+        for (int d = 1; d <= diesMes; ++d) {
+            char bId[12];
+            snprintf(bId, sizeof(bId), "%d##d%d", d, d);
+            bool actiu = (d == dt.dia);
+            if (actiu) {
+                ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(235, 135, 30, 235));
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(255, 160, 55, 255));
             }
-            ImGui::EndPopup();
+            if (ImGui::Button(bId, ImVec2(32.0f, 24.0f))) {
+                dt.dia = d;
+                dt.Validar();
+                canviDataSollicitat = true;
+                ImGui::CloseCurrentPopup();
+            }
+            if (actiu) ImGui::PopStyleColor(2);
+
+            col++;
+            if (col < 7 && d < diesMes) {
+                ImGui::SameLine(0.0f, 4.0f);
+            } else {
+                col = 0;
+            }
         }
 
-        // SECCIO 2: HORA DE SIMULACIO
         ImGui::Spacing();
-        ImGui::Text("Hora:"); ImGui::SameLine();
-        ImGui::SetNextItemWidth(60.0f);
-        if (ImGui::DragInt("##H", &dt.hora, 0.2f, 0, 23, "%02d h")) { dt.Validar(); canviDataSollicitat = true; }
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(60.0f);
-        if (ImGui::DragInt("##M", &dt.minut, 0.2f, 0, 59, "%02d m")) { dt.Validar(); canviDataSollicitat = true; }
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(60.0f);
-        if (ImGui::DragInt("##S", &dt.segon, 0.2f, 0, 59, "%02d s")) { dt.Validar(); canviDataSollicitat = true; }
-
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Ara")) { estat.tempsSimulacio.EstablirDataActual(); canviDataSollicitat = true; }
-        ImGui::SameLine();
-        if (ImGui::SmallButton("J2000")) { estat.tempsSimulacio.EstablirJ2000(); canviDataSollicitat = true; }
-
-        // SECCIO 3: TRANSPORT I CONTROL DE VELOCITAT (1 min/s a 20 dies/s)
-        ImGui::Spacing();
-        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(100, 200, 255, 255));
-        ImGui::Text("CONTROL DE VELOCITAT (1 min/s - 20 dies/s)");
-        ImGui::PopStyleColor();
         ImGui::Separator();
+        ImGui::Spacing();
 
-        bool esEnrere = (estat.tempsSimulacio.direccioTemps < 0);
-        if (esEnrere) ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(180, 90, 20, 255));
-        if (ImGui::Button("<< Enrere", ImVec2(85, 26))) {
+        if (ImGui::Button("Avui", ImVec2(66, 26))) {
+            estat.tempsSimulacio.EstablirDataActual();
+            canviDataSollicitat = true;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Any 2000", ImVec2(82, 26))) {
+            estat.tempsSimulacio.EstablirJ2000();
+            canviDataSollicitat = true;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Tancar", ImVec2(88, 26))) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        PopFontSegur(s_fontPanellRegular);
+        ImGui::EndPopup();
+    }
+
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor(2);
+}
+
+// =========================================================================
+// 2.3 CONTROL DE TEMPS I VELOCITAT (POP-UP FLOTANT EN MODE ESCALA REAL)
+// =========================================================================
+void InterficieUI::DibuixarPanellDataHoraTimelapse(EstatSimulacio& estat)
+{
+    if (estat.modeActual != ModeSimulacio::ESCALA_REAL || !estat.mostrarPanellTemps) return;
+
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    const float ampleFinestra = 580.0f;
+    const float alcadaFinestra = 382.0f;
+    const float margeViewport = 20.0f;
+
+    ImVec2 posInicial(
+        vp->WorkPos.x + vp->WorkSize.x - ampleFinestra - margeViewport,
+        vp->WorkPos.y + vp->WorkSize.y - alcadaFinestra - margeViewport
+    );
+    if (posInicial.x < vp->WorkPos.x + 8.0f) posInicial.x = vp->WorkPos.x + 8.0f;
+    if (posInicial.y < vp->WorkPos.y + 8.0f) posInicial.y = vp->WorkPos.y + 8.0f;
+
+    ImGui::SetNextWindowPos(posInicial, ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(ampleFinestra, alcadaFinestra), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.90f);
+
+    ImGuiWindowFlags flagsFinestra = ImGuiWindowFlags_NoTitleBar |
+                                     ImGuiWindowFlags_NoResize |
+                                     ImGuiWindowFlags_NoScrollbar |
+                                     ImGuiWindowFlags_NoScrollWithMouse |
+                                     ImGuiWindowFlags_NoCollapse |
+                                     ImGuiWindowFlags_NoSavedSettings;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 14.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(10, 22, 40, 230));
+
+    if (ImGui::Begin("ControlTempsVelocitat##PanellFlotant", &estat.mostrarPanellTemps, flagsFinestra))
+    {
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImVec2 winPos = ImGui::GetWindowPos();
+        ImVec2 winSize = ImGui::GetWindowSize();
+        const float alcadaCapcalera = 42.0f;
+
+        DibuixarMarcFinestraEspacial(dl, winPos, winSize, "CONTROL DE TEMPS I VELOCITAT", &estat.mostrarPanellTemps, "##BotoTancarPanell", alcadaCapcalera);
+
+        DataHoraSimulacio& dt = estat.tempsSimulacio.dataHora;
+        bool canviDataSollicitat = false;
+
+        // -----------------------------------------------------------------
+        // 2. VISOR D'HORA I DATA SIMULADA (RELLOTGE | CAIXA DIGITAL | CALENDARI)
+        // -----------------------------------------------------------------
+        const float yVisor = winPos.y + alcadaCapcalera + 14.0f;
+        const float alcadaCaixa = 66.0f;
+        const float ampleCaixa = 376.0f;
+        const float midaBotoLateral = 50.0f;
+        const float gapVisor = 16.0f;
+        const float ampleTotalVisor = midaBotoLateral * 2.0f + ampleCaixa + gapVisor * 2.0f;
+        const float xIniciVisor = winPos.x + (winSize.x - ampleTotalVisor) * 0.5f;
+        const float yBotoLateral = yVisor + (alcadaCaixa - midaBotoLateral) * 0.5f;
+
+        // Botó esquerra: Icona de rellotge (cian) -> Selector d'hora
+        ImVec2 posRellotge(xIniciVisor, yBotoLateral);
+        ImGui::SetCursorScreenPos(posRellotge);
+        if (ImGui::InvisibleButton("##BotoSelectorHora", ImVec2(midaBotoLateral, midaBotoLateral))) {
+            ImGui::OpenPopup("PopupSelectorHora");
+        }
+        bool hoverRellotge = ImGui::IsItemHovered();
+        bool actiuRellotge = ImGui::IsPopupOpen("PopupSelectorHora");
+        ImU32 bgRellotge = (hoverRellotge || actiuRellotge) ? IM_COL32(20, 58, 92, 235) : IM_COL32(14, 34, 58, 220);
+        ImU32 voraRellotge = (hoverRellotge || actiuRellotge) ? IM_COL32(85, 235, 255, 255) : IM_COL32(45, 195, 245, 210);
+        dl->AddRectFilled(posRellotge, ImVec2(posRellotge.x + midaBotoLateral, posRellotge.y + midaBotoLateral), bgRellotge, 9.0f);
+        dl->AddRect(posRellotge, ImVec2(posRellotge.x + midaBotoLateral, posRellotge.y + midaBotoLateral), voraRellotge, 9.0f, 0, 1.5f);
+        DibuixarIconaRellotge(
+            dl,
+            ImVec2(posRellotge.x + midaBotoLateral * 0.5f, posRellotge.y + midaBotoLateral * 0.5f),
+            13.5f,
+            IM_COL32(65, 225, 255, 255)
+        );
+
+        // Caixa central digital: Etiqueta + HH:MM:SS — DD / Mes / AAAA
+        ImVec2 posCaixa(xIniciVisor + midaBotoLateral + gapVisor, yVisor);
+        ImVec2 maxCaixa(posCaixa.x + ampleCaixa, posCaixa.y + alcadaCaixa);
+        dl->AddRectFilled(posCaixa, maxCaixa, IM_COL32(12, 28, 48, 232), 8.0f);
+        dl->AddRect(posCaixa, maxCaixa, IM_COL32(55, 165, 220, 180), 8.0f, 0, 1.3f);
+
+        PushFontSegur(s_fontPanellPetit);
+        const char* titolVisor = "HORA I DATA SIMULADA";
+        ImVec2 midaTitolVisor = ImGui::CalcTextSize(titolVisor);
+        dl->AddText(
+            ImVec2(posCaixa.x + (ampleCaixa - midaTitolVisor.x) * 0.5f, posCaixa.y + 8.0f),
+            IM_COL32(170, 220, 245, 240),
+            titolVisor
+        );
+        PopFontSegur(s_fontPanellPetit);
+
+        static const char* mesosCurts[12] = {
+            "Gen", "Feb", "Mar", "Abr", "Mai", "Jun",
+            "Jul", "Ago", "Set", "Oct", "Nov", "Des"
+        };
+        int idxMes = dt.mes - 1;
+        if (idxMes < 0 || idxMes >= 12) idxMes = 0;
+
+        char bufDataHora[64];
+        snprintf(bufDataHora, sizeof(bufDataHora),
+                 "%02d:%02d:%02d  —  %02d / %s / %04d",
+                 dt.hora, dt.minut, dt.segon, dt.dia, mesosCurts[idxMes], dt.any);
+
+        PushFontSegur(s_fontPanellDigital);
+        ImVec2 midaDigital = ImGui::CalcTextSize(bufDataHora);
+        dl->AddText(
+            ImVec2(posCaixa.x + (ampleCaixa - midaDigital.x) * 0.5f, posCaixa.y + 28.0f),
+            IM_COL32(240, 248, 255, 255),
+            bufDataHora
+        );
+        PopFontSegur(s_fontPanellDigital);
+
+        // Botó dreta: Icona de calendari (taronja/ambre) -> Selector de data
+        ImVec2 posCalendari(maxCaixa.x + gapVisor, yBotoLateral);
+        ImGui::SetCursorScreenPos(posCalendari);
+        if (ImGui::InvisibleButton("##BotoSelectorData", ImVec2(midaBotoLateral, midaBotoLateral))) {
+            ImGui::OpenPopup("PopupSelectorData");
+        }
+        bool hoverCalendari = ImGui::IsItemHovered();
+        bool actiuCalendari = ImGui::IsPopupOpen("PopupSelectorData");
+        ImU32 bgCalendari = (hoverCalendari || actiuCalendari) ? IM_COL32(62, 42, 22, 235) : IM_COL32(14, 34, 58, 220);
+        ImU32 voraCalendari = (hoverCalendari || actiuCalendari) ? IM_COL32(255, 185, 80, 255) : IM_COL32(240, 150, 50, 210);
+        dl->AddRectFilled(posCalendari, ImVec2(posCalendari.x + midaBotoLateral, posCalendari.y + midaBotoLateral), bgCalendari, 9.0f);
+        dl->AddRect(posCalendari, ImVec2(posCalendari.x + midaBotoLateral, posCalendari.y + midaBotoLateral), voraCalendari, 9.0f, 0, 1.5f);
+        DibuixarIconaCalendari(
+            dl,
+            ImVec2(posCalendari.x + midaBotoLateral * 0.5f, posCalendari.y + midaBotoLateral * 0.5f),
+            24.0f,
+            IM_COL32(250, 165, 55, 255)
+        );
+
+        DibuixarPopupSelectorHora(estat, canviDataSollicitat);
+        DibuixarPopupSelectorData(estat, canviDataSollicitat);
+
+        // -----------------------------------------------------------------
+        // 3. CONTROLS DE REPRODUCCIO (<< | || / > | >>)
+        // -----------------------------------------------------------------
+        const float ySecRepro = yVisor + alcadaCaixa + 14.0f;
+        PushFontSegur(s_fontPanellPetit);
+        const char* titolRepro = "CONTROLS DE REPRODUCCIÓ";
+        ImVec2 midaTitolRepro = ImGui::CalcTextSize(titolRepro);
+        dl->AddText(
+            ImVec2(winPos.x + (winSize.x - midaTitolRepro.x) * 0.5f, ySecRepro),
+            IM_COL32(190, 228, 250, 245),
+            titolRepro
+        );
+        PopFontSegur(s_fontPanellPetit);
+
+        const float yBotonsRepro = ySecRepro + 22.0f;
+        const float wSideBtn = 56.0f;
+        const float hSideBtn = 42.0f;
+        const float wCenterBtn = 96.0f;
+        const float hCenterBtn = 46.0f;
+        const float gapRepro = 16.0f;
+        const float ampleRepro = wSideBtn * 2.0f + wCenterBtn + gapRepro * 2.0f;
+        const float xIniciRepro = winPos.x + (winSize.x - ampleRepro) * 0.5f;
+
+        bool esEnrereActiu = (!estat.tempsSimulacio.enPausa && estat.tempsSimulacio.direccioTemps < 0);
+        bool esEndavantActiu = (!estat.tempsSimulacio.enPausa && estat.tempsSimulacio.direccioTemps > 0);
+
+        // Botó 1: Doble fletxa enrere (<<)
+        ImVec2 posEnrere(xIniciRepro, yBotonsRepro + (hCenterBtn - hSideBtn) * 0.5f);
+        ImGui::SetCursorScreenPos(posEnrere);
+        if (ImGui::InvisibleButton("##BotoRebobinar", ImVec2(wSideBtn, hSideBtn))) {
             estat.tempsSimulacio.direccioTemps = -1;
             estat.tempsSimulacio.enPausa = false;
         }
-        if (esEnrere) ImGui::PopStyleColor();
-        ImGui::SameLine();
+        bool hoverEnrere = ImGui::IsItemHovered();
+        ImU32 bgEnrere = esEnrereActiu
+            ? IM_COL32(48, 38, 28, 235)
+            : (hoverEnrere ? IM_COL32(28, 54, 88, 235) : IM_COL32(16, 36, 62, 220));
+        ImU32 voraEnrere = esEnrereActiu
+            ? IM_COL32(255, 165, 55, 240)
+            : (hoverEnrere ? IM_COL32(95, 200, 255, 215) : IM_COL32(55, 145, 205, 175));
+        dl->AddRectFilled(posEnrere, ImVec2(posEnrere.x + wSideBtn, posEnrere.y + hSideBtn), bgEnrere, 8.0f);
+        dl->AddRect(posEnrere, ImVec2(posEnrere.x + wSideBtn, posEnrere.y + hSideBtn), voraEnrere, 8.0f, 0, 1.4f);
+        DibuixarIconaFletxesDobles(
+            dl,
+            ImVec2(posEnrere.x + wSideBtn * 0.5f, posEnrere.y + hSideBtn * 0.5f),
+            20.0f,
+            -1,
+            IM_COL32(255, 150, 45, 255)
+        );
 
-        if (estat.tempsSimulacio.enPausa) {
-            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(30, 150, 60, 255));
-            if (ImGui::Button("Reproduir", ImVec2(95, 26))) {
-                estat.tempsSimulacio.enPausa = false;
-            }
-            ImGui::PopStyleColor();
-        } else {
-            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(190, 50, 50, 255));
-            if (ImGui::Button("Pausa", ImVec2(95, 26))) {
-                estat.tempsSimulacio.enPausa = true;
-            }
-            ImGui::PopStyleColor();
+        // Botó 2: Combinat Pausa / Repren ("|| / >") amb vora ressaltada verd/cian
+        ImVec2 posPausaPlay(xIniciRepro + wSideBtn + gapRepro, yBotonsRepro);
+        ImGui::SetCursorScreenPos(posPausaPlay);
+        if (ImGui::InvisibleButton("##BotoPausaRepren", ImVec2(wCenterBtn, hCenterBtn))) {
+            estat.tempsSimulacio.enPausa = !estat.tempsSimulacio.enPausa;
         }
-        ImGui::SameLine();
+        bool hoverPausaPlay = ImGui::IsItemHovered();
+        dl->AddRect(
+            ImVec2(posPausaPlay.x - 2.0f, posPausaPlay.y - 2.0f),
+            ImVec2(posPausaPlay.x + wCenterBtn + 2.0f, posPausaPlay.y + hCenterBtn + 2.0f),
+            IM_COL32(45, 235, 180, hoverPausaPlay ? 70 : 38),
+            10.0f, 0, 2.5f
+        );
+        ImU32 bgPausaPlay = hoverPausaPlay ? IM_COL32(22, 68, 76, 238) : IM_COL32(16, 48, 60, 225);
+        dl->AddRectFilled(posPausaPlay, ImVec2(posPausaPlay.x + wCenterBtn, posPausaPlay.y + hCenterBtn), bgPausaPlay, 9.0f);
+        dl->AddRect(posPausaPlay, ImVec2(posPausaPlay.x + wCenterBtn, posPausaPlay.y + hCenterBtn), IM_COL32(55, 238, 180, 240), 9.0f, 0, 1.8f);
+        DibuixarIconaPausaReproduccio(
+            dl,
+            ImVec2(posPausaPlay.x + wCenterBtn * 0.5f, posPausaPlay.y + hCenterBtn * 0.5f),
+            hCenterBtn,
+            estat.tempsSimulacio.enPausa
+        );
 
-        bool esEndavant = (estat.tempsSimulacio.direccioTemps > 0 && !estat.tempsSimulacio.enPausa);
-        if (esEndavant) ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(30, 120, 200, 255));
-        if (ImGui::Button("Endavant >>", ImVec2(95, 26))) {
+        // Botó 3: Doble fletxa endavant (>>)
+        ImVec2 posEndavant(posPausaPlay.x + wCenterBtn + gapRepro, yBotonsRepro + (hCenterBtn - hSideBtn) * 0.5f);
+        ImGui::SetCursorScreenPos(posEndavant);
+        if (ImGui::InvisibleButton("##BotoEndavant", ImVec2(wSideBtn, hSideBtn))) {
             estat.tempsSimulacio.direccioTemps = 1;
             estat.tempsSimulacio.enPausa = false;
         }
-        if (esEndavant) ImGui::PopStyleColor();
-        ImGui::SameLine();
+        bool hoverEndavant = ImGui::IsItemHovered();
+        ImU32 bgEndavant = esEndavantActiu
+            ? IM_COL32(48, 38, 28, 235)
+            : (hoverEndavant ? IM_COL32(28, 54, 88, 235) : IM_COL32(16, 36, 62, 220));
+        ImU32 voraEndavant = esEndavantActiu
+            ? IM_COL32(255, 165, 55, 240)
+            : (hoverEndavant ? IM_COL32(95, 200, 255, 215) : IM_COL32(55, 145, 205, 175));
+        dl->AddRectFilled(posEndavant, ImVec2(posEndavant.x + wSideBtn, posEndavant.y + hSideBtn), bgEndavant, 8.0f);
+        dl->AddRect(posEndavant, ImVec2(posEndavant.x + wSideBtn, posEndavant.y + hSideBtn), voraEndavant, 8.0f, 0, 1.4f);
+        DibuixarIconaFletxesDobles(
+            dl,
+            ImVec2(posEndavant.x + wSideBtn * 0.5f, posEndavant.y + hSideBtn * 0.5f),
+            20.0f,
+            +1,
+            IM_COL32(255, 150, 45, 255)
+        );
 
-        if (ImGui::Button("-", ImVec2(30, 26))) {
-            estat.tempsSimulacio.ReduirVelocitat();
+        // -----------------------------------------------------------------
+        // 4. CONTROL LLISCANT (SLIDER) DE VELOCITAT
+        // -----------------------------------------------------------------
+        const float ySecSlider = yBotonsRepro + hCenterBtn + 14.0f;
+        PushFontSegur(s_fontPanellPetit);
+        const char* titolSlider = "VELOCITAT DE LA SIMULACIÓ";
+        ImVec2 midaTitolSlider = ImGui::CalcTextSize(titolSlider);
+        dl->AddText(
+            ImVec2(winPos.x + (winSize.x - midaTitolSlider.x) * 0.5f, ySecSlider),
+            IM_COL32(190, 228, 250, 245),
+            titolSlider
+        );
+        PopFontSegur(s_fontPanellPetit);
+
+        const float ampleTrack = 456.0f;
+        const float alcadaTrack = 9.0f;
+        const float alcadaHitSlider = 26.0f;
+        const float xTrack = winPos.x + (winSize.x - ampleTrack) * 0.5f;
+        const float yTrackCenter = ySecSlider + 30.0f;
+        ImVec2 trackMin(xTrack, yTrackCenter - alcadaTrack * 0.5f);
+        ImVec2 trackMax(xTrack + ampleTrack, yTrackCenter + alcadaTrack * 0.5f);
+
+        ImGui::SetCursorScreenPos(ImVec2(xTrack - 8.0f, yTrackCenter - alcadaHitSlider * 0.5f));
+        ImGui::InvisibleButton("##SliderVelocitatGrad", ImVec2(ampleTrack + 16.0f, alcadaHitSlider));
+        if (ImGui::IsItemActive()) {
+            float mouseX = ImGui::GetIO().MousePos.x;
+            float uNou = (mouseX - xTrack) / ampleTrack;
+            if (uNou < 0.0f) uNou = 0.0f;
+            if (uNou > 1.0f) uNou = 1.0f;
+            estat.tempsSimulacio.factorVelocitatSegonsPerSegon = NormalitzatAVelocitat(uNou);
         }
-        ImGui::SameLine();
-        if (ImGui::Button("+", ImVec2(30, 26))) {
-            estat.tempsSimulacio.AugmentarVelocitat();
+        bool hoverSlider = ImGui::IsItemHovered() || ImGui::IsItemActive();
+
+        float uActual = VelocitatANormalitzat(estat.tempsSimulacio.factorVelocitatSegonsPerSegon);
+        float thumbX = xTrack + uActual * ampleTrack;
+
+        // Fons fosc de la barra
+        dl->AddRectFilled(trackMin, trackMax, IM_COL32(12, 26, 46, 235), 4.5f);
+
+        // Omplert actiu degradat de cian (esquerra) cap a taronja/ambre (dreta)
+        if (thumbX > trackMin.x + 1.0f) {
+            ImU32 colCian = IM_COL32(35, 228, 255, 235);
+            ImU32 colAmbre = IM_COL32(248, 155, 48, 235);
+            ImU32 colThumb = InterpolarColor(colCian, colAmbre, uActual);
+            dl->PushClipRect(trackMin, ImVec2(thumbX, trackMax.y), true);
+            dl->AddRectFilledMultiColor(
+                trackMin,
+                ImVec2(thumbX, trackMax.y),
+                colCian, colThumb, colThumb, colCian
+            );
+            dl->PopClipRect();
         }
 
-        float velActual = (float)estat.tempsSimulacio.factorVelocitatSegonsPerSegon;
-        char bufferFormatVel[32];
-        if (velActual < 3600.0f) {
-            snprintf(bufferFormatVel, sizeof(bufferFormatVel), "%.1f min/s", velActual / 60.0f);
-        } else if (velActual < 86400.0f) {
-            snprintf(bufferFormatVel, sizeof(bufferFormatVel), "%.2f hores/s", velActual / 3600.0f);
-        } else {
-            snprintf(bufferFormatVel, sizeof(bufferFormatVel), "%.2f dies/s", velActual / 86400.0f);
+        // Vora bicolor (cian a l'esquerra del tirador, taronja/ambre a la dreta)
+        if (thumbX > trackMin.x + 1.0f) {
+            dl->PushClipRect(ImVec2(trackMin.x - 1.0f, trackMin.y - 1.0f), ImVec2(thumbX, trackMax.y + 1.0f), true);
+            dl->AddRect(trackMin, trackMax, IM_COL32(60, 230, 255, 235), 4.5f, 0, 1.4f);
+            dl->PopClipRect();
+        }
+        if (thumbX < trackMax.x - 1.0f) {
+            dl->PushClipRect(ImVec2(thumbX, trackMin.y - 1.0f), ImVec2(trackMax.x + 1.0f, trackMax.y + 1.0f), true);
+            dl->AddRect(trackMin, trackMax, IM_COL32(238, 148, 48, 225), 4.5f, 0, 1.4f);
+            dl->PopClipRect();
         }
 
-        ImGui::Text("Velocitat simulada:");
-        ImGui::SetNextItemWidth(ampleFinestra - 30.0f);
-        if (ImGui::SliderFloat("##SliderVelocitat", &velActual, 60.0f, 1728000.0f, bufferFormatVel, ImGuiSliderFlags_Logarithmic)) {
-            estat.tempsSimulacio.factorVelocitatSegonsPerSegon = (double)velActual;
-        }
+        // Marques i etiquetes de l'escala
+        PushFontSegur(s_fontPanellPetit);
+        for (int i = 0; i < kNumMarquesSlider; ++i) {
+            float tx = xTrack + kPosMarques[i] * ampleTrack;
+            ImU32 colMarca = (kPosMarques[i] <= uActual + 0.001f)
+                ? IM_COL32(165, 238, 255, 240)
+                : IM_COL32(150, 185, 215, 200);
+            if (i >= 2 && std::fabs(kPosMarques[i] - uActual) < 0.03f) {
+                colMarca = IM_COL32(255, 180, 80, 255);
+            }
+            dl->AddLine(ImVec2(tx, trackMax.y + 3.0f), ImVec2(tx, trackMax.y + 8.0f), colMarca, 1.3f);
 
-        ImGui::TextDisabled("Valors fixos:");
-        if (ImGui::SmallButton("1 min/s"))  estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 60.0;
-        ImGui::SameLine();
-        if (ImGui::SmallButton("1 hora/s")) estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 3600.0;
-        ImGui::SameLine();
-        if (ImGui::SmallButton("1 dia/s"))  estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 86400.0;
-        ImGui::SameLine();
-        if (ImGui::SmallButton("5 dies/s")) estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 432000.0;
-        ImGui::SameLine();
-        if (ImGui::SmallButton("20 dies/s (Max)")) estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 1728000.0;
-
-        ImGui::Spacing();
-        ImGui::Separator();
-        if (estat.tempsSimulacio.enPausa) {
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Estat: SIMULACIO PAUSADA");
-        } else {
-            ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.5f, 1.0f), 
-                "Estat: %s a %s", 
-                esEnrere ? "REBOBINANT (Enrere)" : "AVANCANT (Endavant)", 
-                bufferFormatVel);
+            ImVec2 mTxt = ImGui::CalcTextSize(kEtiquetesMarques[i]);
+            float xTxt = tx - mTxt.x * 0.5f;
+            dl->AddText(ImVec2(xTxt, trackMax.y + 10.0f), colMarca, kEtiquetesMarques[i]);
         }
+        PopFontSegur(s_fontPanellPetit);
+
+        // Tirador vertical translúcid
+        const float wThumb = 14.0f;
+        const float hThumb = 24.0f;
+        ImVec2 thumbMin(thumbX - wThumb * 0.5f, yTrackCenter - hThumb * 0.5f);
+        ImVec2 thumbMax(thumbX + wThumb * 0.5f, yTrackCenter + hThumb * 0.5f);
+        dl->AddRect(
+            ImVec2(thumbMin.x - 1.5f, thumbMin.y - 1.5f),
+            ImVec2(thumbMax.x + 1.5f, thumbMax.y + 1.5f),
+            IM_COL32(95, 230, 255, hoverSlider ? 95 : 48),
+            5.0f, 0, 2.0f
+        );
+        dl->AddRectFilled(thumbMin, thumbMax, IM_COL32(170, 235, 255, hoverSlider ? 150 : 115), 4.5f);
+        dl->AddRect(thumbMin, thumbMax, IM_COL32(205, 248, 255, 245), 4.5f, 0, 1.5f);
+
+        // -----------------------------------------------------------------
+        // 5. DRECERES DE VELOCITAT (3 BOTONS RECTANGULARS)
+        // -----------------------------------------------------------------
+        const float ySecDreceres = yTrackCenter + 34.0f;
+        PushFontSegur(s_fontPanellPetit);
+        const char* titolDreceres = "DRECERES DE VELOCITAT";
+        ImVec2 midaTitolDreceres = ImGui::CalcTextSize(titolDreceres);
+        dl->AddText(
+            ImVec2(winPos.x + (winSize.x - midaTitolDreceres.x) * 0.5f, ySecDreceres),
+            IM_COL32(190, 228, 250, 245),
+            titolDreceres
+        );
+        PopFontSegur(s_fontPanellPetit);
+
+        struct DreceraVel {
+            const char* etiqueta;
+            double valorSegons;
+        };
+        static const DreceraVel kDreceres[3] = {
+            { "1 HORA / S", 3600.0 },
+            { "1 DIA / S",  86400.0 },
+            { "20 DIES / S", 1728000.0 }
+        };
+
+        const float yBotonsDrecera = ySecDreceres + 22.0f;
+        const float wDrecera = 148.0f;
+        const float hDrecera = 32.0f;
+        const float gapDrecera = 14.0f;
+        const float ampleDreceres = wDrecera * 3.0f + gapDrecera * 2.0f;
+        const float xIniciDreceres = winPos.x + (winSize.x - ampleDreceres) * 0.5f;
+
+        PushFontSegur(s_fontPanellRegular);
+        for (int i = 0; i < 3; ++i) {
+            ImVec2 pBtn(xIniciDreceres + i * (wDrecera + gapDrecera), yBotonsDrecera);
+            ImVec2 pBtnMax(pBtn.x + wDrecera, pBtn.y + hDrecera);
+
+            char btnId[32];
+            snprintf(btnId, sizeof(btnId), "##DreceraVel%d", i);
+            ImGui::SetCursorScreenPos(pBtn);
+            if (ImGui::InvisibleButton(btnId, ImVec2(wDrecera, hDrecera))) {
+                estat.tempsSimulacio.factorVelocitatSegonsPerSegon = kDreceres[i].valorSegons;
+            }
+
+            bool hoverBtn = ImGui::IsItemHovered();
+            double diffRel = std::fabs(estat.tempsSimulacio.factorVelocitatSegonsPerSegon - kDreceres[i].valorSegons) / kDreceres[i].valorSegons;
+            bool actiuBtn = (diffRel < 0.015);
+
+            ImU32 bgBtn = actiuBtn
+                ? IM_COL32(26, 72, 112, 235)
+                : (hoverBtn ? IM_COL32(24, 54, 88, 230) : IM_COL32(14, 34, 58, 215));
+            ImU32 voraBtn = actiuBtn
+                ? IM_COL32(75, 225, 255, 245)
+                : (hoverBtn ? IM_COL32(80, 190, 245, 210) : IM_COL32(55, 140, 200, 175));
+
+            dl->AddRectFilled(pBtn, pBtnMax, bgBtn, 7.0f);
+            dl->AddRect(pBtn, pBtnMax, voraBtn, 7.0f, 0, actiuBtn ? 1.6f : 1.2f);
+
+            ImVec2 mTxt = ImGui::CalcTextSize(kDreceres[i].etiqueta);
+            dl->AddText(
+                ImVec2(pBtn.x + (wDrecera - mTxt.x) * 0.5f, pBtn.y + (hDrecera - mTxt.y) * 0.5f),
+                actiuBtn ? IM_COL32(255, 255, 255, 255) : IM_COL32(220, 240, 255, 245),
+                kDreceres[i].etiqueta
+            );
+        }
+        PopFontSegur(s_fontPanellRegular);
+
+        // -----------------------------------------------------------------
+        // 6. INDICADOR D'ESTAT INFERIOR (FOOTER)
+        // -----------------------------------------------------------------
+        char bufFooter[128];
+        FormatarVelocitatActual(
+            estat.tempsSimulacio.factorVelocitatSegonsPerSegon,
+            estat.tempsSimulacio.enPausa,
+            estat.tempsSimulacio.direccioTemps,
+            bufFooter,
+            sizeof(bufFooter)
+        );
+
+        PushFontSegur(s_fontPanellRegular);
+        ImVec2 midaFooter = ImGui::CalcTextSize(bufFooter);
+        const float yFooter = winPos.y + winSize.y - midaFooter.y - 16.0f;
+        dl->AddText(
+            ImVec2(winPos.x + (winSize.x - midaFooter.x) * 0.5f, yFooter),
+            IM_COL32(232, 246, 255, 255),
+            bufFooter
+        );
+        PopFontSegur(s_fontPanellRegular);
 
         if (canviDataSollicitat) {
             estat.recalculEfemeridesNecessari = true;
         }
     }
     ImGui::End();
+
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(3);
 }
 
 // =========================================================================
-// 2.6 PANELL D'INFORMACIO I TELEMETRIA ASTRONOMICA (HUD FLOTANT)
+// 2.6 FITXA DE L'ASTRE (HUD FLOTANT)
 // =========================================================================
 void InterficieUI::DibuixarFitxaAstronomicaHUD(const CosAstronomicDades& dades, bool* pObert)
 {
     if (!pObert || !*pObert) return;
 
     const ImGuiViewport* vp = ImGui::GetMainViewport();
-    ImVec2 pos(vp->WorkPos.x + vp->WorkSize.x - 330.0f, vp->WorkPos.y + 40.0f);
+    const float ampleFinestra = 340.0f;
+    const float alcadaFinestra = 276.0f;
+
+    ImVec2 pos(vp->WorkPos.x + vp->WorkSize.x - ampleFinestra - 20.0f, vp->WorkPos.y + 44.0f);
     ImGui::SetNextWindowPos(pos, ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(310.0f, 290.0f), ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.85f);
+    ImGui::SetNextWindowSize(ImVec2(ampleFinestra, alcadaFinestra), ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.90f);
 
-    if (ImGui::Begin("Fitxa Astronomica##HUD", pObert, ImGuiWindowFlags_NoResize))
+    ImGuiWindowFlags flagsFinestra = ImGuiWindowFlags_NoTitleBar |
+                                     ImGuiWindowFlags_NoResize |
+                                     ImGuiWindowFlags_NoScrollbar |
+                                     ImGuiWindowFlags_NoScrollWithMouse |
+                                     ImGuiWindowFlags_NoCollapse |
+                                     ImGuiWindowFlags_NoSavedSettings;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 14.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(10, 22, 40, 230));
+
+    if (ImGui::Begin("FitxaAstre##HUD", pObert, flagsFinestra))
     {
-        ImGui::TextColored(ImVec4(0.3f, 0.85f, 1.0f, 1.0f), "%s", dades.nom.c_str());
-        ImGui::Separator();
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImVec2 winPos = ImGui::GetWindowPos();
+        ImVec2 winSize = ImGui::GetWindowSize();
+        const float alcadaCapcalera = 42.0f;
 
-        ImGui::Text("Radi equatorial:");       ImGui::SameLine(175); ImGui::Text("%.1f km", dades.radiKm);
-        ImGui::Text("Distancia al Sol:");      ImGui::SameLine(175); ImGui::Text("%.3f UA", dades.distSolUA);
-        ImGui::Text("Gravetat superficial:");  ImGui::SameLine(175); ImGui::Text("%.2f m/s2", dades.gravetat);
-        ImGui::Text("Periode de rotacio:");    ImGui::SameLine(175); ImGui::Text("%.2f h", dades.periodeRotacioHores);
-        ImGui::Text("Periode orbital:");       ImGui::SameLine(175); ImGui::Text("%.2f anys", dades.periodeOrbitalAnys);
-        
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::TextDisabled("Dades fisiques del cataleg del sistema");
+        DibuixarMarcFinestraEspacial(dl, winPos, winSize, "FITXA DE L'ASTRE", pObert, "##TancarFitxaAstre", alcadaCapcalera);
+
+        // Nom de l'astre destacat
+        PushFontSegur(s_fontPanellTitol);
+        ImVec2 midaNom = ImGui::CalcTextSize(dades.nom.c_str());
+        dl->AddText(
+            ImVec2(winPos.x + (winSize.x - midaNom.x) * 0.5f, winPos.y + alcadaCapcalera + 12.0f),
+            IM_COL32(105, 225, 255, 255),
+            dades.nom.c_str()
+        );
+        PopFontSegur(s_fontPanellTitol);
+
+        // Caixa interior de dades simples
+        const float padLat = 18.0f;
+        ImVec2 caixaMin(winPos.x + padLat, winPos.y + alcadaCapcalera + 42.0f);
+        ImVec2 caixaMax(winPos.x + winSize.x - padLat, winPos.y + winSize.y - 18.0f);
+        dl->AddRectFilled(caixaMin, caixaMax, IM_COL32(12, 28, 48, 232), 9.0f);
+        dl->AddRect(caixaMin, caixaMax, IM_COL32(55, 165, 220, 165), 9.0f, 0, 1.2f);
+
+        char valRadi[48], valDist[48], valGrav[48], valDia[48], valAny[48];
+        snprintf(valRadi, sizeof(valRadi), "%.0f km", dades.radiKm);
+        if (dades.distSolUA <= 0.0001) {
+            snprintf(valDist, sizeof(valDist), "Centre del sistema");
+        } else {
+            snprintf(valDist, sizeof(valDist), "%.2f UA", dades.distSolUA);
+        }
+        snprintf(valGrav, sizeof(valGrav), "%.1f m/s²", dades.gravetat);
+        snprintf(valDia, sizeof(valDia), "%.1f h", dades.periodeRotacioHores);
+        if (dades.periodeOrbitalAnys <= 0.0001) {
+            snprintf(valAny, sizeof(valAny), "—");
+        } else {
+            snprintf(valAny, sizeof(valAny), "%.2f anys", dades.periodeOrbitalAnys);
+        }
+
+        struct FilaDada {
+            const char* etiqueta;
+            const char* valor;
+        };
+        FilaDada files[5] = {
+            { "Radi:",            valRadi },
+            { "Distància al Sol:", valDist },
+            { "Gravetat:",        valGrav },
+            { "Durada del dia:",  valDia },
+            { "Volta al Sol:",    valAny }
+        };
+
+        PushFontSegur(s_fontPanellRegular);
+        float startY = caixaMin.y + 15.0f;
+        float pasY = 34.0f;
+        for (int i = 0; i < 5; ++i) {
+            float y = startY + i * pasY;
+            dl->AddText(ImVec2(caixaMin.x + 16.0f, y), IM_COL32(175, 218, 245, 240), files[i].etiqueta);
+            ImVec2 mVal = ImGui::CalcTextSize(files[i].valor);
+            dl->AddText(ImVec2(caixaMax.x - mVal.x - 16.0f, y), IM_COL32(242, 249, 255, 255), files[i].valor);
+            if (i < 4) {
+                dl->AddLine(
+                    ImVec2(caixaMin.x + 14.0f, y + 25.0f),
+                    ImVec2(caixaMax.x - 14.0f, y + 25.0f),
+                    IM_COL32(45, 110, 165, 75),
+                    1.0f
+                );
+            }
+        }
+        PopFontSegur(s_fontPanellRegular);
     }
     ImGui::End();
+
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(3);
 }
 
 // =========================================================================

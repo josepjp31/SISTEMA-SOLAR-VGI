@@ -1,4 +1,4 @@
-
+﻿
 //******** PRACTICA VISUALITZACIÓ GRÀFICA INTERACTIVA (Escola Enginyeria - UAB)
 //******** Entorn bàsic VS2026 MONOFINESTRA amb OpenGL 4.6, interfície GLFW 3.4, ImGui i llibreries GLM
 //******** Ferran Poveda, Marc Vivet, Carme Julià, Débora Gil, Enric Martí (Setembre 2026)
@@ -1146,7 +1146,7 @@ void draw_Menu_ImGui()
 		escenariActual->m_objectList != nullptr)
 	{
 		static const char* nomsEtiquetes[9] = {
-			"Sol", "Mercuri", "Venus", "Terra", "Mart", "Jupiter", "Saturn", "Ura", "Neptu"
+			"Sol", "Mercuri", "Venus", "Terra", "Mart", "Júpiter", "Saturn", "Urà", "Neptú"
 		};
 		glm::vec4 viewport(0.0f, 0.0f, (float)w, (float)h);
 		for (int i = 0; i < 9; i++)
@@ -7222,7 +7222,7 @@ int main()
 #endif
 
 	// Create a windowed mode window and its OpenGL context */
-	window = glfwCreateWindow(1280, 720, "Entorn Grafic VS2022 amb GLFW i OpenGL 4.6 (Visualitzacio Grafica Interactiva - Grau en Enginyeria Informatica - Escola Enginyeria - UAB)", NULL, NULL);
+	window = glfwCreateWindow(1280, 720, "Entorn Gràfic VS2022 amb GLFW i OpenGL 4.6 (Visualització Gràfica Interactiva - Grau en Enginyeria Informàtica - Escola Enginyeria - UAB)", NULL, NULL);
 	if (!window)
 	{
 		fprintf(stderr, "Failed to open GLFW window. If you have an Intel GPU, they are not 4.6 compatible. Try the 2.1 version of the tutorials.\n");
