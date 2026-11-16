@@ -80,8 +80,6 @@ void InitGL()
 	oProjeccio = 3;		// ImGui: Variable que controla desplegable TIPUS PROJECCIO d'ImGui (opció Perspectiva)
 	ProjectionMatrix = glm::mat4(1.0);	// Inicialitzar matriu a identitat
 	objecte = CAP;		// objecte = TETERA;
-	//cos solar
-	cosSolar = -1;
 	oObjecte = 0;		// ImGui: Variable que controla desplegable TIPUS OBJECTE d'ImGui (opció cap objecte)
 
 	// Entorn VGI: Variables de control Skybox Cube
@@ -433,94 +431,6 @@ void InitGL()
 }
 
 
-void InitAPI()
-{
-	// Vendor, Renderer, Version, Shading Laguage Version i Extensions suportades per la placa gràfica gravades en fitxer extensions.txt
-	std::string nomf = "extensions.txt";
-	char const* nomExt = "";
-	const char* nomfitxer;
-	nomfitxer = nomf.c_str();	// Conversió tipus string --> char *
-	int num_Ext;
-
-	char* str = (char*)glGetString(GL_VENDOR);
-	FILE* f = fopen(nomfitxer, "w");
-	if (f) {
-		fprintf(f, "VENDOR: %s\n", str);
-		fprintf(stderr, "VENDOR: %s\n", str);
-		str = (char*)glGetString(GL_RENDERER);
-		fprintf(f, "RENDERER: %s\n", str);
-		fprintf(stderr, "RENDERER: %s\n", str);
-		str = (char*)glGetString(GL_VERSION);
-		fprintf(f, "VERSION: %s\n", str);
-		fprintf(stderr, "VERSION: %s\n", str);
-		str = (char*)glGetString(GL_SHADING_LANGUAGE_VERSION);
-		fprintf(f, "SHADING_LANGUAGE_VERSION: %s\n", str);
-		fprintf(stderr, "SHADING_LANGUAGE_VERSION: %s\n", str);
-		glGetIntegerv(GL_NUM_EXTENSIONS, &num_Ext);
-		fprintf(f, "EXTENSIONS: \n");
-		fprintf(stderr, "EXTENSIONS: \n");
-		for (int i = 0; i < num_Ext; i++)
-		{
-			nomExt = (char const*)glGetStringi(GL_EXTENSIONS, i);
-			fprintf(f, "%s \n", nomExt);
-			//fprintf(stderr, "%s", nomExt);	// Displaiar extensions per pantalla
-		}
-		//fprintf(stderr, "\n");				// Displaiar <cr> per pantalla després extensions
-//				str = (char*)glGetString(GL_EXTENSIONS);
-//				fprintf(f, "EXTENSIONS: %s\n", str);
-				//fprintf(stderr, "EXTENSIONS: %s\n", str);
-		fclose(f);
-	}
-
-	// Program
-	glCreateProgram = (PFNGLCREATEPROGRAMPROC)wglGetProcAddress("glCreateProgram");
-	glDeleteProgram = (PFNGLDELETEPROGRAMPROC)wglGetProcAddress("glDeleteProgram");
-	glUseProgram = (PFNGLUSEPROGRAMPROC)wglGetProcAddress("glUseProgram");
-	glAttachShader = (PFNGLATTACHSHADERPROC)wglGetProcAddress("glAttachShader");
-	glDetachShader = (PFNGLDETACHSHADERPROC)wglGetProcAddress("glDetachShader");
-	glLinkProgram = (PFNGLLINKPROGRAMPROC)wglGetProcAddress("glLinkProgram");
-	glGetProgramiv = (PFNGLGETPROGRAMIVPROC)wglGetProcAddress("glGetProgramiv");
-	glGetShaderInfoLog = (PFNGLGETSHADERINFOLOGPROC)wglGetProcAddress("glGetShaderInfoLog");
-	glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC)wglGetProcAddress("glGetUniformLocation");
-	glUniform1i = (PFNGLUNIFORM1IPROC)wglGetProcAddress("glUniform1i");
-	glUniform1iv = (PFNGLUNIFORM1IVPROC)wglGetProcAddress("glUniform1iv");
-	glUniform2iv = (PFNGLUNIFORM2IVPROC)wglGetProcAddress("glUniform2iv");
-	glUniform3iv = (PFNGLUNIFORM3IVPROC)wglGetProcAddress("glUniform3iv");
-	glUniform4iv = (PFNGLUNIFORM4IVPROC)wglGetProcAddress("glUniform4iv");
-	glUniform1f = (PFNGLUNIFORM1FPROC)wglGetProcAddress("glUniform1f");
-	glUniform1fv = (PFNGLUNIFORM1FVPROC)wglGetProcAddress("glUniform1fv");
-	glUniform2fv = (PFNGLUNIFORM2FVPROC)wglGetProcAddress("glUniform2fv");
-	glUniform3fv = (PFNGLUNIFORM3FVPROC)wglGetProcAddress("glUniform3fv");
-	glUniform4fv = (PFNGLUNIFORM4FVPROC)wglGetProcAddress("glUniform4fv");
-	glUniformMatrix4fv = (PFNGLUNIFORMMATRIX4FVPROC)wglGetProcAddress("glUniformMatrix4fv");
-	glGetAttribLocation = (PFNGLGETATTRIBLOCATIONPROC)wglGetProcAddress("glGetAttribLocation");
-	glVertexAttrib1f = (PFNGLVERTEXATTRIB1FPROC)wglGetProcAddress("glVertexAttrib1f");
-	glVertexAttrib1fv = (PFNGLVERTEXATTRIB1FVPROC)wglGetProcAddress("glVertexAttrib1fv");
-	glVertexAttrib2fv = (PFNGLVERTEXATTRIB2FVPROC)wglGetProcAddress("glVertexAttrib2fv");
-	glVertexAttrib3fv = (PFNGLVERTEXATTRIB3FVPROC)wglGetProcAddress("glVertexAttrib3fv");
-	glVertexAttrib4fv = (PFNGLVERTEXATTRIB4FVPROC)wglGetProcAddress("glVertexAttrib4fv");
-	glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC)wglGetProcAddress("glEnableVertexAttribArray");
-	glDisableVertexAttribArray = (PFNGLDISABLEVERTEXATTRIBARRAYPROC)wglGetProcAddress("glDisableVertexAttribArray");
-	glBindAttribLocation = (PFNGLBINDATTRIBLOCATIONPROC)wglGetProcAddress("glBindAttribLocation");
-	glGetActiveUniform = (PFNGLGETACTIVEUNIFORMPROC)wglGetProcAddress("glGetActiveUniform");
-
-	// Shader
-	glCreateShader = (PFNGLCREATESHADERPROC)wglGetProcAddress("glCreateShader");
-	glDeleteShader = (PFNGLDELETESHADERPROC)wglGetProcAddress("glDeleteShader");
-	glShaderSource = (PFNGLSHADERSOURCEPROC)wglGetProcAddress("glShaderSource");
-	glCompileShader = (PFNGLCOMPILESHADERPROC)wglGetProcAddress("glCompileShader");
-	glGetShaderiv = (PFNGLGETSHADERIVPROC)wglGetProcAddress("glGetShaderiv");
-
-	// VBO
-	glGenBuffers = (PFNGLGENBUFFERSPROC)wglGetProcAddress("glGenBuffers");
-	glBindBuffer = (PFNGLBINDBUFFERPROC)wglGetProcAddress("glBindBuffer");
-	glBufferData = (PFNGLBUFFERDATAPROC)wglGetProcAddress("glBufferData");
-	glBufferSubData = (PFNGLBUFFERSUBDATAPROC)wglGetProcAddress("glBufferSubData");
-	glDeleteBuffers = (PFNGLDELETEBUFFERSPROC)wglGetProcAddress("glDeleteBuffers");
-	glVertexAttribPointer = (PFNGLVERTEXATTRIBPOINTERPROC)wglGetProcAddress("glVertexAttribPointer");
-}
-
-
 void GetGLVersion(int* major, int* minor)
 {
 	// for all versions
@@ -576,7 +486,6 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		oIlumina = shortCut_Iluminacio();
 
 		objecte = SISTEMA_SOLAR;
-		cosSolar = -1;
 		oObjecte = shortCut_Objecte();
 
 		// Configuracio dels parametres d'il-luminacio del sistema solar:
@@ -1857,19 +1766,6 @@ void ShowEntornVGIWindow(bool* p_open)
 		ImGui::Combo(" ", &oObjecte, items, IM_ARRAYSIZE(items));
 		ImGui::Spacing();
 
-		// Sistema Solar: Sol i planetes (vista individual, centrats a l'origen)
-		ImGui::SeparatorText("SISTEMA SOLAR (cos individual):");
-		const char* nomsCossos[9] = { "Sol", "Mercuri", "Venus", "Terra", "Mart", "Jupiter", "Saturn", "Uranus", "Neptu" };
-		for (int i = 0; i < 9; i++)
-		{
-			if (i % 3 != 0) ImGui::SameLine();
-			if (ImGui::RadioButton(nomsCossos[i], (objecte == ESFERA && cosSolar == i)))
-			{
-				MostraCos(i);
-				oObjecte = shortCut_Objecte();	// Actualitzar opció de menú OBJECTE
-			}
-		}
-		ImGui::Spacing();
 
 		// Mostrar fram PARAMETRES CORBES si Objectes Corbes seleccionats
 		if ((oObjecte > 9) && (oObjecte < 15)) {
@@ -1940,7 +1836,6 @@ void ShowEntornVGIWindow(bool* p_open)
 			if (objecte != C_CATMULL_ROM) OnObjecteCorbaCatmullRom();
 			break;
 		case 15:
-			if (objecte != SISTEMA_SOLAR) OnSistemaTots();
 			break;
 		default:
 			// Opció per defecte: CAP
@@ -2868,8 +2763,6 @@ void OnObjecteCap()
 {
 	// TODO: Agregue aquí su código de controlador de comandos
 	objecte = CAP;
-	// com reutilitzem esfera, declarem cosSolar = -1 per deixar clar que no tractem cap cos
-	cosSolar = -1;
 	netejaVAOList();						// Neteja Llista VAO.
 
 	// Entorn VGI: Eliminar buffers de textures previs del vector texturesID[].
@@ -2933,7 +2826,6 @@ void OnObjecteEsfera()
 {
 	// TODO: Agregue aquí su código de controlador de comandos
 	objecte = ESFERA;
-	cosSolar = -1;
 
 	//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
 
@@ -2975,9 +2867,6 @@ void OnObjecteTetera()
 // OBJECTE ARC
 void OnObjecteArc()
 {
-	CColor color_Mar;
-
-	color_Mar.r = 0.5;	color_Mar.g = 0.4; color_Mar.b = 0.9; color_Mar.a = 1.0;
 	// TODO: Agregue aquí su código de controlador de comandos
 	objecte = ARC;
 
@@ -3000,8 +2889,6 @@ void OnObjecteArc()
 	//if (Get_VAOId(GLUT_TEAPOT) != 0) deleteVAOList(GLUT_TEAPOT);
 	Set_VAOList(GLUT_TEAPOT, loadglutSolidTeapot_VAO());		// Carrega Tetera a la posició GLUT_TEAPOT.
 
-	//if (Get_VAOId(MAR_FRACTAL_VAO) != 0) deleteVAOList(MAR_FRACTAL_VAO);
-	Set_VAOList(MAR_FRACTAL_VAO, loadSea_VAO(color_Mar));		// Carrega Mar a la posició MAR_FRACTAL_VAO.
 }
 
 
@@ -3055,167 +2942,6 @@ void OnObjecteTie()
 	Set_VAOList(GLUT_USER6, loadgluDisk_EBO(0.0f, 1.5f, 8, 1)); // Càrrega disk com a VAO
 }
 
-// CarregaPlaneta: Carrega la textura del Sol (idx=0) o d'un planeta (idx=1..8) sobre l'esfera actual. #€#€#€# Va a dibuixaEscenari()
-void CarregaPlaneta(int idx)
-{
-	static char* fitxers[] = {
-		(char*)".\\textures\\sun\\\\2k_sun.jpg",
-		(char*)".\\textures\\planet\\Mercury\\2k_mercury.jpg",	// 1
-		(char*)".\\textures\\planet\\Venus\\2k_venus_surface.jpg",		// 2
-		(char*)".\\textures\\planet\\Earth\\2k_earth_daymap.jpg",		// 3
-		(char*)".\\textures\\planet\\Mars\\2k_mars.jpg",		// 4
-		(char*)".\\textures\\planet\\Jupiter\\2k_jupiter.jpg",	// 5
-		(char*)".\\textures\\planet\\Saturn\\2k_saturn.jpg",	// 6
-		(char*)".\\textures\\planet\\Uranus\\2k_uranus.jpg",	// 7
-		(char*)".\\textures\\planet\\Neptune\\2k_neptune.jpg"		// 8
-	};
-	if (idx < 0 || idx >= 9) return;
-
-	cosSolar = idx;
-	t_textura = TEXTURA_FITXERIMA;		tFlag_invert_Y = true;		textura = true;
-	sw_material[0] = (idx == 0);		// El Sol brilla amb llum pròpia (emissió)
-
-	glUseProgram(shader_programID);
-
-	// Eliminar textures anteriors
-	for (int i = 0; i < NUM_MAX_TEXTURES; i++)
-		if (texturesID[i]) { glDeleteTextures(1, &texturesID[i]); texturesID[i] = 0; }
-
-	// Carregar la nova textura a texturesID[0]
-	texturesID[0] = loadIMA_SOIL(fitxers[idx]);
-	if (texturesID[0] == 0) fprintf(stderr, "No s'ha pogut carregar: %s\n", fitxers[idx]);
-
-	glUniform1i(glGetUniformLocation(shader_programID, "texture0"), GLint(0));
-	glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), tFlag_invert_Y);
-	glUniform1i(glGetUniformLocation(shader_programID, "sw_intensity[0]"), sw_material[0]);
-}
-
-// MostraCos: Deixa l'escena a punt per veure el cos idx (0=Sol, 1..8=planetes) centrat a l'origen
-void MostraCos(int idx)
-{
-	OnProjeccioPerspectiva();	oProjeccio = shortCut_Projeccio();	// Sincronitzar menú ImGui
-	OnIluminacioSuau();			oIlumina = shortCut_Iluminacio();	// (recarrega el shader: abans de carregar textura)
-	OnObjecteEsfera();			// Esfera (la teva funció)
-	CarregaPlaneta(idx);		// Textura del cos
-}
-
-void OnSistemaTots() //#€#€#€# Va a 
-{
-	static char* fitxers[9] = {
-		(char*)".\\textures\\sun\\\\2k_sun.jpg",
-		(char*)".\\textures\\planet\\Mercury\\2k_mercury.jpg",	// 1
-		(char*)".\\textures\\planet\\Venus\\2k_venus_surface.jpg",		// 2
-		(char*)".\\textures\\planet\\Earth\\2k_earth_daymap.jpg",		// 3
-		(char*)".\\textures\\planet\\Mars\\2k_mars.jpg",		// 4
-		(char*)".\\textures\\planet\\Jupiter\\2k_jupiter.jpg",	// 5
-		(char*)".\\textures\\planet\\Saturn\\2k_saturn.jpg",	// 6
-		(char*)".\\textures\\planet\\Uranus\\2k_uranus.jpg",	// 7
-		(char*)".\\textures\\planet\\Neptune\\2k_neptune.jpg"		// 8
-	};
-
-	OnProjeccioPerspectiva();	oProjeccio = shortCut_Projeccio();
-	// Usamos Phong para calcular la iluminación en cada fragmento de la esfera.
-	// Así la transición entre la zona iluminada y la zona oscura queda suave.
-	OnShaderPhong();
-
-	// Sincronizamos el control del menú de iluminación con el modo SUAU.
-	// La palabra "suau" aquí se refiere al modo de dibujo sólido y sombreado
-	// suave que usa el entorno; el cálculo de luz lo hace el shader Phong.
-	oIlumina = shortCut_Iluminacio();
-
-	// Esta selección hace que dibuixa_EscenaGL entre en el caso del sistema solar.
-	objecte = SISTEMA_SOLAR;
-	cosSolar = -1;
-	camera = CAM_ESFERICA;		Vis_Polar = POLARZ;
-	t_textura = TEXTURA_FITXERIMA;	tFlag_invert_Y = true;	textura = true;
-
-	// La luz debe permanecer fija en coordenadas del mundo.
-	// En este caso, "fija" significa que no se mueve con la cámara.
-	ifixe = true;
-
-	// Activamos la luz número 0, que será la luz del Sol.
-	llumGL[0].encesa = true;
-
-	// La esfera del Sol está centrada en (0, 0, 0), así que colocamos
-	// la fuente puntual exactamente en el centro del sistema solar.
-	// El valor w = 1 indica que es una luz puntual, no direccional.
-	llumGL[0].posicio.x = 0.0f;
-	llumGL[0].posicio.y = 0.0f;
-	llumGL[0].posicio.z = 0.0f;
-	llumGL[0].posicio.w = 1.0f;
-
-	// Luz blanca: ilumina los colores de las texturas sin teñirlos.
-	llumGL[0].difusa.r = 1.0f;
-	llumGL[0].difusa.g = 1.0f;
-	llumGL[0].difusa.b = 1.0f;
-	llumGL[0].difusa.a = 1.0f;
-
-	// La componente especular produce reflejos en las superficies.
-	// La dejamos blanca para que los brillos sigan el color de la luz.
-	llumGL[0].especular.r = 1.0f;
-	llumGL[0].especular.g = 1.0f;
-	llumGL[0].especular.b = 1.0f;
-	llumGL[0].especular.a = 1.0f;
-
-	// Atenuación de la luz puntual:
-	//   a = término cuadrático,
-	//   b = término lineal,
-	//   c = término constante.
-	// Estos valores dan una caída gradual con la distancia en las unidades
-	// visuales actuales del sistema solar.
-	llumGL[0].atenuacio.a = 0.00004f;
-	llumGL[0].atenuacio.b = 0.0f;
-	llumGL[0].atenuacio.c = 1.0f;
-
-	// La luz del Sol no es un foco; ilumina en todas las direcciones.
-	llumGL[0].restringida = false;
-
-	// Evitamos que la luz ambiente ilumine demasiado la cara nocturna.
-	// Si preferís que las caras oscuras sigan visibles, podéis mantener true.
-	llum_ambient = false;
-	sw_material[1] = false;
-
-	// El Sol emite luz propia. El shader solo aplicará esta emisión al Sol
-	// cuando sistema_solar active sw_intensity[0] para el cuerpo i == 0.
-	sw_material[0] = true;
-	llumGL[0].encesa = true;
-
-	// Càmera allunyada i enlairada per veure les òrbites des de dalt
-	OPV.R = 100.0;/*també o cambió :p*/	OPV.alfa = 25.0;/*estava a 65 pero o he cambiat a 25 (noa)*/ OPV.beta = 0.0;
-	cam_Esferica[0] = (float)OPV.R;	cam_Esferica[1] = (float)OPV.alfa;	cam_Esferica[2] = (float)OPV.beta;
-
-	glUseProgram(shader_programID);
-
-	netejaVAOList();
-	SetColor4d(col_obj.r, col_obj.g, col_obj.b, col_obj.a);
-	//Set_VAOList(GLU_DISK, loadgluDisk_EBO());
-	Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(1.0, 40, 40));				// Esfera de radi 1 (cossos)
-	Set_VAOList(GLUT_TORUS, loadglutSolidTorus_EBO(0.005, 1.0, 8, 120));		// Anell fi de radi 1 (òrbites)
-
-	for (int i = 0; i < NUM_MAX_TEXTURES; i++)
-		if (texturesID[i]) { glDeleteTextures(1, &texturesID[i]); texturesID[i] = 0; }
-	for (int i = 0; i < 9; i++)
-	{
-		texturesID[i] = loadIMA_SOIL(fitxers[i]);
-		if (texturesID[i] == 0) fprintf(stderr, "No s'ha pogut carregar: %s\n", fitxers[i]);
-	}
-
-	glUniform1i(glGetUniformLocation(shader_programID, "texture0"), GLint(0));
-	glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), tFlag_invert_Y);
-
-
-	const float radiCos[9] = { 20.0f,  3.0f,  5.0f,  5.0f,  4.0f, 12.0f, 10.0f,  7.0f,  7.0f };
-	const float radiOrbita[9] = { 0.0f, 40.0f, 60.0f, 80.0f,100.0f,135.0f,175.0f,210.0f,240.0f };
-	const float angleOrbita[9] = { 0.0f,  0.0f, 40.0f, 80.0f,120.0f,160.0f,200.0f,240.0f,280.0f };
-
-	for (int i = 0; i < 9; i++)
-	{
-		escenariActual->m_objectList[i].m_radiCos = radiCos[i];
-		escenariActual->m_objectList[i].m_radiOrbita = radiOrbita[i];
-		escenariActual->m_objectList[i].m_angleOrbita = angleOrbita[i];
-	}
-}
-
 // ----------------- OBJECTES CORBES BEZIER, LEMNISCATA i B-SPLINE
 
 // OBJECTE Corba Bezier
@@ -3232,7 +2958,7 @@ void OnObjecteCorbaBezier()
 		puts("Success!");
 		puts(nomFitxer);
 
-		npts_T = llegir_ptsC(nomFitxer);	// Llegir Fitxer amb els punts de Control de la corba.
+		npts_T = 0;
 
 		//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
 
@@ -3292,7 +3018,7 @@ void OnObjecteCorbaHermitte()
 		puts("Success!");
 		puts(nomFitxer);
 
-		npts_T = llegir_ptsC(nomFitxer);
+		npts_T = 0;
 
 		//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
 
@@ -3329,7 +3055,7 @@ void OnObjecteCorbaCatmullRom()
 		puts("Success!");
 		puts(nomFitxer);
 
-		npts_T = llegir_ptsC(nomFitxer);
+		npts_T = 0;
 
 		//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
 
@@ -3367,7 +3093,7 @@ void OnObjecteCorbaBSpline()
 		puts("Success!");
 		puts(nomFitxer);
 
-		npts_T = llegir_ptsC(nomFitxer);
+		npts_T = 0;
 
 		//	---- Entorn VGI: ATENCIÓ!!. Canviar l'escala per a centrar la vista (Ortogràfica)
 
@@ -6487,9 +6213,9 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 					if (incrT <= 0.0)
 					{
 						if (incrT >= -2) incrT = -2;
-						incrT = 1 / Log2(-incrT);
+						incrT = 1 / static_cast<long int>(log2(static_cast<double>(-incrT)));
 					}
-					else incrT = Log2(incrT);
+					else incrT = static_cast<long int>(log2(static_cast<double>(incrT)));
 					TG.VScal.y = TG.VScal.y * incrT;
 					if (TG.VScal.y < 0.25) TG.VScal.y = 0.25;
 					if (TG.VScal.y > 8192.0) TG.VScal.y = 8192.0;
@@ -6618,9 +6344,9 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 		{
 			if (incrT <= 0) {
 				if (incrT >= -2.0) incrT = -2.0;
-				incrT = 1.0 / Log2(-incrT);
+				incrT = 1.0 / static_cast<double>(static_cast<int>(log2(static_cast<double>(-incrT))));
 			}
-			else incrT = Log2(incrT);
+			else incrT = static_cast<long int>(log2(static_cast<double>(incrT)));
 			TG.VScal.z = TG.VScal.z * incrT;
 			if (TG.VScal.z < 0.25) TG.VScal.z = 0.25;
 			if (TG.VScal.z > 8192.0) TG.VScal.z = 8192.0;
@@ -6719,362 +6445,6 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 	}
 }
 
-
-/* ------------------------------------------------------------------------- */
-/*                           CONTROL DEL GAMEPAD / JOYSTICK                  */
-/* ------------------------------------------------------------------------- */
-
-/*
-// OnGamepadMove: Funció de tractament de Gamepad (funció que es crida quan es prem una tecla o comandament d'un joystick)
-//   PARÀMETRES:
-//    - jid: Identificador del gamepad (GLFW_JOYSTICK_1, GLFW_JOYSTICK_2, GLFW_JOYSTICK_3, etc.) connectat o desconnectat
-//    - event: et retorna si el gamepad està connectat (GLFW_CONNECTED) o desconnectat (GLFW_DISCONECTED)
-void OnGamepadMove(int jid, int event)
-{
-	GLFWgamepadstate estat;		// Variable que obté l'estat (valors) del botons i eixos dels stocks i triggers del Gamepad.
-
-	//	if (event == GLFW_CONNECTED)	// NO FUNCIONA
-	if (glfwGetGamepadState(GLFW_JOYSTICK_1, &estat))
-	{
-		// BOTONS-----------------------------------
-
-		if (estat.buttons[GLFW_GAMEPAD_BUTTON_A])
-		{
-			fprintf(stderr, "%s \n", "Botó <A> pulsat");
-		}
-
-		if (estat.buttons[GLFW_GAMEPAD_BUTTON_B])
-		{
-			fprintf(stderr, "%s \n", "Botó <B> pulsat");
-		}
-
-		if (estat.buttons[GLFW_GAMEPAD_BUTTON_X])
-		{
-			fprintf(stderr, "%s \n", "Botó <X> pulsat");
-		}
-
-		if (estat.buttons[GLFW_GAMEPAD_BUTTON_Y])
-		{
-			fprintf(stderr, "%s \n", "Botó <Y> pulsat");
-		}
-
-		if (estat.buttons[GLFW_GAMEPAD_BUTTON_LEFT_BUMPER])
-		{
-			fprintf(stderr, "%s \n", "Left Bumper (LB) pulsat");
-		}
-
-		if (estat.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER])
-		{
-			fprintf(stderr, "%s \n", "Right Bumper (RB) pulsat");
-		}
-
-		if (estat.buttons[GLFW_GAMEPAD_BUTTON_BACK])
-		{
-			fprintf(stderr, "%s \n", "Botó <Back> pulsat");
-		}
-
-		if (estat.buttons[GLFW_GAMEPAD_BUTTON_START])
-		{
-			fprintf(stderr, "%s \n", "Botó <Start> pulsat");
-		}
-
-		if (estat.buttons[GLFW_GAMEPAD_BUTTON_LEFT_THUMB])
-		{
-			fprintf(stderr, "%s \n", "Stick esquerra (click) pulsat");
-		}
-
-		if (estat.buttons[GLFW_GAMEPAD_BUTTON_RIGHT_THUMB])
-		{
-			fprintf(stderr, "%s \n", "Stick dret (click) pulsat");
-		}
-
-		if (estat.buttons[GLFW_GAMEPAD_BUTTON_DPAD_UP])
-		{
-			fprintf(stderr, "%s \n", "Fletxa amunt pulsada");
-		}
-
-		if (estat.buttons[GLFW_GAMEPAD_BUTTON_DPAD_RIGHT])
-		{
-			fprintf(stderr, "%s \n", "Fletxa dreta pulsada");
-		}
-
-		if (estat.buttons[GLFW_GAMEPAD_BUTTON_DPAD_DOWN])
-		{
-			fprintf(stderr, "%s \n", "Fletxa avall pulsada");
-		}
-
-		if (estat.buttons[GLFW_GAMEPAD_BUTTON_DPAD_LEFT])
-		{
-			fprintf(stderr, "%s \n", "Fletxa esquerra pulsada");
-		}
-
-		// EIXOS (DIRECCIONS) DE STICKS i TRIGGERS -----------------------------------
-
-		// STICK ESQUERRE
-		fprintf(stderr, "%s %f %s %f \n", "Stick esquerre X: ", estat.axes[GLFW_GAMEPAD_AXIS_LEFT_X], "Y: ", estat.axes[GLFW_GAMEPAD_AXIS_LEFT_Y]);
-		if (estat.axes[GLFW_GAMEPAD_AXIS_LEFT_X] < -0.5) fprintf(stderr, "%s \n", "Cap a l'esquerra");
-		if (estat.axes[GLFW_GAMEPAD_AXIS_LEFT_X] > 0.5) fprintf(stderr, "%s \n", "Cap a la dreta");
-		if (estat.axes[GLFW_GAMEPAD_AXIS_LEFT_Y] < -0.5) fprintf(stderr, "%s \n", "Cap amunt");
-		if (estat.axes[GLFW_GAMEPAD_AXIS_LEFT_Y] > 0.5) fprintf(stderr, "%s \n", "Cap avall");
-
-		// STICK DRET
-		fprintf(stderr, "%s %f %s %f \n", "Stick dret X: ", estat.axes[GLFW_GAMEPAD_AXIS_RIGHT_X], "Y: ", estat.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y]);
-		if (estat.axes[GLFW_GAMEPAD_AXIS_RIGHT_X] < -0.5) fprintf(stderr, "%s \n", "Cap a l'esquerra");
-		if (estat.axes[GLFW_GAMEPAD_AXIS_RIGHT_X] > 0.5) fprintf(stderr, "%s \n", "Cap a la dreta");
-		if (estat.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y] < -0.5) fprintf(stderr, "%s \n", "Cap amunt");
-		if (estat.axes[GLFW_GAMEPAD_AXIS_RIGHT_Y] > 0.5) fprintf(stderr, "%s \n", "Cap avall");
-
-		// TRIGGERS LT i RT
-		fprintf(stderr, "%s %f \n", "Trigger esquerre (LT): ", estat.axes[GLFW_GAMEPAD_AXIS_LEFT_TRIGGER]);
-		fprintf(stderr, "%s %f \n", "Trigger dret (RT): ", estat.axes[GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER]);
-	}
-	else fprintf(stderr, "%s %i %s \n", "Gamepad ", jid, " desconnectat");
-}
-
-
-// OnJoystickMove: Funció de tractament de joystick (funció que es crida quan es prem una tecla o comandament d'un joystick)
-//   PARÀMETRES:
-//    - jid: Identificador del joystick (GLFW_JOYSTICK_1, GLFW_JOYSTICK_2, GLFW_JOYSTICK_3, etc.) connectat o desconnectat
-//    - event: et retorna si el joystick està connectat (GLFW_CONNECTED) o desconnectat (GLFW_DISCONECTED)
-void OnJoystickMove(int jid, int event)
-{
-	int buttonCount;	// Variable que obté l'estat dels botons del Joystick / Gamepad.
-	int axisCount;		// Variable que obté l'estat dels eixos dels sticks i triggers del Joystick / Gamepad.
-
-//	if (event == GLFW_CONNECTED)	// NO FUNCIONA
-	if (glfwJoystickPresent(GLFW_JOYSTICK_1))
-	{
-		// BOTONS-----------------------------------
-		// Obtenir botons del Gamepad: GLFW_PRESS si botó apretat, GLFW_RELEASE si botó s'ha deixat de pressionar.
-		const unsigned char* buttons = glfwGetJoystickButtons(GLFW_JOYSTICK_1, &buttonCount);
-
-		if (buttons[0] == GLFW_PRESS)
-		{
-			fprintf(stderr, "%s \n", "Botó <A> pulsat");
-		}
-
-		if (buttons[1] == GLFW_PRESS)
-		{
-			fprintf(stderr, "%s \n", "Botó <B> pulsat");
-		}
-
-		if (buttons[2] == GLFW_PRESS)
-		{
-			fprintf(stderr, "%s \n", "Botó <X> pulsat");
-		}
-
-		if (buttons[3] == GLFW_PRESS)
-		{
-			fprintf(stderr, "%s \n", "Botó <Y> pulsat");
-		}
-
-		if (buttons[4] == GLFW_PRESS)
-		{
-			fprintf(stderr, "%s \n", "Left Bumper (LB) pulsat");
-		}
-
-		if (buttons[5] == GLFW_PRESS)
-		{
-			fprintf(stderr, "%s \n", "Right Bumper (RB) pulsat");
-		}
-
-		if (buttons[6] == GLFW_PRESS)
-		{
-			fprintf(stderr, "%s \n", "Botó <Back> pulsat");
-		}
-
-		if (buttons[7] == GLFW_PRESS)
-		{
-			fprintf(stderr, "%s \n", "Botó <Start> pulsat");
-		}
-
-		if (buttons[8] == GLFW_PRESS)
-		{
-			fprintf(stderr, "%s \n", "Stick esquerra (click) pulsat");
-		}
-
-		if (buttons[9] == GLFW_PRESS)
-		{
-			fprintf(stderr, "%s \n", "Stick dret (click) pulsat");
-		}
-
-		if (buttons[10] == GLFW_PRESS)
-		{
-			fprintf(stderr, "%s \n", "Fletxa amunt pulsada");
-		}
-
-		if (buttons[11] == GLFW_PRESS)
-		{
-			fprintf(stderr, "%s \n", "Fletxa dreta pulsada");
-		}
-
-		if (buttons[12] == GLFW_PRESS)
-		{
-			fprintf(stderr, "%s \n", "Fletxa avall pulsada");
-		}
-
-		if (buttons[13] == GLFW_PRESS)
-		{
-			fprintf(stderr, "%s \n", "Fletxa esquerra pulsada");
-		}
-
-		if (buttons[14] == GLFW_PRESS)
-		{
-			fprintf(stderr, "%s \n", "Stick dret (click) pulsat");
-		}
-
-		// EIXOS (DIRECCIONS) DE STICKS i TRIGGERS -----------------------------------
-		// Obtenir direccions pulsades d'algun stick o trigger si s'han pulsat.
-		const float* axes = glfwGetJoystickAxes(GLFW_JOYSTICK_1, &axisCount);
-
-		// STICK ESQUERRE
-		if (axisCount > 0)
-		{	fprintf(stderr, "%s %f %s %f \n", "Stick esquerre X: ", axes[0], "Y: ", axes[1]);
-			if (axes[0] < -0.5) fprintf(stderr, "%s \n", "Cap a l'esquerra");
-			if (axes[0] > 0.5) fprintf(stderr, "%s \n", "Cap a la dreta");
-			if (axes[1] < -0.5) fprintf(stderr, "%s \n", "Cap amunt");
-			if (axes[1] > 0.5) fprintf(stderr, "%s \n", "Cap avall");
-		}
-
-		// STICK DRET
-		if (axisCount > 2)
-		{	fprintf(stderr, "%s %f %s %f \n", "Stick dret X: ", axes[2], "Y: ", axes[3]);
-			if (axes[2] < -0.5) fprintf(stderr, "%s \n", "Cap a l'esquerra");
-			if (axes[2] > 0.5) fprintf(stderr, "%s \n", "Cap a la dreta");
-			if (axes[3] < -0.5) fprintf(stderr, "%s \n", "Cap amunt");
-			if (axes[3] > 0.5) fprintf(stderr, "%s \n", "Cap avall");
-		}
-
-		// TRIGGERS LT i RT
-		if (axisCount > 4)
-		{
-			fprintf(stderr, "%s %f \n", "Trigger esquerre (LT): ", axes[4]);
-			fprintf(stderr, "%s %f \n", "Trigger dret (RT): ", axes[5]);
-		}
-	}
-	else fprintf(stderr, "%s %i %s \n", "Joystick ", jid, " desconnectat");
-}
-*/
-
-
-/* ------------------------------------------------------------------------- */
-/*					     TIMER (ANIMACIÓ)									 */
-/* ------------------------------------------------------------------------- */
-void OnTimer()
-{
-	// TODO: Agregue aquí su código de controlador de mensajes o llame al valor predeterminado
-	if (anima) {
-		// Codi de tractament de l'animació quan transcorren els ms. del crono.
-
-		// Crida a OnPaint() per redibuixar l'escena
-		//InvalidateRect(NULL, false);
-	}
-	else if (satelit) {	// OPCIÓ SATÈLIT: Increment OPV segons moviments mouse.
-		if (camera == CAM_ESFERICA)
-		{	//OPV.R = OPV.R + m_EsfeIncEAvall.R;
-			OPV.alfa = OPV.alfa + m_EsfeIncEAvall.alfa;
-			while (OPV.alfa > 360.0) OPV.alfa = OPV.alfa - 360.0;
-			while (OPV.alfa < 0.0) OPV.alfa = OPV.alfa + 360.0;
-			OPV.beta = OPV.beta + m_EsfeIncEAvall.beta;
-			while (OPV.beta > 360.0) OPV.beta = OPV.beta - 360.0;
-			while (OPV.beta < 0.0) OPV.beta = OPV.beta + 360.0;
-		}
-		else if (camera == CAM_GEODE)
-		{	//OPV.R = OPV.R + m_EsfeIncEAvall.R;
-			OPV_G.alfa = OPV_G.alfa + m_EsfeIncEAvall.alfa * 0.5;
-			while (OPV_G.alfa > 360.0) OPV_G.alfa = OPV_G.alfa - 360.0;
-			while (OPV_G.alfa < 0) OPV_G.alfa = OPV_G.alfa + 360.0;
-			OPV_G.beta = OPV_G.beta + m_EsfeIncEAvall.beta * 0.5;
-			while (OPV_G.beta > 360.0) OPV_G.beta = OPV.beta - 360.0;
-			while (OPV_G.beta < 0.0) OPV_G.beta = OPV_G.beta + 360.0;
-		}
-
-		// Crida a OnPaint() per redibuixar l'escena
-		//OnPaint();
-	}
-	// EntornVGI. QUATERNIONS: Animació Objecte Rígid per Quaternions
-	else if (animaQ)
-	{	// CAL FER: Animació sense fi a partir qI i qF amb interpolació lineal o esfèrica.
-
-		// Crida a OnPaint() per redibuixar l'escena
-		//InvalidateRect(NULL, false);
-	}
-	// EntornVGI. ROBOT: Animació Robot Articulat
-	else if (objecte == ROBOT && animaR)
-	{	// CAL FER: Animació sense fi a partir de dues o tres posicios clau del robot.posicions
-
-		// Crida a OnPaint() per redibuixar l'escena
-		//InvalidateRect(NULL, false);
-	}
-}
-
-// ---------------- Entorn VGI: Funcions locals a main.cpp
-
-// Log2: Càlcul del log base 2 de num
-int Log2(int num)
-{
-	int tlog;
-
-	if (num >= 8192) tlog = 13;
-	else if (num >= 4096) tlog = 12;
-	else if (num >= 2048) tlog = 11;
-	else if (num >= 1024) tlog = 10;
-	else if (num >= 512) tlog = 9;
-	else if (num >= 256) tlog = 8;
-	else if (num >= 128) tlog = 7;
-	else if (num >= 64) tlog = 6;
-	else if (num >= 32) tlog = 5;
-	else if (num >= 16) tlog = 4;
-	else if (num >= 8) tlog = 3;
-	else if (num >= 4) tlog = 2;
-	else if (num >= 2) tlog = 1;
-	else tlog = 0;
-
-	return tlog;
-}
-
-
-// -------------------- FUNCIONS CORBES SPLINE i BEZIER
-
-// llegir_ptsC: Llegir punts de control de corba (spline o Bezier) d'un fitxer .crv. 
-//				Retorna el nombre de punts llegits en el fitxer.
-//int llegir_pts(CString nomf)
-int llegir_ptsC(const char* nomf)
-{
-	int i, j;
-	FILE* fd;
-
-	// Inicialitzar vector punts de control de la corba spline
-	for (i = 0; i < MAX_PATCH_CORBA; i = i++)
-	{
-		PC_t[i].x = 0.0;
-		PC_t[i].y = 0.0;
-		PC_t[i].z = 0.0;
-	}
-
-	//	ifstream f("altinicials.dat",ios::in);
-	//    f>>i; f>>j;
-	if ((fd = fopen(nomf, "rt")) == NULL)
-	{	//LPCWSTR texte1 = reinterpret_cast<LPCWSTR> ("ERROR:");
-		//LPCWSTR texte2 = reinterpret_cast<LPCWSTR> ("File .crv was not opened");
-		//MessageBox(texte1, texte2, MB_OK);
-		fprintf(stderr, "ERROR: File .crv was not opened");
-		return false;
-	}
-	fscanf(fd, "%d \n", &i);
-	if (i == 0) return false;
-	else {
-		for (j = 0; j < i; j = j++)
-		{	//fscanf(fd, "%f", &corbaSpline[j].x);
-			//fscanf(fd, "%f", &corbaSpline[j].y);
-			//fscanf(fd, "%f \n", &corbaSpline[j].z);
-			fscanf(fd, "%lf %lf %lf \n", &PC_t[j].x, &PC_t[j].y, &PC_t[j].z);
-		}
-	}
-	fclose(fd);
-
-	return i;
-}
 
 
 // Entorn VGI. OnFull_Screen: Funció per a pantalla completa
@@ -7190,7 +6560,6 @@ int main()
 
 	//    GLFWwindow* window;
 	// Entorn VGI. Timer: Variables
-	float time = elapsedTime;
 	float now;
 	float delta;
 
@@ -7281,8 +6650,6 @@ int main()
 	// Ensure we can capture the escape key being pressed below
 	glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
 
-	// Initialize API
-		//InitAPI();
 
 	// Initialize Application control varibles
 	InitGL();
@@ -7323,7 +6690,7 @@ int main()
 	escenariActual = &escenaris[0];
 	objecte = CAP;
 
-	objecte = SISTEMA_SOLAR;	cosSolar = -1;
+	objecte = SISTEMA_SOLAR;
 	camera = CAM_ESFERICA;		Vis_Polar = POLARZ;
 	t_textura = TEXTURA_FITXERIMA;	tFlag_invert_Y = true;	textura = true;
 	sw_material[0] = false;		SkyBoxCube = false;
@@ -7343,9 +6710,6 @@ int main()
 		delta = now - previous;
 		previous = now;
 
-		// Entorn VGI. Timer: for each timer do this
-		time -= delta;
-		if ((time <= 0.0) && (satelit || anima)) OnTimer();
 
 		// Actualització del temps de simulació i moviment orbital dels planetes
 		// (només quan s'ha tancat el selector inicial d'escenaris)

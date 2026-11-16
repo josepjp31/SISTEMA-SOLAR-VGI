@@ -1,7 +1,7 @@
 //******** PRACTICA VISUALITZACIÓ GRÀFICA INTERACTIVA (Escola Enginyeria - UAB)
 //******** Entorn bàsic VS2026 MONOFINESTRA amb OpenGL 4.6, interfície GLFW, ImGui i llibreries GLM
 //******** Ferran Poveda, Marc Vivet, Carme Julià, Débora Gil, Enric Martí (Setembre 2026)
-// main.h : interface of the CEntornVGI class
+// main.h : Interfície i declaracions globals de main.cpp (bucle GLFW, càmera, il·luminació i callbacks)
 //
 /////////////////////////////////////////////////////////////////////////////
 
@@ -78,9 +78,6 @@ static int oProjeccio;			// ImGui: Variable que controla desplegable TIPUS PROJE
 glm::mat4 ProjectionMatrix(1.0);// Matriu de Projecció a passar al shader
 char objecte;					// Menú Objecte: Tipus d'Objecte
 static int oObjecte;			// ImGui: Variable que controla desplegable TIPUS OBJECTE d'ImGui
-// SISTEM SOLAR y cosos solars
-int cosSolar;
-
 // Entorn VGI: Variables de control Skybox Cube
 bool SkyBoxCube;			// Booleana que controla si es visualitza Skybox [TRUE] o no [FALSE].
 Shader shader_SkyBoxC;		// Shader Skybox Cub
@@ -181,7 +178,6 @@ CPunt3D VT, VNP, VBN;				// TRIEDRE de FRENET: VT: Vector Tangent, VNP: Vector N
 // Entorn VGI: Variables del Timer
 double t;		// Paràmetre t pel Timer.
 bool anima;		// Booleana que controla si l'animació és activa (TRUE) o no (FALSE)
-//    dins la funció de control del rellotge OnTimer.
 
 // Entorn VGI : QUATERNIONS: Animació de cossos rígids per QUATERNIONS
 bool animaQ;			// Booleana que controla si l'animació rígida és activa 
@@ -263,7 +259,6 @@ std::string buffer; // Buffer que magatzema string caracters corresponent a vari
 // Inicialització variables de control
 void InitGL();
 
-void InitAPI();
 void GetGLVersion(int* major, int* minor);
 
 // Entorn VGI: Control de l'EVENT ONSIZE
@@ -325,11 +320,6 @@ void OnObjecteEsfera();
 void OnObjecteTetera();
 void OnObjecteArc();
 void OnObjecteTie();
-
-//relevants a sistema solar y cosos solars
-void CarregaPlaneta(int idx);
-void MostraCos(int idx);
-void OnSistemaTots();
 
 void OnObjecteCorbaBezier();
 void OnObjecteCorbaLemniscata();
@@ -411,16 +401,7 @@ void OnMouseButton(GLFWwindow* window, int button, int action, int mods);
 void OnMouseMove(GLFWwindow* window, double xpos, double ypos);
 void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset);
 
-// Entorn VGI: GAMEPAD. Control de l'EVENT JOYSTICK / GAMEPAD
-void OnGamepadMove(int jid, int event);
-void OnJoystickMove(int jid, int event);
-
-// Entorn VGI: Control de l'EVENT TIMER
-void OnTimer();
-
 // ---------------- Entorn VGI: Funcions locals a main.cpp
-int Log2(int num);							// Log2: Càlcul del log base 2 de num
-int llegir_ptsC(const char* nomf);				// Llegir Punts Control Corbes Bezier i B-Spline
 void OnFull_Screen(GLFWmonitor* monitor, GLFWwindow* window);
 // ---------------- Entorn VGI: Tractament d'errors
 void error_callback(int code, const char* description);

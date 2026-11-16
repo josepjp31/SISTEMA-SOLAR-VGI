@@ -10,17 +10,12 @@
 // Nombre maxim d'objectes per escenari
 #define MAX_OBJECTES_ESCENARI 10
 
-// Object s'ha de declarar ABANS d'Escenari, perque Escenari en crea un vector (new Object[...]).
+// Dades individuals de cada cos celeste (Sol i planetes) dins de l'escenari
 class Object
 {
 public:
-	Object() : m_mMatrix(glm::mat4(1.0f)), m_modelCarregat(false), m_radiCos(0.0f), m_radiOrbita(0.0f), m_angleOrbita(0.0f), m_velAngular(0.0f) {}
+	Object() : m_mMatrix(glm::mat4(1.0f)), m_radiCos(0.0f), m_radiOrbita(0.0f), m_angleOrbita(0.0f), m_velAngular(0.0f) {}
 	~Object() {}
-
-	// Carrega un fitxer .OBJ al model. Retorna true si s'ha carregat correctament
-	// (COBJModel::LoadModel retorna 0 si tot va be, o el codi errno si falla).
-	bool carregaModel(char* fitxer) { m_modelCarregat = (m_model.LoadModel(fitxer) == 0); return m_modelCarregat; }
-	bool teModel() const { return m_modelCarregat; }
 
 	float m_radiCos;
 	float m_radiOrbita;
@@ -30,17 +25,11 @@ public:
 	float m_angleRotacio;
 	float m_velRotacio;
 
-	//Vector4D m_position;
-	//Vector4D m_rotation;
-	//Vector4D m_scale;
-
 	glm::mat4 m_mMatrix;
-	COBJModel m_model;
-private:
-	bool m_modelCarregat;
 };
 
 
+// Gestió de l'escenari complet del Sistema Solar (cossos, òrbites, textures i actualització orbital)
 class Escenari
 {
 public:
@@ -70,7 +59,6 @@ public:
 		bool mostrarOrbites = true);
 
 	void updateVariables(double dt = 0.016, bool enPausa = false, int direccioTemps = 1, bool escalaReal = false, double factorVelocitat = 60.0);
-	void updateVariables2();
 	// Allibera els objectes (i els seus VAO). Cal cridar-la ABANS de destruir el context OpenGL.
 	void alliberaEscenari() {
 		deleteVAOList(GLU_SPHERE);
@@ -91,8 +79,6 @@ public:
 		}
 		delete[] m_objectList; m_objectList = nullptr;
 	}
-
-	void iluminacio();
 
 	Object* m_objectList;
 	GLuint m_texturesID[NUM_MAX_TEXTURES];
