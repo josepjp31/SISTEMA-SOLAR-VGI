@@ -2908,7 +2908,8 @@ CVAO load_LINES_EBO(std::vector <double> vertices, std::vector <double> colors, 
 void draw_LINES_EBO(GLint vaoList_indx);
 CVAO load_TRIANGLES_VAO(std::vector <double> vertices, std::vector <double> normals, std::vector <double> colors, std::vector <double> textures);
 void draw_TRIANGLES_VAO(GLint vaoList_indx);
-CVAO load_TRIANGLES_EBO(std::vector <double> vertices, std::vector <double> normals, std::vector <double> colors, std::vector <double> textures, std::vector <uint> indices);
+CVAO load_TRIANGLES_EBO(std::vector <double> vertices, std::vector <double> normals, std::vector <double> colors, std::vector <double> textures ,std::vector <uint> indices);
+CVAO load_TRIANGLES_EBOver2(std::vector <double> vertices, std::vector <double> normals, std::vector <double> colors, std::vector <double> textures, std::vector<double> tangents, std::vector <uint> indices);
 void draw_TRIANGLES_EBO(GLint vaoList_indx);
 
 void draw_GL_LINES_VAO(std::vector <double> vertices, std::vector <double> colors);

@@ -98,6 +98,7 @@ const int NUM_MAX_LLUMS = 8;
 #define FLAT_SHADER 'f'
 #define GOURAUD_SHADER 'G'
 #define PHONG_SHADER 'P'
+#define NORMAL_MAP_SHADER 'M'
 #define FILE_SHADER 'F'
 #define PROG_BINARY_SHADER 'p'
 #define PROG_BINARY_SHADERW 'W'

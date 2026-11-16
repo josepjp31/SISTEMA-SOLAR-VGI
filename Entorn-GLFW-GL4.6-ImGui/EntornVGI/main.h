@@ -139,6 +139,8 @@ CColor col_llambient;	// Color llum ambient.
 char shader;				// Tipus de shader [FLAT, GOURAUD, PHONG, FILE, PROG_BINARY_SHADER]
 static int oShader;			// Variable que controla desplegable SHADER d'ImGui
 GLuint shader_programID;	// Shader Program que conté el Vertex i Fragment program.
+GLuint shader_programIDNormalMap;	// Shader Program que conté el Vertex i Fragment program per a normal mapping.
+Shader shaderLightingNormalMap;		// Shader que implementa els codis GLSL d'il.luminació.
 Shader shaderLighting;		// Shader que implementa els codis GLSL d'il.luminació.
 
 // Entorn VGI: Variables de control dels botons de mouse

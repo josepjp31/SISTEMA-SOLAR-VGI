@@ -310,17 +310,17 @@ static void DibuixarDialegQuantA(bool* pObert)
 // =========================================================================
 // 2. RENDERITZADOR PRINCIPAL
 // =========================================================================
-void InterficieUI::Renderitzar(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID)
+void InterficieUI::Renderitzar(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID, GLuint& shader_programIDNormalMap)
 {
     // 1. Selector inicial de modes (2 quadrats centrals amb escalat adaptatiu)
     // En aquesta fase inicial nomes es mostren els quadrats dels modes sobre fons fosc.
     if (estat.mostrarSelectorModes) {
-        DibuixarSelectorInicialModes(estat, currentEscenari, escenaris, shader_programID);
+        DibuixarSelectorInicialModes(estat, currentEscenari, escenaris, shader_programID, shader_programIDNormalMap);
         return;
     }
 
     // 2. Un cop seleccionat el mode, s'activen la barra de menu superior i els panells corresponents
-    DibuixarBarraMenuSuperior(estat, currentEscenari, escenaris, shader_programID);
+    DibuixarBarraMenuSuperior(estat, currentEscenari, escenaris, shader_programID, shader_programIDNormalMap);
 
     // 3. Selector de data/hora i timelapse (cantonada inferior dreta, nomes en mode escala real)
     if (estat.modeActual == ModeSimulacio::ESCALA_REAL && estat.mostrarPanellTemps) {
@@ -352,7 +352,7 @@ static void DibuixarPuntLlista(const char* text)
 // =========================================================================
 // 2.1 SELECTOR INICIAL DE MODES (MODAL CENTRAL ESCALABLE AMB 2 QUADRATS)
 // =========================================================================
-void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID)
+void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID, GLuint& shader_programIDNormalMap)
 {
     if (!estat.mostrarSelectorModes) return;
 
@@ -523,7 +523,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
                 if (escenaris != nullptr)
                 {
                     currentEscenari = &escenaris[0];
-                    currentEscenari->creaEscenari(shader_programID);
+                    currentEscenari->creaEscenari(shader_programID, shader_programIDNormalMap);
                 }
             }
             ImGui::PopStyleColor(4);
@@ -598,7 +598,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
                 if (escenaris != nullptr)
                 {
                     currentEscenari = &escenaris[1];
-                    currentEscenari->creaEscenari(shader_programID);
+                    currentEscenari->creaEscenari(shader_programID, shader_programIDNormalMap);
                 }
             }
             ImGui::PopStyleColor(4);
@@ -615,7 +615,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
 // =========================================================================
 // 2.2 BARRA DE MENU SUPERIOR DINAMICA PER MODE (MAIN MENU BAR)
 // =========================================================================
-void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID)
+void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID, GLuint& shader_programIDNormalMap)
 {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     float viewW = vp->WorkSize.x;
@@ -662,7 +662,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 estat.canviCameraPendent = true;
                 if (escenaris != nullptr) {
                     currentEscenari = &escenaris[1];
-                    currentEscenari->creaEscenari(shader_programID);
+                    currentEscenari->creaEscenari(shader_programID, shader_programIDNormalMap);
                 }
             }
             ImGui::Separator();
@@ -780,7 +780,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 estat.canviCameraPendent = true;
                 if (escenaris != nullptr) {
                     currentEscenari = &escenaris[0];
-                    currentEscenari->creaEscenari(shader_programID);
+                    currentEscenari->creaEscenari(shader_programID, shader_programIDNormalMap);
                 }
             }
             ImGui::Separator();

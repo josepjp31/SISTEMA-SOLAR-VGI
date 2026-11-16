@@ -60,8 +60,8 @@ public:
 	Escenari(const Escenari&) = delete;
 	Escenari& operator=(const Escenari&) = delete;
 
-	void creaEscenari(GLuint& shader_programID);
-	void dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id, CMask3D& reixa, CPunt3D& hreixa, char& objecte,
+	void creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID);
+	void dibuixaEscenari(GLuint& sh_programID, GLuint& shaderNormalMapID, bool& eix, GLuint& axis_Id, CMask3D& reixa, CPunt3D& hreixa, char& objecte,
 		CColor& col_object, bool sw_mat[5],
 		bool& textur, bool& textur_map, bool& flagInvertY,
 		int& nptsU, CPunt3D PC_u[MAX_PATCH_CORBA], GLfloat& pasCS, bool& sw_PC, bool& dib_TFrenet,
@@ -96,6 +96,10 @@ public:
 
 	Object* m_objectList;
 	GLuint m_texturesID[NUM_MAX_TEXTURES];
+	//normal maps para shader normal mapping
+	GLuint m_normalTexturesID[9] = { 0 };
+	char* m_normalFitxers[9] = { nullptr };
+
 	char* m_fitxers[NUM_MAX_TEXTURES];
 	CColor m_colObj;
 	//torus

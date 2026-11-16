@@ -5243,10 +5243,10 @@ CVAO loadgluSphere_EBO(GLdouble radius, GLint slices, GLint stacks)
 	CVAO auxVAO;
 	auxVAO.vaoId = 0;		auxVAO.vboId = 0;	auxVAO.eboId = 0;	auxVAO.nVertexs = 0;	auxVAO.nIndices = 0;
 
-	std::vector <double> vertices, normals, colors, textures;	// Definició vectors dinàmics per a vertexs, normals i textures
+	std::vector <double> vertices, normals, colors, textures,tangents;	// Definició vectors dinàmics per a vertexs, normals i textures + nuevo atributo tangent
 	std::vector <uint> indices;
 	//vertices.resize(0);		normals.resize(0);		colors.resize(0);	textures.resize(0);		// Reinicialitzar vectors
-	vertices.clear();			normals.clear();		colors.clear();		textures.clear();		// Reinicialitzar vectors
+	vertices.clear();			normals.clear();		colors.clear();		textures.clear();	tangents.clear();	// Reinicialitzar vectors
 	indices.clear();
 
 // Obtenir color actual definit en OpenGL amb glColor();
@@ -5348,12 +5348,70 @@ CVAO loadgluSphere_EBO(GLdouble radius, GLint slices, GLint stacks)
 		}
 		//glEnd();
 	}
+	//calculo de tangentes
+	size_t numVertices = vertices.size() / 3;
+
+	// Una tangente XYZ por vértice
+	std::vector<glm::vec3> tangentAccum(numVertices, glm::vec3(0.0f));
+
+	for (size_t k = 0; k < indices.size(); k += 3){
+		uint i0 = indices[k];	uint i1 = indices[k + 1];	uint i2 = indices[k + 2];
+
+		//Pos vertices
+		glm::vec3 p0(vertices[i0 * 3],vertices[i0 * 3 + 1],vertices[i0 * 3 + 2]);
+		glm::vec3 p1(vertices[i1 * 3],vertices[i1 * 3 + 1],vertices[i1 * 3 + 2]);
+		glm::vec3 p2(vertices[i2 * 3],vertices[i2 * 3 + 1],vertices[i2 * 3 + 2]);
+
+		// Coordenadas UV
+		glm::vec2 uv0(textures[i0 * 2],textures[i0 * 2 + 1]);
+		glm::vec2 uv1(textures[i1 * 2],textures[i1 * 2 + 1]);
+		glm::vec2 uv2(textures[i2 * 2],textures[i2 * 2 + 1]);
+
+		glm::vec3 E1 = p1 - p0;
+		glm::vec3 E2 = p2 - p0;
+
+		glm::vec2 deltaUV1 = uv1 - uv0;
+		glm::vec2 deltaUV2 = uv2 - uv0;
+
+		float determinant =deltaUV1.x * deltaUV2.y -deltaUV2.x * deltaUV1.y;
+		if (fabs(determinant) < 0.000001f)
+			continue;
+		float f = 1.0f / determinant;
+
+		// Tangente del triángulo
+		glm::vec3 T = f * (deltaUV2.y * E1 -deltaUV1.y * E2);
+		// Acumular en los tres vértices
+		tangentAccum[i0] += T;
+		tangentAccum[i1] += T;
+		tangentAccum[i2] += T;
+	}
+	// ORTOGONALIZAR Y NORMALIZAR TANGENTES
+
+	for (size_t i = 0; i < numVertices; i++){
+		// Normal del vértice
+		glm::vec3 N(normals[i * 3],normals[i * 3 + 1], normals[i * 3 + 2]);
+		N = glm::normalize(N);
+
+		glm::vec3 T = tangentAccum[i];
+		// Eliminar componente paralela a la normal
+		T = T - glm::dot(T, N) * N;
+		// Evitar tangentes degeneradas
+		if (glm::length(T) < 0.000001f){
+			glm::vec3 reference =(fabs(N.z) < 0.9f)? glm::vec3(0.0f, 0.0f, 1.0f): glm::vec3(0.0f, 1.0f, 0.0f);
+			T = glm::cross(reference, N);
+		}
+		T = glm::normalize(T);
+
+		tangents.push_back(T.x);
+		tangents.push_back(T.y);
+		tangents.push_back(T.z);
+	}
 
 // ----------------------- VAO
 	//std::vector <int>::size_type nv = vertices.size();	// Tamany del vector vertices en elements.
 
 // Creació d'un VAO, VBO i EBO carregant de la geometria. Guardar identificadors VAO, VBO, EBO, numero vèrtexs i indices en struct CVAO.
-	auxVAO = load_TRIANGLES_EBO(vertices, normals, colors, textures,indices);
+	auxVAO = load_TRIANGLES_EBOver2(vertices, normals, colors, textures,tangents,indices);
 	//auxVAO.nVertexs = (int)nv / 3;
 
 	return auxVAO;
@@ -9329,8 +9387,83 @@ void draw_TRIANGLES_VAO(GLint vaoList_indx)
 
 
 // ---------- TRIANGLES EBO
-CVAO load_TRIANGLES_EBO(std::vector <double> vertices, std::vector <double> normals, std::vector <double> colors, std::vector <double> textures, 
+CVAO load_TRIANGLES_EBO(std::vector <double> vertices, std::vector <double> normals, std::vector <double> colors, std::vector <double> textures,
 	std::vector <uint> indices)
+{
+	// ----------------------- VAO
+	CVAO tmpVAO;
+	tmpVAO.vaoId = 0;	tmpVAO.vboId = 0;	tmpVAO.eboId = 0;	tmpVAO.nVertexs = 0;	tmpVAO.nIndices = 0;
+
+	std::vector <int>::size_type nv = vertices.size();	// Tamany del vector vertices en elements.
+	//std::vector <int>::size_type nn = normals.size();	// Tamany del vector normals en elements.
+	//std::vector <int>::size_type nc = colors.size();	// Tamany del vector colors en elements.
+	//std::vector <int>::size_type nt = textures.size();	// Tamany del vector textures en elements.
+
+// Create Vertex Array Object (VAO) for 3D Model Cube
+	glGenVertexArrays(1, &tmpVAO.vaoId);
+
+	// Create vertex buffer objects for 3D Model attributes in the VAO
+	glGenBuffers(1, &tmpVAO.vboId);
+
+	// Create vertex buffer objects for 3D Model EBO Elements attributes in the VAO
+	glGenBuffers(1, &tmpVAO.eboId);
+
+	// Bind our Vertex Array Object as the current used object
+	glBindVertexArray(tmpVAO.vaoId);
+
+	// Bind our Vertex Buffer Object as the current used object
+	glBindBuffer(GL_ARRAY_BUFFER, tmpVAO.vboId);
+
+	glBufferData(GL_ARRAY_BUFFER, (vertices.size() + normals.size() + textures.size() + colors.size()) * sizeof(double), 0, GL_STATIC_DRAW);
+
+	// Position Vertex attributes
+	glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(double), &vertices[0]);	// Copy geometry data to VBO starting from 0 offset
+	glEnableVertexAttribArray(0);											// Enable attribute index 0 as being used (position)
+	glVertexAttribPointer(0, 3, GL_DOUBLE, GL_FALSE, 3 * sizeof(double), 0);	// Specify that our coordinate data is going into attribute index 0 and contains 3 double
+
+	// Color Vertex Attributes
+	glBufferSubData(GL_ARRAY_BUFFER, vertices.size() * sizeof(double), colors.size() * sizeof(double), &colors[0]);	// Copy normal data to VBO starting from 0 offest
+	glEnableVertexAttribArray(1);										// Enable attribute index 1 as being used (colors)
+	glVertexAttribPointer(1, 4, GL_DOUBLE, GL_FALSE, 4 * sizeof(double), (GLvoid*)(vertices.size() * sizeof(double)));	// Specify that our color data is going into attribute index 0 and contains 3 double
+
+	// Normal Vertex Attributes
+	glBufferSubData(GL_ARRAY_BUFFER, (vertices.size() + colors.size()) * sizeof(double), normals.size() * sizeof(double), &normals[0]);	// Copy normal data to VBO starting from 0 offest
+	glEnableVertexAttribArray(2);											// Enable attribute index 2 as being used (normals)
+	glVertexAttribPointer(2, 3, GL_DOUBLE, GL_FALSE, 3 * sizeof(double), (GLvoid*)((vertices.size() + colors.size()) * sizeof(double)));	// Specify that our color data is going into attribute index 0 and contains 3 double
+
+	// Texture Coordinates Vertex Attributes
+	glBufferSubData(GL_ARRAY_BUFFER, (vertices.size() + colors.size() + normals.size()) * sizeof(double), textures.size() * sizeof(double), &textures[0]);	// Copy normal data to VBO starting from 0 offest
+	glEnableVertexAttribArray(3);												// Enable attribute index 3 as being used (texture coordinates)
+	glVertexAttribPointer(3, 2, GL_DOUBLE, GL_FALSE, 2 * sizeof(double), (GLvoid*)((vertices.size() + colors.size() + normals.size()) * sizeof(double)));						// Specify that our color data is going into attribute index 0 and contains 3 double
+
+
+	// Bind our Element Buffer Object as the current used object
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tmpVAO.eboId);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), &indices[0], GL_STATIC_DRAW);
+
+	//Unbind the registered EBO as current EBO
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+	//Unbind the registered VBO as current VBO
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	// Dissable Attrib arrays
+		//glDisableVertexAttribArray(0);
+		//glDisableVertexAttribArray(1);
+		//glDisableVertexAttribArray(2);
+		//glDisableVertexAttribArray(3);
+
+	// Unbind VAO, to prevent bugs
+	glBindVertexArray(0);
+
+	tmpVAO.nVertexs = (GLint)vertices.size() / 3;
+	tmpVAO.nIndices = (GLint)indices.size();
+
+	return tmpVAO;	// retorna CVAO.
+}
+
+CVAO load_TRIANGLES_EBOver2(std::vector <double> vertices, std::vector <double> normals, std::vector <double> colors, std::vector <double> textures, 
+	std::vector <double> tangents ,std::vector <uint> indices)
 {
 // ----------------------- VAO
 	CVAO tmpVAO;
@@ -9356,8 +9489,8 @@ CVAO load_TRIANGLES_EBO(std::vector <double> vertices, std::vector <double> norm
 // Bind our Vertex Buffer Object as the current used object
 	glBindBuffer(GL_ARRAY_BUFFER, tmpVAO.vboId);
 
-	glBufferData(GL_ARRAY_BUFFER, (vertices.size() + normals.size() + textures.size() + colors.size()) * sizeof(double), 0, GL_STATIC_DRAW);
-
+	//icluimos size de colores y tangentes al buffer
+	glBufferData(GL_ARRAY_BUFFER,(vertices.size() + colors.size() + normals.size() +textures.size() + tangents.size()) * sizeof(double),nullptr,GL_STATIC_DRAW);
 // Position Vertex attributes
 	glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.size() * sizeof(double), &vertices[0]);	// Copy geometry data to VBO starting from 0 offset
 	glEnableVertexAttribArray(0);											// Enable attribute index 0 as being used (position)
@@ -9377,7 +9510,13 @@ CVAO load_TRIANGLES_EBO(std::vector <double> vertices, std::vector <double> norm
 	glBufferSubData(GL_ARRAY_BUFFER, (vertices.size() + colors.size() + normals.size()) * sizeof(double), textures.size() * sizeof(double), &textures[0]);	// Copy normal data to VBO starting from 0 offest
 	glEnableVertexAttribArray(3);												// Enable attribute index 3 as being used (texture coordinates)
 	glVertexAttribPointer(3, 2, GL_DOUBLE, GL_FALSE, 2 * sizeof(double), (GLvoid*)((vertices.size() + colors.size() + normals.size()) * sizeof(double)));						// Specify that our color data is going into attribute index 0 and contains 3 double
+//atributo 4 tangente
+	size_t offsetTangents =(vertices.size() + colors.size() + normals.size() + textures.size()) * sizeof(double);
 
+	glBufferSubData(GL_ARRAY_BUFFER, offsetTangents, tangents.size() * sizeof(double), tangents.data());
+	glEnableVertexAttribArray(4);
+
+	glVertexAttribPointer(4, 3, GL_DOUBLE, GL_FALSE, 3 * sizeof(double), (void*)offsetTangents);
 
 // Bind our Element Buffer Object as the current used object
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tmpVAO.eboId);

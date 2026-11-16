@@ -4,9 +4,67 @@
 // NOTA: no s'ha d'incloure "main.cpp" ni "main.h" aqui (definirien totes les variables
 // globals dues vegades -> error de linker LNK2005). El shader es rep com a parametre.
 
-void Escenari::creaEscenari(GLuint& shader_programID)
+static void copiaUniformsShader(GLuint src, GLuint dst)
 {
+	auto locs = [&](const char* nom, GLint& ls, GLint& ld) {
+		ls = glGetUniformLocation(src, nom);
+		ld = glGetUniformLocation(dst, nom);
+		return ls >= 0 && ld >= 0;
+		};
+	auto copiaMat4 = [&](const char* nom) {
+		GLint ls, ld; GLfloat m[16];
+		if (!locs(nom, ls, ld)) return;
+		glGetUniformfv(src, ls, m);
+		glProgramUniformMatrix4fv(dst, ld, 1, GL_FALSE, m);
+		};
+	auto copiaF = [&](const char* nom, int n) {	// vecN de floats (n = 1..4)
+		GLint ls, ld; GLfloat v[4];
+		if (!locs(nom, ls, ld)) return;
+		glGetUniformfv(src, ls, v);
+		if (n == 1) glProgramUniform1fv(dst, ld, 1, v);
+		else if (n == 3) glProgramUniform3fv(dst, ld, 1, v);
+		else glProgramUniform4fv(dst, ld, 1, v);
+		};
+	auto copiaI = [&](const char* nom) {		// int / bool
+		GLint ls, ld, v;
+		if (!locs(nom, ls, ld)) return;
+		glGetUniformiv(src, ls, &v);
+		glProgramUniform1i(dst, ld, v);
+		};
 
+	copiaMat4("projectionMatrix");
+	copiaMat4("viewMatrix");
+
+	// normalMatrix (solo la usa el frag para spots): inversa-transpuesta de la vista
+	GLint lsV = glGetUniformLocation(src, "viewMatrix");
+	GLint ldN = glGetUniformLocation(dst, "normalMatrix");
+	if (lsV >= 0 && ldN >= 0) {
+		glm::mat4 V; glGetUniformfv(src, lsV, &V[0][0]);
+		glm::mat4 NM = glm::transpose(glm::inverse(V));
+		glProgramUniformMatrix4fv(dst, ldN, 1, GL_FALSE, &NM[0][0]);
+	}
+
+	copiaF("LightModelAmbient", 4);
+	copiaI("fixedLight");
+
+	char n[64];
+	for (int i = 0; i < 8; i++) {
+		sprintf_s(n, "LightSource[%d].sw_light", i);		copiaI(n);
+		sprintf_s(n, "LightSource[%d].position", i);		copiaF(n, 4);
+		sprintf_s(n, "LightSource[%d].ambient", i);		copiaF(n, 4);
+		sprintf_s(n, "LightSource[%d].diffuse", i);		copiaF(n, 4);
+		sprintf_s(n, "LightSource[%d].specular", i);		copiaF(n, 4);
+		sprintf_s(n, "LightSource[%d].attenuation", i);	copiaF(n, 3);
+		sprintf_s(n, "LightSource[%d].restricted", i);		copiaI(n);
+		sprintf_s(n, "LightSource[%d].spotDirection", i);	copiaF(n, 3);
+		sprintf_s(n, "LightSource[%d].spotCosCutoff", i);	copiaF(n, 1);
+		sprintf_s(n, "LightSource[%d].spotExponent", i);	copiaF(n, 1);
+	}
+}
+
+void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
+{
+	//texturas
 	m_fitxers[0] = (char*)".\\textures\\sun\\\\2k_sun.jpg";
 	m_fitxers[1] = (char*)".\\textures\\planet\\Mercury\\2k_mercury.jpg";	// 1
 	m_fitxers[2] = (char*)".\\textures\\planet\\Venus\\2k_venus_surface.jpg";		// 2
@@ -20,6 +78,16 @@ void Escenari::creaEscenari(GLuint& shader_programID)
 
 	m_colObj.r = 1.0; m_colObj.g = 1.0; m_colObj.b = 1.0; m_colObj.a = 1.0;
 
+	// Mapas normales de los planetas
+	m_normalFitxers[0] = nullptr; // Sol
+	m_normalFitxers[1] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapMercury.png";
+	m_normalFitxers[2] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapVenus.png";
+	m_normalFitxers[3] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapEarth.png";
+	m_normalFitxers[4] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapMars.png";
+	m_normalFitxers[5] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapJupiter.png";
+	m_normalFitxers[6] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapSaturn.png";
+	m_normalFitxers[7] = nullptr; // Urano: sin mapa normal
+	m_normalFitxers[8] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapNeptune.png";
 
 	glUseProgram(shader_programID);
 
@@ -36,8 +104,7 @@ void Escenari::creaEscenari(GLuint& shader_programID)
 		if (m_texturesID[i]) { glDeleteTextures(1, &m_texturesID[i]); m_texturesID[i] = 0; }
 
 	// Carregar textures i configurar parametres de filtratge i repeticio un sol cop
-	for (int i = 0; i < 10; i++)
-	{
+	for (int i = 0; i < 10; i++){
 		m_texturesID[i] = loadIMA_SOIL(m_fitxers[i]);
 		if (m_texturesID[i] == 0) {
 			fprintf(stderr, "No s'ha pogut carregar: %s\n", m_fitxers[i]);
@@ -46,15 +113,51 @@ void Escenari::creaEscenari(GLuint& shader_programID)
 			glBindTexture(GL_TEXTURE_2D, m_texturesID[i]);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, 8.0f);
+		}
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glUniform1i(glGetUniformLocation(shader_programID, "texture0"), GLint(0));
+	glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), GL_TRUE);
+
+	//carrega mapas normales
+	glActiveTexture(GL_TEXTURE0);
+	for (int i = 0; i < 9; i++){
+		if (m_normalTexturesID[i] != 0){
+			glDeleteTextures(1, &m_normalTexturesID[i]);
+			m_normalTexturesID[i] = 0;
+		}
+	}
+
+	for (int i = 1; i < 9; i++){
+		if (m_normalFitxers[i] == nullptr) continue;
+
+		m_normalTexturesID[i] = loadIMA_SOIL(m_normalFitxers[i]);
+
+		if (m_normalTexturesID[i] == 0) {
+			fprintf(stderr, "No s'ha pogut carregar el mapa normal: %s\n",
+				m_normalFitxers[i]);
+		}
+		else {
+			glBindTexture(GL_TEXTURE_2D, m_normalTexturesID[i]);
+
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, 8.0f);
 		}
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	glUniform1i(glGetUniformLocation(shader_programID, "texture0"), GLint(0));
-	glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), GL_TRUE);
+	glUseProgram(shaderNormalMapID);
+	glUniform1i( glGetUniformLocation(shaderNormalMapID, "texture0"), 0);
+	glUniform1i(glGetUniformLocation(shaderNormalMapID, "normalMap"), 1);
+	glUniform1i(glGetUniformLocation(shaderNormalMapID, "flag_invert_y"), GL_TRUE);
 
+	glUseProgram(shader_programID);
 	//Initialize class variables
 	const float radiCos[9] = {
 		16.0f,  // Sol
@@ -131,7 +234,8 @@ void Escenari::creaEscenari(GLuint& shader_programID)
 
 
 
-void Escenari::dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id, CMask3D& reixa, CPunt3D& hreixa, char& objecte,
+void Escenari::dibuixaEscenari(GLuint& sh_programID, GLuint& shaderNormalMapID,
+	bool& eix, GLuint& axis_Id, CMask3D& reixa, CPunt3D& hreixa, char& objecte,
 	CColor& col_object, bool sw_mat[5],
 	bool& textur, bool& textur_map, bool& flagInvertY,
 	int& nptsU, CPunt3D PC_u[MAX_PATCH_CORBA], GLfloat& pasCS, bool& sw_PC, bool& dib_TFrenet,
@@ -176,14 +280,11 @@ void Escenari::dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id,
 		}
 
 		float x = m_objectList[6].m_radiOrbita * (float)cos(m_objectList[6].m_angleOrbita * PI / 180.0f);
-
 		float y = m_objectList[6].m_radiOrbita * (float)sin(m_objectList[6].m_angleOrbita * PI / 180.0f);
 
 		ModelMatrix = glm::translate(MatriuTG, vec3(x, y, 0.0f));
-
 		// Inclinar ligeramente los anillos
 		ModelMatrix = glm::rotate(ModelMatrix, glm::radians(20.0f), vec3(1.0f, 0.0f, 0.0f));
-
 		// Escalar los anillos
 		ModelMatrix = glm::scale(ModelMatrix, vec3(1.0f, 1.0f, 1.0f));
 
@@ -192,6 +293,7 @@ void Escenari::dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id,
 		draw_TriEBO_Object(GLU_DISK);
 
 	// 3. Cossos: esfera amb la seva textura, situada sobre la seva òrbita
+		//phong shadder
 
 	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_TRUE);
 	glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_TRUE);
@@ -200,9 +302,9 @@ void Escenari::dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id,
 
 	GLint locModelMatCos = glGetUniformLocation(sh_programID, "modelMatrix");
 	GLint locSwInt = glGetUniformLocation(sh_programID, "sw_intensity");
-
-	for (i = 0; i < 9; i++)
-	{
+	auto teNormalMap = [&](int k) { return k > 0 && m_normalTexturesID[k] != 0; };
+	for (int i = 0; i < 9; i++) {
+		if (teNormalMap(i)) continue;
 		if (m_texturesID[i] != 0) {
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, m_texturesID[i]);
@@ -222,12 +324,48 @@ void Escenari::dibuixaEscenari(GLuint& sh_programID, bool& eix, GLuint& axis_Id,
 		glUniform4i(locSwInt, (i == 0 && sw_mat[0]), sw_mat[1], sw_mat[2], sw_mat[3]);
 		draw_TriEBO_Object(GLU_SPHERE);
 	}
+		//normal map shadder
+	glUseProgram(shaderNormalMapID);
+	copiaUniformsShader(sh_programID, shaderNormalMapID);
+	// Configuración de texturas
+	glUniform1i(glGetUniformLocation(shaderNormalMapID, "textur"), GL_TRUE);
+	glUniform1i(glGetUniformLocation(shaderNormalMapID, "modulate"), GL_TRUE);
+	glUniform1i(glGetUniformLocation(shaderNormalMapID, "flag_invert_y"),flagInvertY);
+	// Configuración de material
+	SeleccionaColorMaterial(shaderNormalMapID, col_blanc, sw_mat);
 
+	locModelMatCos =glGetUniformLocation(shaderNormalMapID, "modelMatrix");
+	locSwInt =glGetUniformLocation(shaderNormalMapID, "sw_intensity");
 
-	// Restaurar l'estat dels uniforms de material i textura
-	glUniform4i(glGetUniformLocation(sh_programID, "sw_intensity"), sw_mat[0], sw_mat[1], sw_mat[2], sw_mat[3]);
+	// Planetas con mapas normales: Mercurio, Venus, Tierra,Marte, Júpiter, Saturno y Neptuno.
+	for (int i = 1; i < 9; i++){
+		// Urano no tiene mapa normal !textura plana sin gracia se puede canviar despues si hace falta!
+		if(!teNormalMap(i)) continue;		// Textura difusa: unidad 0
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, m_texturesID[i]);
+		// Mapa normal: unidad 1
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, m_normalTexturesID[i]);
+
+		float x = m_objectList[i].m_radiOrbita *(float)cos(m_objectList[i].m_angleOrbita * PI / 180.0);
+		float y = m_objectList[i].m_radiOrbita *(float)sin(m_objectList[i].m_angleOrbita * PI / 180.0);
+
+		ModelMatrix = glm::translate(MatriuTG, vec3(x, y, 0.0f));
+		ModelMatrix = glm::rotate(ModelMatrix,glm::radians(m_objectList[i].m_angleRotacio),vec3(0.0f, 0.0f, 1.0f));
+		ModelMatrix = glm::scale(ModelMatrix,vec3(m_objectList[i].m_radiCos,m_objectList[i].m_radiCos,m_objectList[i].m_radiCos));
+		glUniformMatrix4fv(locModelMatCos, 1, GL_FALSE, &ModelMatrix[0][0]);
+		glUniform4i(locSwInt,0,sw_mat[1],sw_mat[2],sw_mat[3]);
+		draw_TriEBO_Object(GLU_SPHERE);
+	}
+	//restaurar shader id
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE0);
+	glUseProgram(sh_programID);
+
+	// Restaurar uniforms de Phong
+	glUniform4i(glGetUniformLocation(sh_programID, "sw_intensity"),sw_mat[0], sw_mat[1], sw_mat[2], sw_mat[3]);
 	glUniform1i(glGetUniformLocation(sh_programID, "textur"), textur);
-
 }
 
 void Escenari::updateVariables(double dt, bool enPausa, int direccioTemps, bool escalaReal, double factorVelocitat)

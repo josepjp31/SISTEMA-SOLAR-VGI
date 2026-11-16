@@ -77,8 +77,7 @@ void Iluminacio(GLint sh_programID, char ilumin, bool ifix, bool ilu2sides, bool
 
 // Intensitats difusa i especular de la font de llum:
 	//	glLightfv(GL_LIGHT1, GL_DIFFUSE, lumin[1].difusa);	// Codi OpenGL 1.1
-	glUniform4f(glGetUniformLocation(sh_programID, "LightSource[1].diffuse"), lumin[0].difusa.r, lumin[1].difusa.g, lumin[1].difusa.b, lumin[1].difusa.a);
-	//	glLightfv(GL_LIGHT1, GL_SPECULAR, lumin[1].especular);	// Codi OpenGL 1.1
+	glUniform4f(glGetUniformLocation(sh_programID, "LightSource[1].diffuse"), lumin[1].difusa.r, lumin[1].difusa.g, lumin[1].difusa.b, lumin[1].difusa.a);	//	glLightfv(GL_LIGHT1, GL_SPECULAR, lumin[1].especular);	// Codi OpenGL 1.1
 	glUniform4f(glGetUniformLocation(sh_programID, "LightSource[1].specular"), lumin[1].especular.r, lumin[1].especular.g, lumin[1].especular.b, lumin[1].especular.a);
 
 // Coeficients factor atenuació f_att=1/(ad2+bd+c):
@@ -95,8 +94,7 @@ void Iluminacio(GLint sh_programID, char ilumin, bool ifix, bool ilu2sides, bool
 	glUniform1i(glGetUniformLocation(sh_programID, "LightSource[1].restricted"), lumin[1].restringida);
 	glUniform3f(glGetUniformLocation(sh_programID, "LightSource[1].spotDirection"), lumin[1].spotdirection.x, lumin[1].spotdirection.y, lumin[1].spotdirection.z);
 	glUniform1f(glGetUniformLocation(sh_programID, "LightSource[1].spotCosCutoff"), lumin[1].spotcoscutoff);
-	glUniform1f(glGetUniformLocation(sh_programID, "LightSource[1].SpotExponent"), lumin[1].spotexponent);
-
+	glUniform1f(glGetUniformLocation(sh_programID, "LightSource[1].spotExponent"), lumin[1].spotexponent);
 // Activació - Desactivació font de llum:
 	//	glEnable(GL_LIGHT1);	//	glDisable(GL_LIGHT1);	// Codi OpenGL 1.1
 	glUniform1i(glGetUniformLocation(sh_programID, "LightSource[1].sw_light"), lumin[1].encesa);

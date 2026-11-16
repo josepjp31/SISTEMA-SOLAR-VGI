@@ -285,7 +285,8 @@ void InitGL()
 	// Entorn VGI: Variables de control del menú SHADERS
 	shader = CAP_SHADER;
 	oShader = 1;				// Variable que controla desplegable SHADER d'ImGui (opció Gouraud)
-	shader_programID = 0;
+	shader_programID = 0; 
+	shader_programIDNormalMap = 0; //inicializar variable shader normal map
 	shaderLighting.releaseAllShaders();
 
 	// Entorn VGI: Inicialitzar llista de VAO's ABANS de carregar el VAO del Skybox per no esborrar-lo
@@ -556,6 +557,14 @@ void OnSize(GLFWwindow* window, int width, int height)
 	//	OnPaint();
 }
 
+void OnShaderNormalMap()
+{
+	fprintf(stderr, "Normal Mapping Shader:\n");
+	shaderLightingNormalMap.DeleteProgram();	shader_programIDNormalMap = 0;
+	GLuint newShaderID = shaderLightingNormalMap.loadFileShaders(".\\shaders\\normal_mapping.vert", ".\\shaders\\normal_mapping.frag");
+	if (newShaderID) shader_programIDNormalMap = newShaderID;
+	else fprintf(stderr, "GLSL_Error. Fitxers normal_mapping amb errors\n");
+}
 
 // SincronitzarEstatSimuladorAmbOpenGL: Sincronitza les opcions del menu ImGui (InterficieUI)
 // amb les variables internes d'OpenGL (il-luminacio del Sol, Skybox, eixos, camera i focus).
@@ -571,6 +580,8 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 
 		// Carregar i activar Shader Phong amb il-luminacio Suau
 		OnShaderPhong();
+		//activar normal map shaders
+		OnShaderNormalMap();
 		oShader = shortCut_Shader();
 		ilumina = SUAU;
 		oIlumina = shortCut_Iluminacio();
@@ -609,11 +620,17 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		glUseProgram(shader_programID);
 		glUniform1i(glGetUniformLocation(shader_programID, "texture0"), GLint(0));
 		glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), tFlag_invert_Y);
+		glUseProgram(shader_programIDNormalMap);
+
+		glUseProgram(shader_programIDNormalMap);
+		glUniform1i(glGetUniformLocation(shader_programIDNormalMap, "texture0"),0);
+		glUniform1i(glGetUniformLocation(shader_programIDNormalMap, "normalMap"),1);
+		glUniform1i(glGetUniformLocation(shader_programIDNormalMap, "flag_invert_y"),tFlag_invert_Y);
 
 		// Assegurar que l'escenari te els VAOs i textures vinculats al shader Phong actual
 		if (escenariActual != nullptr)
 		{
-			escenariActual->creaEscenari(shader_programID);
+			escenariActual->creaEscenari(shader_programID, shader_programIDNormalMap);
 		}
 
 		// Assegurar que el Skybox i els Eixos estan carregats
@@ -845,6 +862,7 @@ void OnPaint(GLFWwindow* window)
 
 		// Entorn VGI: Càrrega Shader de Gouraud
 		if (!shader_programID) shader_programID = shaderLighting.loadFileShaders(".\\shaders\\gouraud_shdrML.vert", ".\\shaders\\gouraud_shdrML.frag");
+		if (!shader_programIDNormalMap) shader_programIDNormalMap = shaderLightingNormalMap.loadFileShaders(".\\shaders\\normal_mapping.vert", ".\\shaders\\normal_mapping.frag");
 
 		// Entorn VGI: Creació de la llista que dibuixarà els eixos Coordenades Món. Funció on està codi per dibuixar eixos	
 		if (!eixos_Id) eixos_Id = deixos();						// Funció que defineix els Eixos Coordenades Món com un VAO.
@@ -884,7 +902,7 @@ void dibuixa_Escena() {
 	//	GTMatrix = glm::scale();
 
 	//	Dibuix geometria de l'escena amb comandes GL.
-	dibuixa_EscenaGL(shader_programID, eixos, eixos_Id, grid, hgrid, objecte, col_obj, sw_material,
+	dibuixa_EscenaGL(shader_programID, shader_programIDNormalMap, eixos, eixos_Id, grid, hgrid, objecte, col_obj, sw_material,
 		textura, texturesID, textura_map, tFlag_invert_Y,
 		npts_T, PC_t, pas_CS, sw_Punts_Control, dibuixa_TriedreFrenet,
 		ObOBJ,				// Classe de l'objecte OBJ que conté els VAO's
@@ -1136,7 +1154,7 @@ void draw_Menu_ImGui()
 	ImGui::NewFrame();
 
 	// Renderitzar la interficie principal del Simulador del Sistema Solar (Selector inicial, barra superior, panell de temps, HUD)
-	InterficieUI::Renderitzar(g_EstatSimulador, escenariActual, escenaris, shader_programID);
+	InterficieUI::Renderitzar(g_EstatSimulador, escenariActual, escenaris, shader_programID, shader_programIDNormalMap);
 
 	// Projeccio de les etiquetes 2D dels astres sobre la pantalla quan la simulacio esta activa
 	if (!g_EstatSimulador.mostrarSelectorModes &&
@@ -3987,7 +4005,6 @@ void OnShaderPhong()
 	}
 	else fprintf(stderr, "%s", "GLSL_Error. Fitxers .vert o .frag amb errors"); // AfxMessageBox(_T("GLSL_Error. Fitxers .vert o .frag amb errors"));
 }
-
 
 // SHADERS: Càrrega Fitxers Shader (.vert, .frag)
 void OnShaderLoadFiles()
@@ -7334,7 +7351,7 @@ int main()
 
 
 	escenariActual = new Escenari();
-	escenariActual->creaEscenari(shader_programID);
+	escenariActual->creaEscenari(shader_programID, shader_programIDNormalMap);
 
 
 // Loop until the user closes the window

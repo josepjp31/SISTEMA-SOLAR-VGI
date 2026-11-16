@@ -80,7 +80,7 @@ void dibuixa_Skybox(GLuint sk_programID, GLuint cmTexture, char eix_Polar, glm::
 
 
 // dibuixa_EscenaGL: Dibuix de l'escena amb comandes GL
-void dibuixa_EscenaGL(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D reixa, CPunt3D hreixa, char objecte,
+void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, bool eix, GLuint axis_Id, CMask3D reixa, CPunt3D hreixa, char objecte,
 	CColor col_object, bool sw_mat[5],
 	bool textur, GLuint texturID[NUM_MAX_TEXTURES], bool textur_map, bool flagInvertY,
 	int nptsU, CPunt3D PC_u[MAX_PATCH_CORBA], GLfloat pasCS, bool sw_PC, bool dib_TFrenet,
@@ -394,7 +394,7 @@ void dibuixa_EscenaGL(GLuint sh_programID, bool eix, GLuint axis_Id, CMask3D rei
 
 	case SISTEMA_SOLAR:
 		if (escenariActual != nullptr)
-			escenariActual->dibuixaEscenari(sh_programID, eix, axis_Id, reixa, hreixa, objecte, col_object, sw_mat, textur, textur_map, flagInvertY, nptsU, PC_u, pasCS, sw_PC, dib_TFrenet, objecteOBJ, /*glm::mat4 MatriuVista,*/ MatriuTG, mostrarOrbites);
+			escenariActual->dibuixaEscenari(sh_programID, shader_programIDNormalMap, eix, axis_Id, reixa, hreixa, objecte, col_object, sw_mat, textur, textur_map, flagInvertY, nptsU, PC_u, pasCS, sw_PC, dib_TFrenet, objecteOBJ, /*glm::mat4 MatriuVista,*/ MatriuTG, mostrarOrbites);
 		break;
 
 		// Dibuix de la resta d'objectes
