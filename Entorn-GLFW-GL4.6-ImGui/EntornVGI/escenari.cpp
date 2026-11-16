@@ -63,6 +63,19 @@ glm::vec3 Escenari::getPosicioCos(int idx) const
 	return m_cossos[idx].m_posicio;
 }
 
+glm::vec3 Escenari::getPosicioVista(int idx, int cosEnfocatId, bool origenRelatiu) const
+{
+	(void)cosEnfocatId;
+	(void)origenRelatiu;
+	return getPosicioCos(idx);
+}
+
+glm::vec3 Escenari::getColorCos(int idx) const
+{
+	(void)idx;
+	return glm::vec3(0.0f, 0.78f, 1.0f);
+}
+
 float Escenari::getRadiCos(int idx) const
 {
 	if (idx < 0 || idx >= static_cast<int>(m_cossos.size())) return 0.0f;

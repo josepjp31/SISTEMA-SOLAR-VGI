@@ -21,6 +21,9 @@
 #include "visualitzacio.h"
 #include "escena.h"
 
+double p_near = 0.01;
+double p_far = 50000.0;
+
 // Iluminació: Configurar iluminació de l'escena
 void Iluminacio(GLint sh_programID, char ilumin, bool ifix, bool ilu2sides, bool ll_amb, LLUM* lumin, char obj, bool frnt_fcs,
 	bool bc_lin, int step)
@@ -348,7 +351,8 @@ glm::mat4 Vista_Esferica(GLuint sh_programID,CEsfe3D opv,char VPol,bool pant,CPu
 	glm::mat4 TransMatrix(1.0);	// Matrius Traslació
 
 // Rectificar paràmetre R si negatiu.
-	if (opv.R < 1.0) opv.R = 1.0;
+	// Respectar el pla proper dinamic (p_near) sense forcar R >= 1.0
+	opv.R = glm::max(p_near * 2.0, opv.R);
 
 // Conversió angles radians -> graus
 	opv.alfa=opv.alfa*PI/180;

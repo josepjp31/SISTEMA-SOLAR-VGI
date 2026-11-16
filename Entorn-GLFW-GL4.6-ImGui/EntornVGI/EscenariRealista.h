@@ -52,6 +52,8 @@ public:
 
 	double getEphemerisTimeET() const { return m_ephemerisTimeET; }
 	bool areKernelsCarregats() const { return m_kernelsCarregats; }
+	glm::vec3 getPosicioVista(int idx, int cosEnfocatId, bool origenRelatiu) const override;
+	glm::vec3 getColorCos(int idx) const override;
 
 private:
 	void recalcularOrbites3D(double et);
@@ -61,6 +63,7 @@ private:
 	double m_ephemerisTimeET;
 	bool m_kernelsCarregats;
 	bool m_primerFrame;
+	glm::dvec3 m_posicionsAU[NUM_COSSOS_REALISTA];
 
 	std::vector<OrbitaLineVAO> m_orbitesVAO;
 	static const CosRealMetadata kMetadadesReals[NUM_COSSOS_REALISTA];

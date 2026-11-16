@@ -12,10 +12,11 @@ EscenariIntuitiu::EscenariIntuitiu()
 	// Parametres de camera adaptats al Mode Didactic / Intuitiu
 	m_configCamera.distInicialSol = 140.0f;
 	m_configCamera.angleInclinacioInicial = 25.0f;
-	m_configCamera.distGlobal = 550.0f;
+	m_configCamera.globalSistemaR = 550.0f;
 	m_configCamera.angleGlobal = 65.0f;
 	m_configCamera.minDistSol = 42.0f;
-	m_configCamera.maxDistCamera = 800.0f;
+	m_configCamera.minDistSolFixa = true;
+	m_configCamera.maxR = 800.0f;
 	m_configCamera.factorFocusPlaneta = 4.5f;
 	m_configCamera.minDistFocusPlaneta = 14.0f;
 	m_configCamera.minDistFocusZoom = 2.5f;
@@ -23,10 +24,12 @@ EscenariIntuitiu::EscenariIntuitiu()
 	m_configCamera.pasZoomSol = 5.0f;
 	m_configCamera.minPasZoomPlaneta = 1.0f;
 	m_configCamera.factorPasZoomPlaneta = 0.5f;
+	m_configCamera.zoomLogaritmic = false;
 	m_configCamera.navPosX = 110.0f;
 	m_configCamera.navPosY = -110.0f;
 	m_configCamera.navPosZ = 30.0f;
 	m_configCamera.navPas = 2.5f;
+	m_configCamera.atenuacioQuad = 0.00004f;
 }
 
 EscenariIntuitiu::~EscenariIntuitiu()

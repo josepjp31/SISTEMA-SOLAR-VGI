@@ -407,7 +407,9 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		llumGL[0].posicio.x = 0.0;		llumGL[0].posicio.y = 0.0;		llumGL[0].posicio.z = 0.0;		llumGL[0].posicio.w = 1.0;
 		llumGL[0].difusa.r = 1.0f;		llumGL[0].difusa.g = 1.0f;		llumGL[0].difusa.b = 1.0f;		llumGL[0].difusa.a = 1.0f;
 		llumGL[0].especular.r = 1.0f;	llumGL[0].especular.g = 1.0f;	llumGL[0].especular.b = 1.0f;	llumGL[0].especular.a = 1.0f;
-		llumGL[0].atenuacio.a = (g_EstatSimulador.modeActual == ModeSimulacio::INTUITIU) ? 0.00004 : 0.0;
+		llumGL[0].atenuacio.a = (escenariActual != nullptr)
+			? static_cast<GLdouble>(escenariActual->getConfigCamera().atenuacioQuad)
+			: ((g_EstatSimulador.modeActual == ModeSimulacio::INTUITIU) ? 0.00004 : 1.0e-10);
 		llumGL[0].atenuacio.b = 0.0;	llumGL[0].atenuacio.c = 1.0;
 		llumGL[0].restringida = false;
 		for (int i = 1; i < NUM_MAX_LLUMS; i++) llumGL[i].encesa = false;
@@ -453,12 +455,7 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		int cid = g_EstatSimulador.cosEnfocatId;
 		if (cid < 0 || cid >= numCossos) cid = 0;
 
-		float distPerDefecte = cfgCam.distInicialSol;
-		if (cid > 0)
-		{
-			distPerDefecte = escenariActual->getRadiCos(cid) * cfgCam.factorFocusPlaneta;
-			if (distPerDefecte < cfgCam.minDistFocusPlaneta) distPerDefecte = cfgCam.minDistFocusPlaneta;
-		}
+		float distPerDefecte = cfgCam.getDistDefecte(cid, escenariActual->getRadiCos(cid));
 
 		if (g_EstatSimulador.cameraConfig.mode == ModeCamera::FIXA_INCLINADA_25)
 		{
@@ -482,7 +479,7 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 			mobil = true;	zzoom = true;	satelit = false;	pan = false;
 			Vis_Polar = POLARZ;
 			g_EstatSimulador.cosEnfocatId = 0;
-			OPV.R = cfgCam.distGlobal;
+			OPV.R = cfgCam.globalSistemaR;
 			OPV.alfa = cfgCam.angleGlobal;
 			OPV.beta = 0.0;
 		}
@@ -536,6 +533,26 @@ void OnPaint(GLFWwindow* window)
 		// Entorn VGI: Activar shader Visualització Escena
 		glUseProgram(shader_programID);
 
+		// Calcul dinamic de plans near/far en Escala Real per evitar near-clipping i Z-fighting
+		if (g_EstatSimulador.modeActual == ModeSimulacio::ESCALA_REAL)
+		{
+			if (camera == CAM_NAVEGA)
+			{
+				p_near = 0.01;
+				p_far = 100000.0;
+			}
+			else
+			{
+				p_near = glm::clamp((float)OPV.R * 0.01f, 0.0001f, 10.0f);
+				p_far = glm::max(100000.0f, (float)OPV.R * 4.0f);
+			}
+		}
+		else
+		{
+			p_near = 0.01;
+			p_far = 50000.0;
+		}
+
 		// Entorn VGI: Definició de Viewport, Projecció i Càmera
 		ProjectionMatrix = Projeccio_Perspectiva(shader_programID, 0, 0, w, h, OPV.R);
 
@@ -552,9 +569,19 @@ void OnPaint(GLFWwindow* window)
 				g_EstatSimulador.cosEnfocatId > 0 && g_EstatSimulador.cosEnfocatId < escenariActual->getNumCossos())
 			{
 				glm::vec3 pos = escenariActual->getPosicioCos(g_EstatSimulador.cosEnfocatId);
-				ViewMatrix = glm::translate(ViewMatrix, -pos);
-				glUseProgram(shader_programID);
-				glUniformMatrix4fv(glGetUniformLocation(shader_programID, "viewMatrix"), 1, GL_FALSE, &ViewMatrix[0][0]);
+				if (g_EstatSimulador.modeActual == ModeSimulacio::ESCALA_REAL)
+				{
+					// Origen relatiu al cos enfocat (evita jitter en float32 a 30.000-40.000 u):
+					// la camera orbita (0,0,0) i el Sol (Llum #0) es situa a -pos
+					glUseProgram(shader_programID);
+					glUniform4f(glGetUniformLocation(shader_programID, "LightSource[0].position"), -pos.x, -pos.y, -pos.z, 1.0f);
+				}
+				else
+				{
+					ViewMatrix = glm::translate(ViewMatrix, -pos);
+					glUseProgram(shader_programID);
+					glUniformMatrix4fv(glGetUniformLocation(shader_programID, "viewMatrix"), 1, GL_FALSE, &ViewMatrix[0][0]);
+				}
 			}
 		}
 		else if (camera == CAM_NAVEGA) {
@@ -639,20 +666,47 @@ void draw_Menu_ImGui()
 	// Renderitzar la interficie principal del Simulador del Sistema Solar (Selector inicial, barra superior, panell de temps, HUD)
 	InterficieUI::Renderitzar(g_EstatSimulador, escenariActual, escenaris, shader_programID);
 
-	// Projeccio de les etiquetes 2D dels astres sobre la pantalla quan la simulacio esta activa
+	// Projeccio de les etiquetes i marcadors 2D dels astres sobre la pantalla quan la simulacio esta activa
 	if (!g_EstatSimulador.mostrarSelectorModes &&
-		g_EstatSimulador.opcionsVisualitzacio.mostrarEtiquetes &&
 		objecte == SISTEMA_SOLAR &&
 		escenariActual != nullptr)
 	{
-		glm::vec4 viewport(0.0f, 0.0f, (float)w, (float)h);
-		int numCossos = escenariActual->getNumCossos();
-		for (int i = 0; i < numCossos; i++)
+		const int numCossos = escenariActual->getNumCossos();
+		const bool esEscalaReal = (g_EstatSimulador.modeActual == ModeSimulacio::ESCALA_REAL);
+		const bool mostrarMarcadors = esEscalaReal && g_EstatSimulador.opcionsVisualitzacio.mostrarMarcadorsPetits;
+		const bool mostrarEtiquetes = g_EstatSimulador.opcionsVisualitzacio.mostrarEtiquetes;
+
+		if (mostrarMarcadors || mostrarEtiquetes)
 		{
-			glm::vec3 pos = escenariActual->getPosicioCos(i);
-			float rCos = escenariActual->getRadiCos(i);
-			glm::vec3 posMon(pos.x, pos.y, pos.z + rCos * 1.15f);
-			InterficieUI::DibuixarEtiquetaPlaneta(escenariActual->getNomCos(i), posMon, ViewMatrix, ProjectionMatrix, viewport);
+			const glm::vec4 viewport(0.0f, 0.0f, (float)w, (float)h);
+			const bool origenRelatiu = (esEscalaReal && camera == CAM_ESFERICA &&
+				g_EstatSimulador.cosEnfocatId > 0 && g_EstatSimulador.cosEnfocatId < numCossos);
+
+			for (int i = 0; i < numCossos; i++)
+			{
+				glm::vec3 pos = escenariActual->getPosicioVista(i, g_EstatSimulador.cosEnfocatId, origenRelatiu);
+				float rCos = escenariActual->getRadiCos(i);
+
+				if (mostrarMarcadors)
+				{
+					InterficieUI::DibuixarMarcadorPlaneta(
+						escenariActual->getNomCos(i),
+						pos,
+						rCos,
+						escenariActual->getColorCos(i),
+						i == g_EstatSimulador.cosEnfocatId,
+						mostrarEtiquetes,
+						ViewMatrix,
+						ProjectionMatrix,
+						viewport
+					);
+				}
+				else
+				{
+					glm::vec3 posMon(pos.x, pos.y, pos.z + rCos * 1.15f);
+					InterficieUI::DibuixarEtiquetaPlaneta(escenariActual->getNomCos(i), posMon, ViewMatrix, ProjectionMatrix, viewport);
+				}
+			}
 		}
 	}
 
@@ -791,7 +845,7 @@ void OnShaderPhong()
 //    - mods: Variable que identifica si la tecla s'ha pulsat directa (mods=0), juntament amb la tecla Shift (mods=1) o la tecla Ctrl (mods=2).
 static void CalculaLimitsZoomCamera(int cosId, double& outMinR, double& outMaxR, double& outPasZoom)
 {
-	double radiCos = 35.0;
+	float radiCos = 35.0f;
 	outMinR = 42.0;
 	outMaxR = 800.0;
 	outPasZoom = 5.0;
@@ -802,15 +856,11 @@ static void CalculaLimitsZoomCamera(int cosId, double& outMinR, double& outMaxR,
 		int numCossos = escenariActual->getNumCossos();
 		if (cosId >= 0 && cosId < numCossos)
 		{
-			radiCos = static_cast<double>(escenariActual->getRadiCos(cosId));
+			radiCos = escenariActual->getRadiCos(cosId);
 		}
-		outMinR = (cosId == 0)
-			? static_cast<double>(cfgCam.minDistSol)
-			: std::max(static_cast<double>(cfgCam.minDistFocusZoom), radiCos * static_cast<double>(cfgCam.factorRadiMinZoom));
-		outMaxR = static_cast<double>(cfgCam.maxDistCamera);
-		outPasZoom = (cosId == 0)
-			? static_cast<double>(cfgCam.pasZoomSol)
-			: std::max(static_cast<double>(cfgCam.minPasZoomPlaneta), radiCos * static_cast<double>(cfgCam.factorPasZoomPlaneta));
+		outMinR = static_cast<double>(cfgCam.getMinR(cosId, radiCos));
+		outMaxR = static_cast<double>(cfgCam.maxR);
+		outPasZoom = static_cast<double>(cfgCam.getPasZoom(cosId, radiCos, static_cast<float>(OPV.R)));
 	}
 }
 
@@ -1332,10 +1382,19 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 		long int incr = zoomincr.cy / 1.0;
 
 		if (camera == CAM_ESFERICA) {	// Càmera Esfèrica
-			OPV.R = OPV.R + incr;
-			//if (OPV.R < 0.25) OPV.R = 0.25;
-			if (OPV.R < p_near) OPV.R = p_near;
-			if (OPV.R > p_far) OPV.R = p_far;
+			if (escenariActual != nullptr && escenariActual->getConfigCamera().zoomLogaritmic) {
+				double minR = 0.0005, maxR = 80000.0, pasZoom = 0.0;
+				CalculaLimitsZoomCamera(g_EstatSimulador.cosEnfocatId, minR, maxR, pasZoom);
+				OPV.R = OPV.R * exp(static_cast<double>(zoomincr.cy) * 0.01);
+				if (OPV.R < minR) OPV.R = minR;
+				if (OPV.R > maxR) OPV.R = maxR;
+			}
+			else {
+				OPV.R = OPV.R + incr;
+				//if (OPV.R < 0.25) OPV.R = 0.25;
+				if (OPV.R < p_near) OPV.R = p_near;
+				if (OPV.R > p_far) OPV.R = p_far;
+			}
 		}
 
 		//m_PosDAvall = point;
@@ -1452,7 +1511,15 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 				double minR = 42.0, maxR = 800.0, pasZoom = 5.0;
 				CalculaLimitsZoomCamera(cosId, minR, maxR, pasZoom);
 
-				OPV.R = OPV.R - yoffset * pasZoom;
+				if (escenariActual != nullptr && escenariActual->getConfigCamera().zoomLogaritmic)
+				{
+					double factor = static_cast<double>(escenariActual->getConfigCamera().factorZoomLogaritmic);
+					OPV.R = OPV.R * pow(1.0 - factor, yoffset);
+				}
+				else
+				{
+					OPV.R = OPV.R - yoffset * pasZoom;
+				}
 				if (OPV.R < minR)
 					OPV.R = minR;
 				if (OPV.R > maxR)
@@ -1475,7 +1542,7 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 			vdir[2] = vdir[2] / modul;
 
 			// Entorn VGI: Segons orientació dels eixos Polars (Vis_Polar)
-			double pasNav = yoffset * 2.5;
+			double pasNav = yoffset * fact_pan;
 			if (Vis_Polar == POLARZ)
 			{ // (X,Y,Z)
 				opvN.x += pasNav * vdir[0];

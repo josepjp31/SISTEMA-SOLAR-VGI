@@ -35,9 +35,9 @@ static void PopFontSegur(ImFont* f)
 }
 
 // =========================================================================
-// CATALEG DE DADES FISIQUES DELS 9 COSSOS DEL SISTEMA SOLAR (0: Sol .. 8: Neptu)
+// CATALEG DE DADES FISIQUES DELS COSSOS DEL SISTEMA SOLAR (0: Sol .. 8: Neptu, 9: Pluto, 10: Lluna)
 // =========================================================================
-static const CosAstronomicDades kCatalegCossos[9] = {
+static const CosAstronomicDades kCatalegCossos[11] = {
     { "Sol",     696340.0,  0.000, 274.00,  609.12,   0.00 },
     { "Mercuri",   2439.7,  0.387,   3.70, 1407.60,   0.24 },
     { "Venus",     6051.8,  0.723,   8.87, 5832.50,   0.62 },
@@ -46,13 +46,15 @@ static const CosAstronomicDades kCatalegCossos[9] = {
     { "Júpiter",  69911.0,  5.204,  24.79,    9.93,  11.86 },
     { "Saturn",   58232.0,  9.582,  10.44,   10.70,  29.45 },
     { "Urà",      25362.0, 19.218,   8.69,   17.24,  84.02 },
-    { "Neptú",    24622.0, 30.110,  11.15,   16.11, 164.79 }
+    { "Neptú",    24622.0, 30.110,  11.15,   16.11, 164.79 },
+    { "Plutó",     1188.3, 39.482,   0.62,  153.29, 247.94 },
+    { "Lluna",     1737.4,  1.000,   1.62,  655.72,   0.07 }
 };
 
 void InterficieUI::ActualitzarDadesCosActiu(EstatSimulacio& estat)
 {
     int id = estat.cosEnfocatId;
-    if (id < 0 || id >= 9) id = 0;
+    if (id < 0 || id >= 11) id = 0;
     estat.dadesCosActiu = kCatalegCossos[id];
 }
 
@@ -856,9 +858,13 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             }
             if (ImGui::BeginMenu("El Planeta Seleccionat")) {
                 ImGui::SetWindowFontScale(factorFontMenu);
-                for (int i = 1; i < 9; ++i) {
+                static const char* nomsPlanetesRealista[11] = {
+                    "Sol (Centre)", "Mercuri", "Venus", "Terra",
+                    "Mart", "Júpiter", "Saturn", "Urà", "Neptú", "Plutó", "Lluna"
+                };
+                for (int i = 1; i < 11; ++i) {
                     bool seleccionat = (!estat.origenReferenciaSol && estat.cosEnfocatId == i);
-                    if (ImGui::MenuItem(nomsPlanetesMenu[i], nullptr, seleccionat)) {
+                    if (ImGui::MenuItem(nomsPlanetesRealista[i], nullptr, seleccionat)) {
                         estat.cosEnfocatId = i;
                         estat.origenReferenciaSol = false;
                         estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
@@ -899,6 +905,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             ImGui::SetWindowFontScale(factorFontMenu);
             ImGui::MenuItem("Mostrar Òrbites", nullptr, &estat.opcionsVisualitzacio.mostrarOrbites);
             ImGui::MenuItem("Mostrar Noms dels Planetes", nullptr, &estat.opcionsVisualitzacio.mostrarEtiquetes);
+            ImGui::MenuItem("Mostrar Marcadors (Halos)", nullptr, &estat.opcionsVisualitzacio.mostrarMarcadorsPetits);
             ImGui::MenuItem("Llum del Sol", nullptr, &estat.opcionsVisualitzacio.iluminacioSolarDirecta);
             ImGui::MenuItem("Vista Clara (Sense ombres)", nullptr, &estat.opcionsVisualitzacio.vistaClaraAmbient);
             ImGui::Separator();
@@ -1869,5 +1876,52 @@ void InterficieUI::DibuixarEtiquetaPlaneta(const std::string& nom, const glm::ve
         drawList->AddCircleFilled(posText, 3.5f, IM_COL32(0, 200, 255, 255));
         drawList->AddText(ImVec2(posText.x + 8.0f, posText.y - 7.0f), 
                           IM_COL32(245, 245, 245, 230), nom.c_str());
+    }
+}
+
+void InterficieUI::DibuixarMarcadorPlaneta(const std::string& nom, const glm::vec3& posicioMon,
+                                           float radiCos, const glm::vec3& colorCos,
+                                           bool esCosEnfocat, bool mostrarEtiqueta,
+                                           const glm::mat4& viewMatrix, const glm::mat4& projMatrix,
+                                           const glm::vec4& viewport)
+{
+    glm::vec3 win = glm::project(posicioMon, viewMatrix, projMatrix, viewport);
+    if (win.z < 0.0f || win.z > 1.0f) return;
+
+    ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+    if (drawList == nullptr) return;
+
+    // Diametre aparent en pixels a pantalla per amagar el halo quan la esfera 3D es prou gran (> ~25 px)
+    glm::vec4 posCam = viewMatrix * glm::vec4(posicioMon, 1.0f);
+    float distCam = glm::length(glm::vec3(posCam));
+    float diametrePx = (distCam > 1e-6f)
+        ? 2.0f * (radiCos / distCam) * (0.5f * viewport.w * projMatrix[1][1])
+        : 9999.0f;
+
+    bool ocultarHalo = (esCosEnfocat && diametrePx > 25.0f) || (diametrePx > 25.0f);
+
+    if (!ocultarHalo) {
+        ImVec2 centre(win.x, viewport.w - win.y);
+        int cr = static_cast<int>(glm::clamp(colorCos.r * 255.0f, 0.0f, 255.0f));
+        int cg = static_cast<int>(glm::clamp(colorCos.g * 255.0f, 0.0f, 255.0f));
+        int cb = static_cast<int>(glm::clamp(colorCos.b * 255.0f, 0.0f, 255.0f));
+
+        // Halo circular subtil + punt central amb el color caracteristic de l'astre
+        drawList->AddCircleFilled(centre, 10.0f, IM_COL32(cr, cg, cb, 34), 24);
+        drawList->AddCircle(centre, 7.5f, IM_COL32(cr, cg, cb, 165), 24, 1.3f);
+        drawList->AddCircleFilled(centre, 3.0f, IM_COL32(cr, cg, cb, 245), 16);
+
+        if (mostrarEtiqueta) {
+            drawList->AddText(ImVec2(centre.x + 11.0f, centre.y - 7.0f),
+                              IM_COL32(245, 245, 245, 235), nom.c_str());
+        }
+    } else if (mostrarEtiqueta) {
+        glm::vec3 posEtiquetaMon(posicioMon.x, posicioMon.y, posicioMon.z + radiCos * 1.15f);
+        glm::vec3 winLabel = glm::project(posEtiquetaMon, viewMatrix, projMatrix, viewport);
+        if (winLabel.z >= 0.0f && winLabel.z <= 1.0f) {
+            ImVec2 posText(winLabel.x, viewport.w - winLabel.y);
+            drawList->AddText(ImVec2(posText.x + 8.0f, posText.y - 7.0f),
+                              IM_COL32(245, 245, 245, 230), nom.c_str());
+        }
     }
 }

@@ -223,8 +223,13 @@ public:
     // 2.6 Panell d'Informacio i Telemetria Astronomica (HUD Flotant)
     static void DibuixarFitxaAstronomicaHUD(const CosAstronomicDades& dades, bool* pObert);
 
-    // 2.7 Projeccio d'Etiquetes 3D a Pantalla 2D amb ImDrawList
+    // 2.7 Projeccio d'Etiquetes i Marcadors 3D a Pantalla 2D amb ImDrawList
     static void DibuixarEtiquetaPlaneta(const std::string& nom, const glm::vec3& posicioMon, 
                                        const glm::mat4& viewMatrix, const glm::mat4& projMatrix, 
                                        const glm::vec4& viewport);
+    static void DibuixarMarcadorPlaneta(const std::string& nom, const glm::vec3& posicioMon,
+                                        float radiCos, const glm::vec3& colorCos,
+                                        bool esCosEnfocat, bool mostrarEtiqueta,
+                                        const glm::mat4& viewMatrix, const glm::mat4& projMatrix,
+                                        const glm::vec4& viewport);
 };

@@ -65,8 +65,8 @@
 
 
 // -------------- VGI: Definició dels valors del pla near i far del Volum de Visualització en Perspectiva
-const double p_near = 0.01;
-const double p_far = 50000.0;
+extern double p_near;
+extern double p_far;
 
 //-------------- VGI: Tipus d'Objectes Picking
 #define PICKCAP 0
