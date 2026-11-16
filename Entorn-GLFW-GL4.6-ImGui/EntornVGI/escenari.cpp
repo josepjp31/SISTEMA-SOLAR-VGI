@@ -10,7 +10,7 @@ void Escenari::creaEscenari(GLuint& shader_programID)
 	m_fitxers[0] = (char*)".\\textures\\sun\\\\2k_sun.jpg";
 	m_fitxers[1] = (char*)".\\textures\\planet\\Mercury\\2k_mercury.jpg";	// 1
 	m_fitxers[2] = (char*)".\\textures\\planet\\Venus\\2k_venus_surface.jpg";		// 2
-	m_fitxers[3] = (char*)".\\textures\\planet\\Earth\\2k_earth_daymap.jpg";		// 3
+	m_fitxers[3] = (char*)".\\textures\\planet\\Earth\\earth2048.bmp";		// 3
 	m_fitxers[4] = (char*)".\\textures\\planet\\Mars\\2k_mars.jpg";		// 4
 	m_fitxers[5] = (char*)".\\textures\\planet\\Jupiter\\2k_jupiter.jpg";	// 5
 	m_fitxers[6] = (char*)".\\textures\\planet\\Saturn\\2k_saturn.jpg";	// 6
