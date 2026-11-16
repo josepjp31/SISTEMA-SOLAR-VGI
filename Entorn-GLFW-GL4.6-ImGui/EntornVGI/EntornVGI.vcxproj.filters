@@ -30,6 +30,12 @@
     <ClCompile Include="escenari.cpp">
       <Filter>Archivos de origen</Filter>
     </ClCompile>
+    <ClCompile Include="EscenariIntuitiu.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
+    <ClCompile Include="EscenariRealista.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
     <ClCompile Include="glut_geometry.cpp">
       <Filter>Archivos de origen</Filter>
     </ClCompile>
@@ -84,6 +90,12 @@
       <Filter>Archivos de encabezado</Filter>
     </ClInclude>
     <ClInclude Include="escenari.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="EscenariIntuitiu.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="EscenariRealista.h">
       <Filter>Archivos de encabezado</Filter>
     </ClInclude>
     <ClInclude Include="framework.h">

@@ -18,11 +18,13 @@
 #include "escena.h"
 #include "main.h"
 #include "escenari.h"
+#include "EscenariIntuitiu.h"
+#include "EscenariRealista.h"
 #include "InterficieUI.h"
 
-// Escenari actiu i llista d'escenaris (0: Mode Didactic, 1: Mode a Escala Real)
+// Escenari actiu i llista d'escenaris polimorfics (0: Mode Didactic, 1: Mode a Escala Real)
 Escenari* escenariActual = nullptr;
-Escenari* escenaris = nullptr;
+Escenari* escenaris[2] = { nullptr, nullptr };
 
 // Estat global de la interficie d'usuari del simulador
 EstatSimulacio g_EstatSimulador;
@@ -405,7 +407,8 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		llumGL[0].posicio.x = 0.0;		llumGL[0].posicio.y = 0.0;		llumGL[0].posicio.z = 0.0;		llumGL[0].posicio.w = 1.0;
 		llumGL[0].difusa.r = 1.0f;		llumGL[0].difusa.g = 1.0f;		llumGL[0].difusa.b = 1.0f;		llumGL[0].difusa.a = 1.0f;
 		llumGL[0].especular.r = 1.0f;	llumGL[0].especular.g = 1.0f;	llumGL[0].especular.b = 1.0f;	llumGL[0].especular.a = 1.0f;
-		llumGL[0].atenuacio.a = 0.00004; llumGL[0].atenuacio.b = 0.0;	llumGL[0].atenuacio.c = 1.0;
+		llumGL[0].atenuacio.a = (g_EstatSimulador.modeActual == ModeSimulacio::INTUITIU) ? 0.00004 : 0.0;
+		llumGL[0].atenuacio.b = 0.0;	llumGL[0].atenuacio.c = 1.0;
 		llumGL[0].restringida = false;
 		for (int i = 1; i < NUM_MAX_LLUMS; i++) llumGL[i].encesa = false;
 
@@ -443,16 +446,18 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 	}
 
 	// 3. Aplicacio dels canvis de mode de camera o d'astre enfocat des del menu
-	if (g_EstatSimulador.canviCameraPendent)
+	if (g_EstatSimulador.canviCameraPendent && escenariActual != nullptr)
 	{
+		const ConfigCamera& cfgCam = escenariActual->getConfigCamera();
+		int numCossos = escenariActual->getNumCossos();
 		int cid = g_EstatSimulador.cosEnfocatId;
-		if (cid < 0 || cid >= 9) cid = 0;
+		if (cid < 0 || cid >= numCossos) cid = 0;
 
-		float distPerDefecte = 140.0f;
-		if (cid > 0 && escenariActual != nullptr)
+		float distPerDefecte = cfgCam.distInicialSol;
+		if (cid > 0)
 		{
-			distPerDefecte = escenariActual->m_objectList[cid].m_radiCos * 4.5f;
-			if (distPerDefecte < 14.0f) distPerDefecte = 14.0f;
+			distPerDefecte = escenariActual->getRadiCos(cid) * cfgCam.factorFocusPlaneta;
+			if (distPerDefecte < cfgCam.minDistFocusPlaneta) distPerDefecte = cfgCam.minDistFocusPlaneta;
 		}
 
 		if (g_EstatSimulador.cameraConfig.mode == ModeCamera::FIXA_INCLINADA_25)
@@ -460,7 +465,7 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 			camera = CAM_ESFERICA;
 			mobil = true;	zzoom = true;	satelit = false;	pan = false;
 			Vis_Polar = POLARZ;
-			OPV.alfa = 25.0;
+			OPV.alfa = cfgCam.angleInclinacioInicial;
 			OPV.R = distPerDefecte;
 		}
 		else if (g_EstatSimulador.cameraConfig.mode == ModeCamera::ORBITAL_CENTRADOR)
@@ -468,7 +473,7 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 			camera = CAM_ESFERICA;
 			mobil = true;	zzoom = true;	satelit = false;	pan = false;
 			Vis_Polar = POLARZ;
-			if (OPV.alfa == 0.0) OPV.alfa = 25.0;
+			if (OPV.alfa == 0.0) OPV.alfa = cfgCam.angleInclinacioInicial;
 			OPV.R = distPerDefecte;
 		}
 		else if (g_EstatSimulador.cameraConfig.mode == ModeCamera::GLOBAL_SISTEMA)
@@ -477,8 +482,8 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 			mobil = true;	zzoom = true;	satelit = false;	pan = false;
 			Vis_Polar = POLARZ;
 			g_EstatSimulador.cosEnfocatId = 0;
-			OPV.R = 550.0;
-			OPV.alfa = 65.0;
+			OPV.R = cfgCam.distGlobal;
+			OPV.alfa = cfgCam.angleGlobal;
 			OPV.beta = 0.0;
 		}
 		else if (g_EstatSimulador.cameraConfig.mode == ModeCamera::COET_PRIMERA_PERSONA)
@@ -486,9 +491,9 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 			// Camera Lliure implementada a l'opcio Navega (CAM_NAVEGA)
 			OnCameraNavega();
 			Vis_Polar = POLARZ;
-			fact_pan = 2.5;
+			fact_pan = cfgCam.navPas;
 			// Situar la camera lliure en una posicio inicial privilegiada mirant cap al centre del Sistema Solar
-			opvN.x = 110.0;	opvN.y = -110.0;	opvN.z = 30.0;
+			opvN.x = cfgCam.navPosX;	opvN.y = cfgCam.navPosY;	opvN.z = cfgCam.navPosZ;
 			n[0] = 0.0;		n[1] = 0.0;			n[2] = 0.0;
 			angleZ = 0.0;
 		}
@@ -542,16 +547,12 @@ void OnPaint(GLFWwindow* window)
 				ilumina, llum_ambient, llumGL, ifixe, ilum2sides,
 				eixos, grid, hgrid);
 
-			// Quan hi ha un planeta enfocat (cosEnfocatId > 0), centrar la camera sobre la posicio orbital (x, y, 0) de l'astre
-			if (objecte == SISTEMA_SOLAR && escenariActual != nullptr && g_EstatSimulador.cosEnfocatId > 0 && g_EstatSimulador.cosEnfocatId < 9)
+			// Quan hi ha un astre enfocat (cosEnfocatId > 0), centrar la camera sobre la posicio 3D de l'astre
+			if (objecte == SISTEMA_SOLAR && escenariActual != nullptr &&
+				g_EstatSimulador.cosEnfocatId > 0 && g_EstatSimulador.cosEnfocatId < escenariActual->getNumCossos())
 			{
-				int cid = g_EstatSimulador.cosEnfocatId;
-				float ang = escenariActual->m_objectList[cid].m_angleOrbita * (float)PI / 180.0f;
-				float rOrb = escenariActual->m_objectList[cid].m_radiOrbita;
-				float px = rOrb * cos(ang);
-				float py = rOrb * sin(ang);
-
-				ViewMatrix = glm::translate(ViewMatrix, glm::vec3(-px, -py, 0.0f));
+				glm::vec3 pos = escenariActual->getPosicioCos(g_EstatSimulador.cosEnfocatId);
+				ViewMatrix = glm::translate(ViewMatrix, -pos);
 				glUseProgram(shader_programID);
 				glUniformMatrix4fv(glGetUniformLocation(shader_programID, "viewMatrix"), 1, GL_FALSE, &ViewMatrix[0][0]);
 			}
@@ -619,7 +620,7 @@ void dibuixa_Escena() {
 	//	Dibuix geometria de l'escena amb comandes GL.
 	dibuixa_EscenaGL(shader_programID, ViewMatrix, GTMatrix, sw_material,
 		escenariActual,
-		g_EstatSimulador.opcionsVisualitzacio.mostrarOrbites);
+		g_EstatSimulador);
 }
 
 
@@ -642,20 +643,16 @@ void draw_Menu_ImGui()
 	if (!g_EstatSimulador.mostrarSelectorModes &&
 		g_EstatSimulador.opcionsVisualitzacio.mostrarEtiquetes &&
 		objecte == SISTEMA_SOLAR &&
-		escenariActual != nullptr &&
-		escenariActual->m_objectList != nullptr)
+		escenariActual != nullptr)
 	{
-		static const char* nomsEtiquetes[9] = {
-			"Sol", "Mercuri", "Venus", "Terra", "Mart", "Júpiter", "Saturn", "Urà", "Neptú"
-		};
 		glm::vec4 viewport(0.0f, 0.0f, (float)w, (float)h);
-		for (int i = 0; i < 9; i++)
+		int numCossos = escenariActual->getNumCossos();
+		for (int i = 0; i < numCossos; i++)
 		{
-			float ang = escenariActual->m_objectList[i].m_angleOrbita * (float)PI / 180.0f;
-			float rOrb = escenariActual->m_objectList[i].m_radiOrbita;
-			float rCos = escenariActual->m_objectList[i].m_radiCos;
-			glm::vec3 posMon(rOrb * cos(ang), rOrb * sin(ang), rCos * 1.15f);
-			InterficieUI::DibuixarEtiquetaPlaneta(nomsEtiquetes[i], posMon, ViewMatrix, ProjectionMatrix, viewport);
+			glm::vec3 pos = escenariActual->getPosicioCos(i);
+			float rCos = escenariActual->getRadiCos(i);
+			glm::vec3 posMon(pos.x, pos.y, pos.z + rCos * 1.15f);
+			InterficieUI::DibuixarEtiquetaPlaneta(escenariActual->getNomCos(i), posMon, ViewMatrix, ProjectionMatrix, viewport);
 		}
 	}
 
@@ -792,6 +789,31 @@ void OnShaderPhong()
 //    - scancode: Nombre de vegades que s'ha apretat la tecla (acceleració)
 //    - action: Acció de la tecla: GLFW_PRESS (si s'ha apretat), GLFW_REPEAT, si s'ha repetit pressió i GL_RELEASE, si es deixa d'apretar.
 //    - mods: Variable que identifica si la tecla s'ha pulsat directa (mods=0), juntament amb la tecla Shift (mods=1) o la tecla Ctrl (mods=2).
+static void CalculaLimitsZoomCamera(int cosId, double& outMinR, double& outMaxR, double& outPasZoom)
+{
+	double radiCos = 35.0;
+	outMinR = 42.0;
+	outMaxR = 800.0;
+	outPasZoom = 5.0;
+
+	if (escenariActual != nullptr)
+	{
+		const ConfigCamera& cfgCam = escenariActual->getConfigCamera();
+		int numCossos = escenariActual->getNumCossos();
+		if (cosId >= 0 && cosId < numCossos)
+		{
+			radiCos = static_cast<double>(escenariActual->getRadiCos(cosId));
+		}
+		outMinR = (cosId == 0)
+			? static_cast<double>(cfgCam.minDistSol)
+			: std::max(static_cast<double>(cfgCam.minDistFocusZoom), radiCos * static_cast<double>(cfgCam.factorRadiMinZoom));
+		outMaxR = static_cast<double>(cfgCam.maxDistCamera);
+		outPasZoom = (cosId == 0)
+			? static_cast<double>(cfgCam.pasZoomSol)
+			: std::max(static_cast<double>(cfgCam.minPasZoomPlaneta), radiCos * static_cast<double>(cfgCam.factorPasZoomPlaneta));
+	}
+}
+
 void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
 	// EntornVGI.ImGui: Test si events de teclat han sigut filtrats per ImGui (io.WantCaptureKeyboard)
@@ -839,13 +861,8 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 		{
 			const double pasAngle = 5.0;
 			int cosId = g_EstatSimulador.cosEnfocatId;
-			double radiCos = 35.0;
-			if (escenariActual != nullptr && cosId >= 0 && cosId < 9) {
-				radiCos = escenariActual->m_objectList[cosId].m_radiCos;
-			}
-			double minR = (cosId == 0) ? 42.0 : std::max(2.5, radiCos * 2.2);
-			double maxR = 800.0;
-			const double pasDistancia = (cosId == 0) ? 5.0 : std::max(1.0, radiCos * 0.5);
+			double minR = 42.0, maxR = 800.0, pasDistancia = 5.0;
+			CalculaLimitsZoomCamera(cosId, minR, maxR, pasDistancia);
 
 			// Gir horitzontal al voltant del cos enfocat
 			if (key == GLFW_KEY_LEFT)
@@ -1432,13 +1449,8 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 			if (camera == CAM_ESFERICA)
 			{	// Càmera Esfèrica
 				int cosId = g_EstatSimulador.cosEnfocatId;
-				double radiCos = 35.0;
-				if (escenariActual != nullptr && cosId >= 0 && cosId < 9) {
-					radiCos = escenariActual->m_objectList[cosId].m_radiCos;
-				}
-				double minR = (cosId == 0) ? 42.0 : std::max(2.5, radiCos * 2.2);
-				double maxR = 800.0;
-				double pasZoom = (cosId == 0) ? 5.0 : std::max(1.0, radiCos * 0.5);
+				double minR = 42.0, maxR = 800.0, pasZoom = 5.0;
+				CalculaLimitsZoomCamera(cosId, minR, maxR, pasZoom);
 
 				OPV.R = OPV.R - yoffset * pasZoom;
 				if (OPV.R < minR)
@@ -1728,10 +1740,11 @@ int main()
 	ImGui_ImplOpenGL3_Init("#version 130");
 	// Entorn VGI.ImGui: End Setup Dear ImGui context
 
-	// Reserva dels 5 escenaris disponibles.
+	// Reserva dels 2 escenaris polimorfics disponibles (0: Intuitiu, 1: Escala Real).
 	// L'escena del sistema solar NO es carrega ni es dibuixa mentre el selector inicial de modes estigui obert.
-	escenaris = new Escenari[5];
-	escenariActual = &escenaris[0];
+	escenaris[0] = new EscenariIntuitiu();
+	escenaris[1] = new EscenariRealista();
+	escenariActual = escenaris[0];
 	objecte = CAP;
 
 	objecte = SISTEMA_SOLAR;
@@ -1768,10 +1781,7 @@ int main()
 			if (escenariActual != nullptr && objecte == SISTEMA_SOLAR) {
 				escenariActual->updateVariables(
 					(double)delta,
-					g_EstatSimulador.tempsSimulacio.enPausa,
-					g_EstatSimulador.tempsSimulacio.direccioTemps,
-					escalaReal,
-					g_EstatSimulador.tempsSimulacio.factorVelocitatSegonsPerSegon
+					g_EstatSimulador
 				);
 			}
 		}
@@ -1804,8 +1814,11 @@ int main()
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
 
-	delete[] escenaris;
-	escenaris = nullptr;
+	for (int i = 0; i < 2; i++)
+	{
+		delete escenaris[i];
+		escenaris[i] = nullptr;
+	}
 	escenariActual = nullptr;
 
 	glfwDestroyWindow(window);

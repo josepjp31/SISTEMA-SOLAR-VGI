@@ -1,39 +1,33 @@
-//******** PRACTICA VISUALITZACIÓ GRÀFICA INTERACTIVA (Escola Enginyeria - UAB)
-//******** Entorn bàsic VS2026 MONOFINESTRA amb OpenGL 4.6, interfície GLFW 3.4, ImGui i llibreries GLM
-//******** Ferran Poveda, Marc Vivet, Carme Julià, Débora Gil, Enric Martí (Setembre 2026)
+ï»¿//******** PRACTICA VISUALITZACIÃ“ GRÃ€FICA INTERACTIVA (Escola Enginyeria - UAB)
+//******** Entorn bÃ sic VS2026 MONOFINESTRA amb OpenGL 4.6, interfÃ­cie GLFW 3.4, ImGui i llibreries GLM
+//******** Ferran Poveda, Marc Vivet, Carme JuliÃ , DÃ©bora Gil, Enric MartÃ­ (Setembre 2026)
 // escena.cpp : Aqui es on ha d'anar el codi de les funcions que 
 //              dibuixin les escenes.
-//
-//    Versió 2.0:	- Objectes Cub, Esfera, Tetera (primitives libreria GLUT)
-//
-//	  Versió 2.2:	- Objectes Cub, Esfera, Tetera definides en fitxer font glut_geometry amb altres primitives GLUT
-//
-//	  Versió 2.5:	- Objectes cubRGB i Tie (nau Star Wars fet per alumnes)
-//
 
 #include "escenari.h"
+#include "InterficieUI.h"
 
 #include "framework.h"
 #include "material.h"
 #include "visualitzacio.h"
 #include "escena.h"
 
-// Dibuixa Eixos Coordenades Món i Reixes, activant un shader propi.
+// Dibuixa Eixos Coordenades MÃ³n i Reixes, activant un shader propi.
 void dibuixa_Eixos(GLuint ax_programID, bool eix, GLuint axis_Id, CMask3D reixa, CPunt3D hreixa,
 	glm::mat4 MatriuProjeccio, glm::mat4 MatriuVista)
 {
-	// Visualització Eixos Coordenades Mòn
+	// VisualitzaciÃ³ Eixos Coordenades MÃ³n
 	glUseProgram(ax_programID);
 
-	// Pas Matrius Projecció i Vista Vista a shader
+	// Pas Matrius ProjecciÃ³ i Vista a shader
 	glUniformMatrix4fv(glGetUniformLocation(ax_programID, "projectionMatrix"), 1, GL_FALSE, &MatriuProjeccio[0][0]);
 	glUniformMatrix4fv(glGetUniformLocation(ax_programID, "viewMatrix"), 1, GL_FALSE, &MatriuVista[0][0]);
 
 	// Attribute Locations must be setup before calling glLinkProgram()
-	glBindAttribLocation(ax_programID, 0, "in_Vertex"); // Vèrtexs
+	glBindAttribLocation(ax_programID, 0, "in_Vertex"); // VÃ¨rtexs
 	glBindAttribLocation(ax_programID, 1, "in_Color");	// Color
 
-	//  Dibuix dels eixos
+	// Dibuix dels eixos
 	if (eix) draw_Eixos(axis_Id);
 }
 
@@ -68,33 +62,31 @@ void dibuixa_Skybox(GLuint sk_programID, GLuint cmTexture, char eix_Polar, glm::
 	glBindTexture(GL_TEXTURE_CUBE_MAP, cmTexture);
 	glUniform1i(glGetUniformLocation(sk_programID, "skybox"), 0);
 
-	//  Dibuix del Skybox
+	// Dibuix del Skybox
 	drawCubeSkybox();
 
 	glDepthMask(GL_TRUE); // Restaurar escriptura de profunditat
 	glDepthFunc(GL_LESS); // set depth function back to default
 }
 
-
-
 // dibuixa_EscenaGL: Dibuix de l'escena amb comandes GL
 void dibuixa_EscenaGL(GLuint sh_programID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5],
-	Escenari* escenariActual, bool mostrarOrbites)
+	Escenari* escenariActual, const EstatSimulacio& estat)
 {
-	// Shader Visualització Objectes
+	// Shader VisualitzaciÃ³ Objectes
 	glUseProgram(sh_programID);
 
-	// Parametrització inicial de textures
+	// ParametritzaciÃ³ inicial de textures
 	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_FALSE);
 	glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_FALSE);
 	glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), GL_TRUE);
 
 	// Attribute Locations must be setup before calling glLinkProgram()
-	glBindAttribLocation(sh_programID, 0, "in_Vertex");		// Vèrtexs
+	glBindAttribLocation(sh_programID, 0, "in_Vertex");		// VÃ¨rtexs
 	glBindAttribLocation(sh_programID, 1, "in_Color");		// Color
 	glBindAttribLocation(sh_programID, 2, "in_Normal");		// Normals
 	glBindAttribLocation(sh_programID, 3, "in_TexCoord");	// Textura
 
 	if (escenariActual != nullptr)
-		escenariActual->dibuixaEscenari(sh_programID, MatriuVista, MatriuTG, sw_mat, mostrarOrbites);
+		escenariActual->dibuixaEscenari(sh_programID, MatriuVista, MatriuTG, sw_mat, estat);
 }

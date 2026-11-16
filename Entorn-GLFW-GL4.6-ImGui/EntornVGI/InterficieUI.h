@@ -209,13 +209,13 @@ public:
     static void ActualitzarDadesCosActiu(EstatSimulacio& estat);
 
     // Renderitzador principal que coordina tots els components
-    static void Renderitzar(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID);
+    static void Renderitzar(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari* escenaris[2], GLuint& shader_programID);
 
     // 2.1 Selector Inicial de Modes (Modal Central amb 2 Quadrats)
-    static void DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID);
+    static void DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari* escenaris[2], GLuint& shader_programID);
 
     // 2.2 Barra de Menu Superior Dinamica per Mode (Main Menu Bar)
-    static void DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID);
+    static void DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari* escenaris[2], GLuint& shader_programID);
 
     // 2.3 Selector de Data, Hora i Control de Timelapse (Cantonada Inferior Dreta)
     static void DibuixarPanellDataHoraTimelapse(EstatSimulacio& estat);

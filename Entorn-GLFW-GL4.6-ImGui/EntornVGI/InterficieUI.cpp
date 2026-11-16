@@ -310,7 +310,7 @@ static void DibuixarDialegQuantA(bool* pObert)
 // =========================================================================
 // 2. RENDERITZADOR PRINCIPAL
 // =========================================================================
-void InterficieUI::Renderitzar(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID)
+void InterficieUI::Renderitzar(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari* escenaris[2], GLuint& shader_programID)
 {
     // 1. Selector inicial de modes (2 quadrats centrals amb escalat adaptatiu)
     // En aquesta fase inicial nomes es mostren els quadrats dels modes sobre fons fosc.
@@ -352,7 +352,7 @@ static void DibuixarPuntLlista(const char* text)
 // =========================================================================
 // 2.1 SELECTOR INICIAL DE MODES (MODAL CENTRAL ESCALABLE AMB 2 QUADRATS)
 // =========================================================================
-void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID)
+void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari* escenaris[2], GLuint& shader_programID)
 {
     if (!estat.mostrarSelectorModes) return;
 
@@ -520,9 +520,9 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
                 ActualitzarDadesCosActiu(estat);
 
                 // Creacio de l'escenari corresponent (index 0: Mode Didactic)
-                if (escenaris != nullptr)
+                if (escenaris != nullptr && escenaris[0] != nullptr)
                 {
-                    currentEscenari = &escenaris[0];
+                    currentEscenari = escenaris[0];
                     currentEscenari->creaEscenari(shader_programID);
                 }
             }
@@ -595,9 +595,9 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
                 ActualitzarDadesCosActiu(estat);
 
                 // Creacio de l'escenari corresponent (index 1: Mode a Escala Real)
-                if (escenaris != nullptr)
+                if (escenaris != nullptr && escenaris[1] != nullptr)
                 {
-                    currentEscenari = &escenaris[1];
+                    currentEscenari = escenaris[1];
                     currentEscenari->creaEscenari(shader_programID);
                 }
             }
@@ -615,7 +615,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
 // =========================================================================
 // 2.2 BARRA DE MENU SUPERIOR DINAMICA PER MODE (MAIN MENU BAR)
 // =========================================================================
-void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID)
+void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari* escenaris[2], GLuint& shader_programID)
 {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     float viewW = vp->WorkSize.x;
@@ -660,8 +660,8 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 estat.mostrarPanellTemps = true;
                 estat.configuracioInicialPendent = true;
                 estat.canviCameraPendent = true;
-                if (escenaris != nullptr) {
-                    currentEscenari = &escenaris[1];
+                if (escenaris != nullptr && escenaris[1] != nullptr) {
+                    currentEscenari = escenaris[1];
                     currentEscenari->creaEscenari(shader_programID);
                 }
             }
@@ -778,8 +778,12 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 estat.cameraConfig.mode = ModeCamera::FIXA_INCLINADA_25;
                 estat.configuracioInicialPendent = true;
                 estat.canviCameraPendent = true;
-                if (escenaris != nullptr) {
-                    currentEscenari = &escenaris[0];
+                if (estat.cosEnfocatId >= 9) {
+                    estat.cosEnfocatId = 0;
+                    ActualitzarDadesCosActiu(estat);
+                }
+                if (escenaris != nullptr && escenaris[0] != nullptr) {
+                    currentEscenari = escenaris[0];
                     currentEscenari->creaEscenari(shader_programID);
                 }
             }

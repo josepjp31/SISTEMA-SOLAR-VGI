@@ -4,16 +4,48 @@
 #include "material.h"
 #include "visualitzacio.h"
 
-// Nombre maxim d'objectes per escenari
-#define MAX_OBJECTES_ESCENARI 10
+struct EstatSimulacio;
 
-// Dades individuals de cada cos celeste (Sol i planetes) dins de l'escenari
+// Configuracio de parametres de camera propis de cada mode d'escenari
+struct ConfigCamera
+{
+	float distInicialSol = 140.0f;
+	float angleInclinacioInicial = 25.0f;
+	float distGlobal = 550.0f;
+	float angleGlobal = 65.0f;
+	float minDistSol = 42.0f;
+	float maxDistCamera = 800.0f;
+	float factorFocusPlaneta = 4.5f;
+	float minDistFocusPlaneta = 14.0f;
+	float minDistFocusZoom = 2.5f;
+	float factorRadiMinZoom = 2.2f;
+	float pasZoomSol = 5.0f;
+	float minPasZoomPlaneta = 1.0f;
+	float factorPasZoomPlaneta = 0.5f;
+	float navPosX = 110.0f;
+	float navPosY = -110.0f;
+	float navPosZ = 30.0f;
+	float navPas = 2.5f;
+};
+
+// Dades individuals de cada cos celeste dins de l'escenari
 class Object
 {
 public:
-	Object() : m_mMatrix(glm::mat4(1.0f)), m_radiCos(0.0f), m_radiOrbita(0.0f), m_angleOrbita(0.0f), m_velAngular(0.0f) {}
+	Object()
+		: m_nom("")
+		, m_radiCos(0.0f)
+		, m_radiOrbita(0.0f)
+		, m_angleOrbita(0.0f)
+		, m_velAngular(0.0f)
+		, m_angleRotacio(0.0f)
+		, m_velRotacio(0.0f)
+		, m_posicio(0.0f, 0.0f, 0.0f)
+		, m_mMatrix(glm::mat4(1.0f))
+	{}
 	~Object() {}
 
+	std::string m_nom;
 	float m_radiCos;
 	float m_radiOrbita;
 	float m_angleOrbita;
@@ -22,60 +54,41 @@ public:
 	float m_angleRotacio;
 	float m_velRotacio;
 
+	glm::vec3 m_posicio;
 	glm::mat4 m_mMatrix;
 };
 
-
-// Gestió de l'escenari complet del Sistema Solar (cossos, òrbites, textures i actualització orbital)
+// Classe base polimorfica per als escenaris del Sistema Solar (Intuitiu vs Escala Real)
 class Escenari
 {
 public:
-	Escenari()
-	{
-		m_objectList = new Object[MAX_OBJECTES_ESCENARI];
-		m_colObj.r = 1.0; m_colObj.g = 1.0; m_colObj.b = 1.0; m_colObj.a = 1.0;
-		for (int i = 0; i < NUM_MAX_TEXTURES; i++)
-		{
-			m_texturesID[i] = 0;
-			m_fitxers[i] = nullptr;
-		}
-	}
-	~Escenari() { alliberaEscenari(); }
+	Escenari();
+	virtual ~Escenari();
 
-	// No es permet copiar un Escenari (gestiona memoria dinamica i recursos OpenGL)
+	// No es permet copiar un Escenari (gestiona recursos OpenGL)
 	Escenari(const Escenari&) = delete;
 	Escenari& operator=(const Escenari&) = delete;
 
-	void creaEscenari(GLuint& shader_programID);
-	void dibuixaEscenari(GLuint sh_programID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5], bool mostrarOrbites = true);
+	virtual void creaEscenari(GLuint& shader_programID) = 0;
+	virtual void updateVariables(double dt, EstatSimulacio& estat) = 0;
+	virtual void dibuixaEscenari(GLuint& sh_programID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5], const EstatSimulacio& estat) = 0;
 
-	void updateVariables(double dt = 0.016, bool enPausa = false, int direccioTemps = 1, bool escalaReal = false, double factorVelocitat = 60.0);
-	// Allibera els objectes (i els seus VAO). Cal cridar-la ABANS de destruir el context OpenGL.
-	void alliberaEscenari() {
-		deleteVAOList(GLU_SPHERE);
-		deleteVAOList(GLU_DISK);
-		deleteVAOList(GLUT_TORUS);
-		for (int i = 0; i < 8; i++) {
-			if (m_orbitVAO[i].vaoId != 0) {
-				glDeleteVertexArrays(1, &m_orbitVAO[i].vaoId);
-				glDeleteBuffers(1, &m_orbitVAO[i].vboId);
-				glDeleteBuffers(1, &m_orbitVAO[i].eboId);
-				m_orbitVAO[i].vaoId = 0;
-				m_orbitVAO[i].vboId = 0;
-				m_orbitVAO[i].eboId = 0;
-			}
-		}
-		for (int i = 0; i < NUM_MAX_TEXTURES; i++) {
-			if (m_texturesID[i]) { glDeleteTextures(1, &m_texturesID[i]); m_texturesID[i] = 0; }
-		}
-		delete[] m_objectList; m_objectList = nullptr;
-	}
+	// Allibera els recursos comuns (textures). Les subclasses han d'alliberar els seus VAOs propis.
+	virtual void alliberaEscenari();
 
-	Object* m_objectList;
+	// Getters comuns per a camera, focus i etiquetes 2D
+	int getNumCossos() const { return static_cast<int>(m_cossos.size()); }
+	glm::vec3 getPosicioCos(int idx) const;
+	float getRadiCos(int idx) const;
+	std::string getNomCos(int idx) const;
+	const ConfigCamera& getConfigCamera() const { return m_configCamera; }
+
+protected:
+	GLuint carregaTextura2D(const char* rutaFitxer);
+	void alliberaTextures();
+
+	std::vector<Object> m_cossos;
 	GLuint m_texturesID[NUM_MAX_TEXTURES];
-	char* m_fitxers[NUM_MAX_TEXTURES];
 	CColor m_colObj;
-	//torus
-	CVAO m_orbitVAO[8];
-
+	ConfigCamera m_configCamera;
 };
