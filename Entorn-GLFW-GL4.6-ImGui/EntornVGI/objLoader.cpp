@@ -451,6 +451,10 @@ bool _stdcall COBJModel::LoadMaterialLib(const char szFileName[],
 			strcpy_s(pMaterials[*iCurMaterialIndex].szTexture, szTextureFile);
 			// Load texture and store its ID in the structure
 			pMaterials[*iCurMaterialIndex].iTextureID = LoadTexture2(szTextureFile);
+			//COET
+			printf("Textura: %s\n", szTextureFile);
+			printf("ID textura: %u\n",
+				pMaterials[*iCurMaterialIndex].iTextureID);
 		}
 
 // Shininess
@@ -1034,6 +1038,8 @@ void _stdcall COBJModel::UseMaterial_ShaderID(GLuint sh_programID, Material pMat
 			glEnable(GL_TEXTURE_2D);
 			glBindTexture(GL_TEXTURE_2D, pMaterial.iTextureID);
 			glUniform1i(glGetUniformLocation(sh_programID, "texture0"), GLint(0));
+			//COET
+			glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_TRUE);
 			//glUniform1i(glGetUniformLocation(sh_programID, "texture0"), pMaterial.iTextureID);
 
 			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -1046,7 +1052,8 @@ void _stdcall COBJModel::UseMaterial_ShaderID(GLuint sh_programID, Material pMat
 		else {
 			glDisable(GL_TEXTURE_2D);
 			//glMaterialfv(GL_FRONT, GL_EMISSION, pMaterial->fEmmissive);
-
+			//COET
+			glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_FALSE);
 			//glColorMaterial(GL_FRONT, GL_AMBIENT);
 			color[0] = pMaterial.fAmbient[0];	color[1] = pMaterial.fAmbient[1];	color[2] = pMaterial.fAmbient[2];
 			//glMaterialfv(GL_FRONT, GL_AMBIENT, pMaterial->fAmbient);

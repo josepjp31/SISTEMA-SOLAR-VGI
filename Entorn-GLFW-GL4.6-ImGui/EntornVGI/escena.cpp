@@ -87,7 +87,7 @@ void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, boo
 	COBJModel* objecteOBJ,
 	//glm::mat4 MatriuVista, 
 	glm::mat4 MatriuTG,
-	Escenari* escenariActual, bool mostrarOrbites)
+	Escenari* escenariActual, bool mostrarOrbites, bool mostrarMilano  /*COET*/)
 {
 	float altfar = 0;
 	GLint npunts = 0, nvertexs = 0;
@@ -407,6 +407,72 @@ void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, boo
 
 	// Enviar les comandes gràfiques a pantalla
 	//	glFlush();
+	//COET
+	if (mostrarMilano && objecteOBJ != nullptr)
+	{
+		// Centre geomètric del model
+		glm::vec3 centreModel(5.05f, 0.71f, -7.55f);
+
+		ModelMatrix = glm::translate(MatriuTG, posMilano);
+
+		// Portar el centre del model a l'origen
+		ModelMatrix = glm::translate(ModelMatrix, centreModel);
+
+		// Calcular l'eix lateral de la nau
+		float angleRad = glm::radians(angleMilano);
+
+		glm::vec3 eixPitch(
+			-sin(angleRad),
+			cos(angleRad),
+			0.0f
+		);
+
+		// Inclinació vertical de la nau
+		ModelMatrix = glm::rotate(
+			ModelMatrix,
+			glm::radians(-inclinacioMilano),
+			eixPitch
+		);
+
+		// Gir horitzontal de la nau
+		ModelMatrix = glm::rotate(
+			ModelMatrix,
+			glm::radians(angleMilano ),
+			glm::vec3(0.0f, 0.0f, 1.0f)
+		);
+
+		// Recuperar la posició original dels vèrtexs
+		ModelMatrix = glm::translate(ModelMatrix, -centreModel);
+
+		// Orientació fixa del model (sobre z)
+		ModelMatrix = glm::rotate(
+			ModelMatrix,
+			glm::radians(90.0f),
+			glm::vec3(0.0f, 0.0f, 1.0f)
+		);
+
+		// Gir de 180 graus sobre Y
+		ModelMatrix = glm::rotate(
+			ModelMatrix,
+			glm::radians(180.0f),
+			glm::vec3(0.0f, 1.0f, 0.0f)
+		);
+		//morro baix
+		ModelMatrix = glm::rotate(
+			ModelMatrix,
+			glm::radians(-90.0f),
+			glm::vec3(1.0f, 0.0f, 0.0f)
+		);
+
+		ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.5f));
+
+		glUniformMatrix4fv(
+			glGetUniformLocation(sh_programID, "modelMatrix"),
+			1, GL_FALSE, &ModelMatrix[0][0]
+		);
+
+		objecteOBJ->draw_TriVAO_OBJ(sh_programID);
+	}
 }
 
 

@@ -14,6 +14,9 @@
 /* ------------------------------------------------------------------------- */
 /*                            Funcions de les escenes                        */
 /* ------------------------------------------------------------------------- */
+
+
+
 void dibuixa_Eixos(GLuint ax_programID, bool eix, GLuint axis_Id, CMask3D reixa, CPunt3D hreixa, glm::mat4 MatriuProjeccio, glm::mat4 MatriuVista);
 void dibuixa_Skybox(GLuint sk_programID, GLuint cmTexture, char eix_Polar, glm::mat4 MatriuProjeccio, glm::mat4 MatriuVista);
 
@@ -24,7 +27,7 @@ void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, boo
 	int nptsU, CPunt3D PC_u[MAX_PATCH_CORBA], GLfloat pasCS, bool sw_PC, bool dib_TFrenet,
 	COBJModel* objecteOBJ,
 	glm::mat4 MatriuTG,
-	Escenari* escenariActual, bool mostrarOrbites = true);
+	Escenari* escenariActual, bool mostrarOrbites = true, bool mostrarMilano = true/*COET*/);
 
 // Entorn VGI: dibuixa -> Funció que dibuixa objectes simples de la llibreria GLUT segons obj
 void dibuixa(GLuint sh_programID, char obj, glm::mat4 MatriuTG);
@@ -43,4 +46,11 @@ void Motor(GLint shaderId, glm::mat4 MatriuTG, bool sw_mat[4]);
 void Canon(GLint shaderId, glm::mat4 MatriuTG, bool sw_mat[4]);
 void Cuerpo(GLint shaderId, glm::mat4 MatriuTG, bool sw_mat[4]);
 void Cabina(GLint shaderId, glm::mat4 MatriuTG, bool sw_mat[4]);
+
+
+//VARIABLES GLOBALS COET
+extern glm::vec3 posMilano;
+extern float angleMilano;
+extern float inclinacioMilano;
+
 #endif

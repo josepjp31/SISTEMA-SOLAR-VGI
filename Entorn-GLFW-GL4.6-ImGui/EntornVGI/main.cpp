@@ -27,6 +27,12 @@ Escenari* escenaris = nullptr;
 
 // Estat global de la interficie d'usuari del simulador
 EstatSimulacio g_EstatSimulador;
+//VARIABLE GLOBALS COET
+// Posició i orientació de la Milano
+glm::vec3 posMilano(120.0f, 0.0f, 0.0f);
+float angleMilano = 0.0f;
+float velocitatMilano = 0.5f;
+float inclinacioMilano = 0.0f;
 
 void InitGL()
 {
@@ -704,11 +710,20 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 			OnCameraNavega();
 			oCamera = 1;
 			Vis_Polar = POLARZ;
-			fact_pan = 2.5;
+			
 			// Situar la camera lliure en una posicio inicial privilegiada mirant cap al centre del Sistema Solar
-			opvN.x = 110.0;	opvN.y = -110.0;	opvN.z = 30.0;
-			n[0] = 0.0;		n[1] = 0.0;			n[2] = 0.0;
+			/**/
+			// Posició de la càmera darrere de la Milano
+			opvN.x = 50.0;
+			opvN.y = -25.0;
+			opvN.z = 15.0;
+
+			// Punt cap on mira: centre de la Milano
+			n[0] = 30.0;
+			n[1] = 0.0;
+			n[2] = 0.0;
 			angleZ = 0.0;
+			fact_pan = 0.5;
 		}
 
 		cam_Esferica[0] = (float)OPV.R;
@@ -839,6 +854,36 @@ void OnPaint(GLFWwindow* window)
 				front_faces, oculta, test_vis, back_line,
 				ilumina, llum_ambient, llumGL, ifixe, ilum2sides,
 				eixos, grid, hgrid);
+			// Càmera de seguiment de la Milano (tercera persona)
+			float angleRad = glm::radians(angleMilano);
+			//COET
+			// Direcció cap a la qual apunta la nau
+			glm::vec3 direccio(
+				cos(angleRad),
+				sin(angleRad),
+				0.0f
+			);
+
+			// Posició de la càmera: darrere i una mica per sobre
+			glm::vec3 cameraPos =
+				posMilano - direccio * 35.0f + glm::vec3(0.0f, 0.0f, 5.0f);
+
+			// Punt cap on mira la càmera
+			glm::vec3 puntMirada = posMilano + direccio * 8.0f + glm::vec3(0.0f, 0.0f, 2.0f);
+
+			// Crear la nova càmera
+			ViewMatrix = glm::lookAt(
+				cameraPos,
+				puntMirada,
+				glm::vec3(0.0f, 0.0f, 1.0f)
+			);
+
+			// Actualitzar la matriu de càmera al shader
+			glUseProgram(shader_programID);
+			glUniformMatrix4fv(
+				glGetUniformLocation(shader_programID, "viewMatrix"),
+				1, GL_FALSE, &ViewMatrix[0][0]
+			);
 		}
 		else if (camera == CAM_GEODE) {
 			ViewMatrix = Vista_Geode(shader_programID, OPV_G, Vis_Polar, pan, tr_cpv, tr_cpvF, c_fons, col_obj, objecte, mida, pas,
@@ -908,7 +953,8 @@ void dibuixa_Escena() {
 		ObOBJ,				// Classe de l'objecte OBJ que conté els VAO's
 		GTMatrix,
 		escenariActual,
-		g_EstatSimulador.opcionsVisualitzacio.mostrarOrbites);
+		g_EstatSimulador.opcionsVisualitzacio.mostrarOrbites,
+		camera == CAM_NAVEGA);
 }
 
 
@@ -2684,6 +2730,25 @@ void OnCameraNavega()
 	if (projeccio != ORTO || projeccio != CAP)
 	{
 		camera = CAM_NAVEGA;
+		// Carregar la Milano automàticament si encara no està carregada
+		if (ObOBJ == NULL) //COET
+		{
+			ObOBJ = new COBJModel;
+
+			char nomFitxer[] = "textures/coet/milano_gotg.obj";
+
+			int error = ObOBJ->LoadModel(nomFitxer);
+
+			if (error == 0)
+			{
+				
+				printf("Milano carregada correctament!\n");
+			}
+			else
+			{
+				printf("Error carregant la Milano: %d\n", error);
+			}
+		}
 		// Desactivació de zoom, mobil, Transformacions Geomètriques via mouse i pan 
 		//		si navega activat
 		mobil = false;	zzoom = false;	satelit = false;
@@ -2693,9 +2758,16 @@ void OnCameraNavega()
 		tr_cpvF.x = 0.0;	tr_cpvF.y = 0.0;	tr_cpvF.x = 0.0;	// Inicialitzar a 0 desplaçament de pantalla
 
 		// Incialitzar variables Navega segons configuració eixos en Polars
-		if (Vis_Polar == POLARZ) {
-			opvN.x = 10.0;	opvN.y = 0.0;	opvN.z = 0.0; // opvN = (10,0,0)
-			n[0] = 0.0;		n[1] = 0.0;		n[2] = 0.0;
+		if (Vis_Polar == POLARZ) { /*COET*/
+			// Posició inicial de la càmera darrere de la Milano
+			opvN.x = 50.0;
+			opvN.y = -25.0;
+			opvN.z = 15.0;
+
+			// Punt cap on mira la càmera: posició de la Milano
+			n[0] = 30.0;
+			n[1] = 0.0;
+			n[2] = 0.0;
 			angleZ = 0.0;
 		}
 		else if (Vis_Polar == POLARY) {
@@ -5387,186 +5459,51 @@ void Teclat_ColorFons(int key, int action)
 // Teclat_Navega: Teclat pels moviments de navegació.
 void Teclat_Navega(int key, int action)
 {
-	GLdouble vdir[3] = { 0, 0, 0 };
-	double modul = 0;
+	if (action != GLFW_PRESS && action != GLFW_REPEAT)
+		return;
 
-	// Entorn VGI: Controls de moviment de navegació
-	vdir[0] = n[0] - opvN.x;
-	vdir[1] = n[1] - opvN.y;
-	vdir[2] = n[2] - opvN.z;
-	modul = sqrt(vdir[0] * vdir[0] + vdir[1] * vdir[1] + vdir[2] * vdir[2]);
-	vdir[0] = vdir[0] / modul;
-	vdir[1] = vdir[1] / modul;
-	vdir[2] = vdir[2] / modul;
+	float pas = 2.0f;
+	float gir = 5.0f;
 
-	if (action == GLFW_PRESS || action == GLFW_REPEAT)
+	float angleRad = glm::radians(angleMilano);
+	float inclinacioRad = glm::radians(inclinacioMilano);
+
+	// Direcció cap on apunta la nau
+	glm::vec3 direccio(
+		cos(angleRad) * cos(inclinacioRad),
+		sin(angleRad) * cos(inclinacioRad),
+		sin(inclinacioRad)
+	);
+
+	switch (key)
 	{
-		double nx = 0.0, ny = 0.0, nz = 0.0;
-		switch (key)
-		{	// Tecla cursor amunt o W
-		case GLFW_KEY_UP:
-		case GLFW_KEY_W:
-			if (Vis_Polar == POLARZ)
-			{  // (X,Y,Z)
-				opvN.x += fact_pan * vdir[0];
-				opvN.y += fact_pan * vdir[1];
-				n[0] += fact_pan * vdir[0];
-				n[1] += fact_pan * vdir[1];
-			}
-			else if (Vis_Polar == POLARY)
-			{ //(X,Y,Z) --> (Z,X,Y)
-				opvN.x += fact_pan * vdir[0];
-				opvN.z += fact_pan * vdir[2];
-				n[0] += fact_pan * vdir[0];
-				n[2] += fact_pan * vdir[2];
-			}
-			else if (Vis_Polar == POLARX)
-			{	//(X,Y,Z) --> (Y,Z,X)
-				opvN.y += fact_pan * vdir[1];
-				opvN.z += fact_pan * vdir[2];
-				n[1] += fact_pan * vdir[1];
-				n[2] += fact_pan * vdir[2];
-			}
-			break;
+	case GLFW_KEY_UP:
+	case GLFW_KEY_W:
+		posMilano += direccio * pas;
+		break;
 
-			// Tecla cursor avall o S
-		case GLFW_KEY_DOWN:
-		case GLFW_KEY_S:
-			if (Vis_Polar == POLARZ)
-			{ // (X,Y,Z)
-				opvN.x -= fact_pan * vdir[0];
-				opvN.y -= fact_pan * vdir[1];
-				n[0] -= fact_pan * vdir[0];
-				n[1] -= fact_pan * vdir[1];
-			}
-			else if (Vis_Polar == POLARY)
-			{ //(X,Y,Z) --> (Z,X,Y)
-				opvN.x -= fact_pan * vdir[0];
-				opvN.z -= fact_pan * vdir[2];
-				n[0] -= fact_pan * vdir[0];
-				n[2] -= fact_pan * vdir[2];
-			}
-			else if (Vis_Polar == POLARX)
-			{ //(X,Y,Z) --> (Y,Z,X)
-				opvN.y -= fact_pan * vdir[1];
-				opvN.z -= fact_pan * vdir[2];
-				n[1] -= fact_pan * vdir[1];
-				n[2] -= fact_pan * vdir[2];
-			}
-			break;
+	case GLFW_KEY_DOWN:
+	case GLFW_KEY_S:
+		posMilano -= direccio * pas;
+		break;
 
-			// Tecla cursor esquerra o A
-		case GLFW_KEY_LEFT:
-		case GLFW_KEY_A:
-			angleZ = fact_pan;
-			if (Vis_Polar == POLARZ)
-			{ // (X,Y,Z)
-				nx = vdir[0] * cos(angleZ * PI / 180.0) - vdir[1] * sin(angleZ * PI / 180.0);
-				ny = vdir[0] * sin(angleZ * PI / 180.0) + vdir[1] * cos(angleZ * PI / 180.0);
-				n[0] = nx + opvN.x;
-				n[1] = ny + opvN.y;
-			}
-			else if (Vis_Polar == POLARY)
-			{ //(X,Y,Z) --> (Z,X,Y)
-				nz = vdir[2] * cos(angleZ * PI / 180.0) - vdir[0] * sin(angleZ * PI / 180.0);
-				nx = vdir[2] * sin(angleZ * PI / 180.0) + vdir[0] * cos(angleZ * PI / 180.0);
-				n[2] = nz + opvN.z;
-				n[0] = nx + opvN.x;
-			}
-			else if (Vis_Polar == POLARX)
-			{ //(X,Y,Z) --> (Y,Z,X)
-				ny = vdir[1] * cos(angleZ * PI / 180.0) - vdir[2] * sin(angleZ * PI / 180.0);
-				nz = vdir[1] * sin(angleZ * PI / 180.0) + vdir[2] * cos(angleZ * PI / 180.0);
-				n[1] = ny + opvN.y;
-				n[2] = nz + opvN.z;
-			}
-			break;
+	case GLFW_KEY_LEFT:
+	case GLFW_KEY_A:
+		angleMilano += gir;
+		break;
 
-			// Tecla cursor dret o D
-		case GLFW_KEY_RIGHT:
-		case GLFW_KEY_D:
-			angleZ = 360.0 - fact_pan;
-			if (Vis_Polar == POLARZ)
-			{ // (X,Y,Z)
-				nx = vdir[0] * cos(angleZ * PI / 180.0) - vdir[1] * sin(angleZ * PI / 180.0);
-				ny = vdir[0] * sin(angleZ * PI / 180.0) + vdir[1] * cos(angleZ * PI / 180.0);
-				n[0] = nx + opvN.x;
-				n[1] = ny + opvN.y;
-			}
-			else if (Vis_Polar == POLARY)
-			{ //(X,Y,Z) --> (Z,X,Y)
-				nz = vdir[2] * cos(angleZ * PI / 180.0) - vdir[0] * sin(angleZ * PI / 180.0);
-				nx = vdir[2] * sin(angleZ * PI / 180.0) + vdir[0] * cos(angleZ * PI / 180.0);
-				n[2] = nz + opvN.z;
-				n[0] = nx + opvN.x;
-			}
-			else if (Vis_Polar == POLARX)
-			{ //(X,Y,Z) --> (Y,Z,X)
-				ny = vdir[1] * cos(angleZ * PI / 180.0) - vdir[2] * sin(angleZ * PI / 180.0);
-				nz = vdir[1] * sin(angleZ * PI / 180.0) + vdir[2] * cos(angleZ * PI / 180.0);
-				n[1] = ny + opvN.y;
-				n[2] = nz + opvN.z;
-			}
-			break;
+	case GLFW_KEY_RIGHT:
+	case GLFW_KEY_D:
+		angleMilano -= gir;
+		break;
 
-			// Tecla Inicio ('7') o Q (Pujar)
-		case GLFW_KEY_KP_7: //GLFW_KEY_HOME:
-		case GLFW_KEY_Q:
-			if (Vis_Polar == POLARZ) {
-				opvN.z += fact_pan;
-				n[2] += fact_pan;
-			}
-			else if (Vis_Polar == POLARY) {
-				opvN.y += fact_pan;
-				n[1] += fact_pan;
-			}
-			else if (Vis_Polar == POLARX) {
-				opvN.x += fact_pan;
-				n[0] += fact_pan;
-			}
-			break;
+	case GLFW_KEY_Q:
+		posMilano.z += pas;
+		break;
 
-			// Tecla Fin o E (Baixar)
-		case GLFW_KEY_END:
-		case GLFW_KEY_E:
-			if (Vis_Polar == POLARZ) {
-				opvN.z -= fact_pan;
-				n[2] -= fact_pan;
-			}
-			else if (Vis_Polar == POLARY) {
-				opvN.y -= fact_pan;
-				n[1] -= fact_pan;
-			}
-			else if (Vis_Polar == POLARX) {
-				opvN.x -= fact_pan;
-				n[0] -= fact_pan;
-			}
-			break;
-
-			// Tecla PgUp ('9)
-		case GLFW_KEY_KP_9: //GLFW_KEY_PAGE_UP:
-			fact_pan /= 2;
-			if (fact_pan < 0.125) fact_pan = 0.125;
-			break;
-
-			// Tecla PgDown ('3')
-		case GLFW_KEY_KP_3: //GLFW_KEY_PAGE_DOWN:
-			fact_pan *= 2;
-			if (fact_pan > 2048) fact_pan = 2048;
-			break;
-
-		default:
-			if (transf)
-			{
-				if (rota) Teclat_TransRota(key, action);
-				else if (trasl) Teclat_TransTraslada(key, action);
-				else if (escal) Teclat_TransEscala(key, action);
-			}
-			else if (camera == CAM_NAVEGA) Teclat_Navega(key, action);
-			else if (!sw_color) Teclat_ColorFons(key, action);
-			else Teclat_ColorObjecte(key, action);
-			break;
-		}
+	case GLFW_KEY_E:
+		posMilano.z -= pas;
+		break;
 	}
 }
 
@@ -6418,41 +6355,24 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 	}
 	else if (m_ButoEAvall && (camera == CAM_NAVEGA) && (projeccio != CAP && projeccio != ORTO)) // Opció Navegació
 	{	// Entorn VGI: Canviar orientació en opció de Navegació
-		girn.cx = m_PosEAvall.x - xpos;		girn.cy = m_PosEAvall.y - ypos;
-		angleZ = girn.cx / 2.0;
-		// Entorn VGI: Control per evitar el creixement desmesurat dels angles.
-		while (angleZ >= 360.0) angleZ = angleZ - 360.0;
-		while (angleZ < 0.0)	angleZ = angleZ + 360.0;
+		girn.cx = m_PosEAvall.x - xpos;
+		girn.cy = m_PosEAvall.y - ypos;
 
-		// Entorn VGI: Segons orientació dels eixos Polars (Vis_Polar)
-		if (Vis_Polar == POLARZ)
-		{ // (X,Y,Z)
-			double dx = n[0] - opvN.x;
-			double dy = n[1] - opvN.y;
-			n[0] = (dx * cos(angleZ * PI / 180.0) - dy * sin(angleZ * PI / 180.0)) + opvN.x;
-			n[1] = (dx * sin(angleZ * PI / 180.0) + dy * cos(angleZ * PI / 180.0)) + opvN.y;
-			n[2] = n[2] + girn.cy * 0.01;
-		}
-		else if (Vis_Polar == POLARY)
-		{ //(X,Y,Z) --> (Z,X,Y)
-			double dz = n[2] - opvN.z;
-			double dx = n[0] - opvN.x;
-			n[2] = (dz * cos(angleZ * PI / 180.0) - dx * sin(angleZ * PI / 180.0)) + opvN.z;
-			n[0] = (dz * sin(angleZ * PI / 180.0) + dx * cos(angleZ * PI / 180.0)) + opvN.x;
-			n[1] = n[1] + girn.cy * 0.01;
-		}
-		else if (Vis_Polar == POLARX)
-		{ //(X,Y,Z) --> (Y,Z,X)
-			double dy = n[1] - opvN.y;
-			double dz = n[2] - opvN.z;
-			n[1] = (dy * cos(angleZ * PI / 180.0) - dz * sin(angleZ * PI / 180.0)) + opvN.y;
-			n[2] = (dy * sin(angleZ * PI / 180.0) + dz * cos(angleZ * PI / 180.0)) + opvN.z;
-			n[0] = n[0] + girn.cy * 0.01;
-		}
+		// Gir horitzontal
+		angleMilano -= girn.cx * 0.2f;
 
-		m_PosEAvall.x = xpos;		m_PosEAvall.y = ypos;
-		// Crida a OnPaint() per redibuixar l'escena
-		//OnPaint(window);
+		// Inclinació vertical
+		inclinacioMilano += girn.cy * 0.2f;
+		
+		// Limitar la inclinació vertical
+		if (inclinacioMilano > 60.0f)
+			inclinacioMilano = 60.0f;
+
+		if (inclinacioMilano < -60.0f)
+			inclinacioMilano = -60.0f;
+
+		m_PosEAvall.x = xpos;
+		m_PosEAvall.y = ypos;
 	}
 
 	// Entorn VGI: Transformació Geomètrica interactiva pels eixos X,Y boto esquerra del mouse.
