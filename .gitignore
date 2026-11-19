@@ -7,7 +7,6 @@ x64/
 x86/
 [Dd]ebug/
 [Rr]elease/
-*.obj
 *.exe
 *.pdb
 *.ilk
