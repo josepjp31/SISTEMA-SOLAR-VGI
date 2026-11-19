@@ -156,7 +156,6 @@ std::vector<CState3D> getOrbitStates(CelestialBodyId body, double et, int nState
     for (int i = 0; i < nStates; i++)
 	{
 		state = getCBstate(body, props.m_orbitedObject, time); 
-        state = getCBstate(body, props.m_orbitedObject, time);// if (body == CB_MOON) {state.x *= 10.0; state.y *= 10.0; state.z *= 10.0;}
         state.x += currentOriginState.x; state.y += currentOriginState.y; state.z += currentOriginState.z;
 		mulState(state, KM_TO_AU); 
 		state.vx *= vconst; state.vy *= vconst; state.vz *= vconst;
@@ -164,7 +163,6 @@ std::vector<CState3D> getOrbitStates(CelestialBodyId body, double et, int nState
 		time += t;
 	}
     state = getCBstate(body, props.m_orbitedObject, time); 
-    state = getCBstate(body, props.m_orbitedObject, time);// if (body == CB_MOON) { state.x *= 10.0; state.y *= 10.0; state.z *= 10.0; }
     state.x += currentOriginState.x; state.y += currentOriginState.y; state.z += currentOriginState.z;
     mulState(state, KM_TO_AU);
     state.vx *= vconst; state.vy *= vconst; state.vz *= vconst;

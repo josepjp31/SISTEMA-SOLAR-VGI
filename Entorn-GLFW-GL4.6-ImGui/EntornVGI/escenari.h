@@ -1,26 +1,18 @@
 #pragma once
 
-// IMPORTANT: framework.h s'ha d'incloure ABANS d'objLoader.h, perque objLoader.h
-// necessita els tipus d'OpenGL (GLuint, GLint, uint), CVAO (constants.h) i GLM.
 #include "framework.h"
-#include "objLoader.h"
 #include "material.h"
 #include "visualitzacio.h"
 
-// Nombre maxim d'objectes per escenari
+// Nombre maxim d'objectes per escenari (0 Sol, 1..8 planetes, 9 Lluna)
 #define MAX_OBJECTES_ESCENARI 10
 
-// Object s'ha de declarar ABANS d'Escenari, perque Escenari en crea un vector (new Object[...]).
+// Dades individuals de cada cos celeste (Sol, planetes i Lluna) dins de l'escenari
 class Object
 {
 public:
-	Object() : m_mMatrix(glm::mat4(1.0f)), m_modelCarregat(false), m_radiCos(0.0f), m_radiOrbita(0.0f), m_angleOrbita(0.0f), m_velAngular(0.0f) {}
+	Object() : m_mMatrix(glm::mat4(1.0f)), m_radiCos(0.0f), m_radiOrbita(0.0f), m_angleOrbita(0.0f), m_velAngular(0.0f) {}
 	~Object() {}
-
-	// Carrega un fitxer .OBJ al model. Retorna true si s'ha carregat correctament
-	// (COBJModel::LoadModel retorna 0 si tot va be, o el codi errno si falla).
-	bool carregaModel(char* fitxer) { m_modelCarregat = (m_model.LoadModel(fitxer) == 0); return m_modelCarregat; }
-	bool teModel() const { return m_modelCarregat; }
 
 	float m_radiCos;
 	float m_radiOrbita;
@@ -30,17 +22,11 @@ public:
 	float m_angleRotacio;
 	float m_velRotacio;
 
-	//Vector4D m_position;
-	//Vector4D m_rotation;
-	//Vector4D m_scale;
-
 	glm::mat4 m_mMatrix;
-	COBJModel m_model;
-private:
-	bool m_modelCarregat;
 };
 
 
+// Gestió de l'escenari complet del Sistema Solar (cossos, òrbites, textures i actualització orbital)
 class Escenari
 {
 public:
@@ -53,6 +39,8 @@ public:
 			m_texturesID[i] = 0;
 			m_fitxers[i] = nullptr;
 		}
+		// CVAO no s'inicialitza sol: posar-lo a 0 evita alliberar identificadors brossa
+		m_orbitVAO = { 0, 0, 0, 0, 0 };
 	}
 	~Escenari() { alliberaEscenari(); }
 
@@ -61,48 +49,43 @@ public:
 	Escenari& operator=(const Escenari&) = delete;
 
 	void creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID);
-	void dibuixaEscenari(GLuint& sh_programID, GLuint& shaderNormalMapID, bool& eix, GLuint& axis_Id, CMask3D& reixa, CPunt3D& hreixa, char& objecte,
-		CColor& col_object, bool sw_mat[5],
-		bool& textur, bool& textur_map, bool& flagInvertY,
-		int& nptsU, CPunt3D PC_u[MAX_PATCH_CORBA], GLfloat& pasCS, bool& sw_PC, bool& dib_TFrenet,
-		COBJModel* objecteOBJ,
-		glm::mat4& MatriuTG,
-		bool mostrarOrbites = true);
+	void dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5], bool mostrarOrbites = true);
 
 	void updateVariables(double dt = 0.016, bool enPausa = false, int direccioTemps = 1, bool escalaReal = false, double factorVelocitat = 60.0);
-	void updateVariables2();
 	// Allibera els objectes (i els seus VAO). Cal cridar-la ABANS de destruir el context OpenGL.
 	void alliberaEscenari() {
 		deleteVAOList(GLU_SPHERE);
 		deleteVAOList(GLU_DISK);
 		deleteVAOList(GLUT_TORUS);
-		for (int i = 0; i < 8; i++) {
-			if (m_orbitVAO[i].vaoId != 0) {
-				glDeleteVertexArrays(1, &m_orbitVAO[i].vaoId);
-				glDeleteBuffers(1, &m_orbitVAO[i].vboId);
-				glDeleteBuffers(1, &m_orbitVAO[i].eboId);
-				m_orbitVAO[i].vaoId = 0;
-				m_orbitVAO[i].vboId = 0;
-				m_orbitVAO[i].eboId = 0;
-			}
-		}
+		alliberaOrbita();
 		for (int i = 0; i < NUM_MAX_TEXTURES; i++) {
 			if (m_texturesID[i]) { glDeleteTextures(1, &m_texturesID[i]); m_texturesID[i] = 0; }
+		}
+		for (int i = 0; i < 9; i++) {
+			if (m_normalTexturesID[i]) { glDeleteTextures(1, &m_normalTexturesID[i]); m_normalTexturesID[i] = 0; }
 		}
 		delete[] m_objectList; m_objectList = nullptr;
 	}
 
-	void iluminacio();
-
 	Object* m_objectList;
 	GLuint m_texturesID[NUM_MAX_TEXTURES];
-	//normal maps para shader normal mapping
+	char* m_fitxers[NUM_MAX_TEXTURES];
+	CColor m_colObj;
+	// Orbites: un unic cercle de radi 1 dibuixat com a linia (GL_LINE_LOOP). Cada orbita
+	// (8 planetes + Lluna) el reutilitza escalant-lo al seu radi amb la modelMatrix.
+	CVAO m_orbitVAO;
+
+	// Mapes normals per al shader de normal mapping (index = cos; 0 Sol i 7 Urà sense mapa)
 	GLuint m_normalTexturesID[9] = { 0 };
 	char* m_normalFitxers[9] = { nullptr };
 
-	char* m_fitxers[NUM_MAX_TEXTURES];
-	CColor m_colObj;
-	//torus
-	CVAO m_orbitVAO[8];
-
+private:
+	void creaOrbita();
+	void alliberaOrbita() {
+		if (m_orbitVAO.vaoId != 0) {
+			glDeleteVertexArrays(1, &m_orbitVAO.vaoId);
+			glDeleteBuffers(1, &m_orbitVAO.vboId);
+			m_orbitVAO = { 0, 0, 0, 0, 0 };
+		}
+	}
 };
