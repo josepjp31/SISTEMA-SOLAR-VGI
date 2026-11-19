@@ -250,6 +250,7 @@ void Escenari::dibuixaEscenari(GLuint& sh_programID, GLuint& shaderNormalMapID,
 	glm::mat4 ModelMatrix(1.0);
 	int i;
 
+	//glUseProgram(shader_programID); #~#~#~#
 	// 1. Orbites: anell fi sense textura, escalat al radi de cada orbita (condicionat a mostrarOrbites)
 	if (mostrarOrbites) {
 		glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_FALSE);

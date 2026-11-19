@@ -864,6 +864,9 @@ void OnPaint(GLFWwindow* window)
 		if (!shader_programID) shader_programID = shaderLighting.loadFileShaders(".\\shaders\\gouraud_shdrML.vert", ".\\shaders\\gouraud_shdrML.frag");
 		if (!shader_programIDNormalMap) shader_programIDNormalMap = shaderLightingNormalMap.loadFileShaders(".\\shaders\\normal_mapping.vert", ".\\shaders\\normal_mapping.frag");
 
+		//#~#~#~#~# Crear un altre shader
+		if (!shader_programID) instancing_programID = shaderLighting.loadFileShaders(".\\shaders\\gouraud_shdrML_inst.vert", ".\\shaders\\gouraud_shdrML_inst.frag");
+		
 		// Entorn VGI: Creació de la llista que dibuixarà els eixos Coordenades Món. Funció on està codi per dibuixar eixos	
 		if (!eixos_Id) eixos_Id = deixos();						// Funció que defineix els Eixos Coordenades Món com un VAO.
 
