@@ -233,8 +233,8 @@ static void DibuixarDialegQuantA(bool* pObert)
     if (!pObert || !*pObert) return;
 
     const ImGuiViewport* vp = ImGui::GetMainViewport();
-    const float ampleFinestra = 460.0f;
-    const float alcadaFinestra = 270.0f;
+    const float ampleFinestra = 500.0f;
+    const float alcadaFinestra = 356.0f;
 
     ImVec2 posInicial(
         vp->WorkPos.x + (vp->WorkSize.x - ampleFinestra) * 0.5f,
@@ -287,11 +287,35 @@ static void DibuixarDialegQuantA(bool* pObert)
         const char* linia3 = "• Mode a Escala Real: distàncies reals i control del temps.";
         const char* linia4 = "Projecte educatiu — Escola d'Enginyeria (UAB)";
 
-        dl->AddText(ImVec2(caixaMin.x + 16.0f, caixaMin.y + 44.0f), IM_COL32(235, 245, 255, 250), linia1);
-        dl->AddText(ImVec2(caixaMin.x + 16.0f, caixaMin.y + 72.0f), IM_COL32(195, 228, 250, 240), linia2);
-        dl->AddText(ImVec2(caixaMin.x + 16.0f, caixaMin.y + 96.0f), IM_COL32(195, 228, 250, 240), linia3);
+        dl->AddText(ImVec2(caixaMin.x + 16.0f, caixaMin.y + 40.0f), IM_COL32(235, 245, 255, 250), linia1);
+        dl->AddText(ImVec2(caixaMin.x + 16.0f, caixaMin.y + 64.0f), IM_COL32(195, 228, 250, 240), linia2);
+        dl->AddText(ImVec2(caixaMin.x + 16.0f, caixaMin.y + 86.0f), IM_COL32(195, 228, 250, 240), linia3);
+
+        // Separador i llista dels integrants del grup (Grup 05) en dues columnes
+        float ySep = caixaMin.y + 112.0f;
+        dl->AddLine(ImVec2(caixaMin.x + 14.0f, ySep), ImVec2(caixaMax.x - 14.0f, ySep), IM_COL32(55, 165, 220, 110), 1.0f);
+        dl->AddText(ImVec2(caixaMin.x + 16.0f, ySep + 8.0f), IM_COL32(115, 225, 255, 255), "Integrants del grup (Grup 05):");
+
+        static const char* integrantsCol1[3] = {
+            "• Carles Peiró",
+            "• Noa Gangolells Alcázar",
+            "• Josep Montoro Pascual"
+        };
+        static const char* integrantsCol2[3] = {
+            "• Lucas Luna Rodriguez",
+            "• Abel Paiz Ilias",
+            "• Ty Devia Ballesteros"
+        };
 
         PushFontSegur(s_fontPanellPetit);
+        float yMembres = ySep + 32.0f;
+        float xCol1 = caixaMin.x + 18.0f;
+        float xCol2 = caixaMin.x + (caixaMax.x - caixaMin.x) * 0.50f + 4.0f;
+        for (int i = 0; i < 3; ++i) {
+            dl->AddText(ImVec2(xCol1, yMembres + i * 20.0f), IM_COL32(225, 240, 255, 245), integrantsCol1[i]);
+            dl->AddText(ImVec2(xCol2, yMembres + i * 20.0f), IM_COL32(225, 240, 255, 245), integrantsCol2[i]);
+        }
+
         ImVec2 mLinia4 = ImGui::CalcTextSize(linia4);
         dl->AddText(
             ImVec2(winPos.x + (winSize.x - mLinia4.x) * 0.5f, caixaMax.y - mLinia4.y - 10.0f),
@@ -591,7 +615,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
             DibuixarPuntLlista("Control complet de Data, Hora i Velocitat.");
             DibuixarPuntLlista("Velocitat regulable: 1 min/s a 20 dies/s.");
             DibuixarPuntLlista("Possibilitat d'avançar o rebobinar.");
-            DibuixarPuntLlista("Pilota coet i focus a cada astre.");
+            DibuixarPuntLlista("Focus directe a cada astre.");
             ImGui::PopStyleColor();
 
             float padY = 16.0f * factorEscala;
