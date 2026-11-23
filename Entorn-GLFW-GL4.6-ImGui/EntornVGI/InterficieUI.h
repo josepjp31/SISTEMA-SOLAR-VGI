@@ -1,4 +1,10 @@
-// InterficieUI.h : Declaracio de tipus, estructures d'estat i metodes de la interficie d'usuari
+// InterficieUI.h : Declaracio de tipus, estructures d'estat i metodes de la interficie d'usuari (Dear ImGui)
+//
+// Arquitectura general de la UI:
+// - EstatSimulacio actua com a punt unic de veritat compartit entre ImGui (InterficieUI.cpp)
+//   i el motor OpenGL/GLFW (main.cpp).
+// - Els canvis fets des dels menus o botons activen flags de sincronitzacio
+//   (configuracioInicialPendent, canviCameraPendent) que main.cpp processa a cada frame.
 
 #pragma once
 
@@ -8,21 +14,21 @@
 #include "framework.h"
 #include "escenari.h"
 
-// Modes de funcionament de la simulacio
+// Modes de funcionament de la simulacio (determinen quin Escenari i quins menus es mostren)
 enum class ModeSimulacio {
-    INTUITIU,    // Mode Didactic / Intuitiu
-    ESCALA_REAL  // Mode a Escala Real (Cientific)
+    INTUITIU,    // Mode Didactic / Intuitiu: orbites circulars i radis/distancies ajustats visualment (escenaris[0])
+    ESCALA_REAL  // Mode a Escala Real (Cientific): escenari realista amb control de data, hora i timelapse (escenaris[1])
 };
 
-// Modes de camera del simulador
+// Modes de camera disponibles al simulador (mapejats a CAM_ESFERICA o CAM_NAVEGA dins main.cpp)
 enum class ModeCamera {
-    ORBITAL_CENTRADOR,      // Camera Esferica lliure centrada en l'astre enfocat
-    FIXA_INCLINADA_25,      // Camera Esferica amb inclinacio vertical fixa de 25 graus
-    GLOBAL_SISTEMA,         // Vista global del sistema solar des de dalt
-    COET_PRIMERA_PERSONA    // Camera Lliure en primera persona (mode Navega)
+    ORBITAL_CENTRADOR,      // Camera esferica lliure (CAM_ESFERICA) centrada sobre l'astre enfocant (cosEnfocatId)
+    FIXA_INCLINADA_25,      // Camera esferica amb inclinacio vertical blocada a 25 graus (OPV.alfa = 25)
+    GLOBAL_SISTEMA,         // Vista zenital allunyada (R = 550, alfa = 65) centrada al Sol per veure tot el sistema
+    COET_PRIMERA_PERSONA    // Mode "Pilota coet" (CAM_NAVEGA): nau Milano pilotable amb teclat/ratoli i camera de seguiment
 };
 
-// Estructura per a dates i hores amb validacio de calendari gregoria
+// Estructura per a dates i hores amb validacio automatica de calendari gregoria
 struct DataHoraSimulacio {
     int any = 2026;
     int mes = 10;
@@ -31,10 +37,12 @@ struct DataHoraSimulacio {
     int minut = 0;
     int segon = 0;
 
+    // Comprova si un any es de traspas segons el calendari gregoria
     static bool EsAnyDeTraspas(int a) {
         return (a % 4 == 0 && a % 100 != 0) || (a % 400 == 0);
     }
 
+    // Retorna el nombre de dies que te el mes (1..12) per a l'any indicat
     static int DiesAlMes(int m, int a) {
         static const int dies[12] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
         if (m == 2 && EsAnyDeTraspas(a)) return 29;
@@ -42,7 +50,7 @@ struct DataHoraSimulacio {
         return 31;
     }
 
-    // Retorna 0 (Dilluns) .. 6 (Diumenge) per a una data gregoriana
+    // Retorna 0 (Dilluns) .. 6 (Diumenge) per a una data gregoriana (algoritme de Sakamoto adaptat a dilluns=0)
     static int DiaDeLaSetmana(int d, int m, int a) {
         static const int t[12] = { 0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4 };
         int y = a;
@@ -52,6 +60,7 @@ struct DataHoraSimulacio {
         return (dowSun0 + 6) % 7;
     }
 
+    // Ajusta mes, dia, hora, minut i segon als seus rangs valids (respectant anys de traspas)
     void Validar() {
         if (mes < 1) mes = 1; if (mes > 12) mes = 12;
         int maxD = DiesAlMes(mes, any);
@@ -62,14 +71,15 @@ struct DataHoraSimulacio {
     }
 };
 
-// Control de temps i timelapse (Rang permes: 1 min/s a 20 dies/s)
+// Control de temps i timelapse (Rang permes: 1 min/s [60 s/s] a 20 dies/s [1.728.000 s/s])
 struct EstatTempsSimulacio {
     DataHoraSimulacio dataHora;
-    bool enPausa = false;
-    int direccioTemps = 1; // +1: Endavant, -1: Enrere (Rebobinar)
-    double factorVelocitatSegonsPerSegon = 60.0; // Minim inicial: 1 min/s (60 s/s)
-    double acumulatSegons = 0.0;
+    bool enPausa = false;                        // true atura l'avanc del rellotge i del moviment orbital
+    int direccioTemps = 1;                       // +1: Endavant, -1: Enrere (Rebobinar)
+    double factorVelocitatSegonsPerSegon = 60.0; // Minim inicial: 1 min/s (60 s/s); maxim: 20 dies/s (1728000 s/s)
+    double acumulatSegons = 0.0;                 // Fraccio de segons pendents d'acumular entre frames
 
+    // Sincronitza la data/hora simulada amb el rellotge local del sistema operatiu
     void EstablirDataActual() {
         time_t t = time(nullptr);
         tm ltm;
@@ -82,23 +92,27 @@ struct EstatTempsSimulacio {
         dataHora.segon = ltm.tm_sec;
     }
 
+    // Situa la simulacio a l'epoca astronomica estandard J2000 (1 de gener de 2000 a les 12:00:00)
     void EstablirJ2000() {
         dataHora = { 2000, 1, 1, 12, 0, 0 };
     }
 
+    // Duplica la velocitat de simulacio fins al limit superior de 20 dies/s
     void AugmentarVelocitat() {
         factorVelocitatSegonsPerSegon *= 2.0;
         if (factorVelocitatSegonsPerSegon > 1728000.0) factorVelocitatSegonsPerSegon = 1728000.0;
     }
 
+    // Redueix a la meitat la velocitat de simulacio fins al limit inferior de 1 min/s
     void ReduirVelocitat() {
         factorVelocitatSegonsPerSegon *= 0.5;
         if (factorVelocitatSegonsPerSegon < 60.0) factorVelocitatSegonsPerSegon = 60.0;
     }
 
+    // Acumula el temps transcorregut del frame (deltaSegons) multiplicat pel timelapse i aplica els segons sencers
     void AvancarSegons(double deltaSegons) {
         if (enPausa) return;
-        if (deltaSegons > 0.25) deltaSegons = 0.25;
+        if (deltaSegons > 0.25) deltaSegons = 0.25; // Topall de seguretat davant pauses del sistema
         acumulatSegons += (double)direccioTemps * factorVelocitatSegonsPerSegon * deltaSegons;
         long long segonsPassats = (long long)acumulatSegons;
         if (segonsPassats != 0) {
@@ -108,6 +122,7 @@ struct EstatTempsSimulacio {
     }
 
 private:
+    // Suma o resta un nombre enter de segons propagant l'arrossegament cap a minuts, hores, dies, mesos i anys
     void AvancarSegonsInt(long long s) {
         long long totalSeg = (long long)dataHora.segon + s;
         long long extraMin = totalSeg / 60;
@@ -146,28 +161,28 @@ private:
     }
 };
 
-// Capes de renderitzat i opcions de visualitzacio
+// Capes de renderitzat i opcions de visualitzacio commutables des del menu "Visualitzacio"
 struct OpcionsVisualitzacio {
-    bool mostrarOrbites = true;
-    bool mostrarEtiquetes = true;
-    bool mostrarMarcadorsPetits = true;
-    bool mostrarSkybox = true;
-    bool mostrarEixos = false;
+    bool mostrarOrbites = true;          // Dibuixa les trajectories orbitals (consumit a main.cpp -> dibuixa_EscenaGL)
+    bool mostrarEtiquetes = true;        // Projecta els noms 2D sobre els cossos (consumit a main.cpp -> draw_Menu_ImGui)
+    bool mostrarMarcadorsPetits = true;  // Indicadors per a planetes petits en escales grans
+    bool mostrarSkybox = true;           // Activa/desactiva el cubemap d'estrelles (sincronitzat amb SkyBoxCube)
+    bool mostrarEixos = false;           // Activa/desactiva els eixos XYZ del mon (sincronitzat amb eixos)
     bool mostrarCinturoAsteroides = true;
     bool mostrarPuntsLagrange = false;
     bool anellsSaturnParticules = false; // false: disc pla amb textura, true: particules instanciades
-    bool iluminacioSolarDirecta = true;  // Sol com a emissor directe + Llum #0 activa
-    bool vistaClaraAmbient = false;      // Vista clara (llum ambient) desactivada per defecte
+    bool iluminacioSolarDirecta = true;  // Sol com a emissor directe + Llum #0 activa (sw_material[0] i llumGL[0].encesa)
+    bool vistaClaraAmbient = false;      // Vista clara (llum ambient global sense ombres fortes, sw_material[1])
 };
 
-// Parametres de camera
+// Parametres de configuracio activa de la camera
 struct CameraConfig {
     ModeCamera mode = ModeCamera::FIXA_INCLINADA_25;
-    float angleInclinacio = 25.0f; // Inclinacio inicial de 25 graus
+    float angleInclinacio = 25.0f; // Inclinacio inicial de 25 graus (OPV.alfa)
     float distZoom = 100.0f;
 };
 
-// Dades per a la fitxa astronomica HUD
+// Dades fisiques de l'astre seleccionat per mostrar a la Fitxa Astronomica (HUD)
 struct CosAstronomicDades {
     std::string nom = "Sol";
     double radiKm = 696340.0;
@@ -177,20 +192,20 @@ struct CosAstronomicDades {
     double periodeOrbitalAnys = 0.0;
 };
 
-// Estat global de la interficie del simulador
+// Estat global de la interficie del simulador (instancia unica g_EstatSimulador a main.cpp)
 struct EstatSimulacio {
-    ModeSimulacio modeActual = ModeSimulacio::INTUITIU;
-    bool mostrarSelectorModes = true;  // 2 quadrats centrals a l'inici (Selector Inicial)
-    bool mostrarPanellTemps = false;   // Cantonada inferior dreta (mode escala)
-    bool mostrarFitxaHUD = false;      // Fitxa astronomica HUD
-    bool mostrarDialegQuantA = false;  // Dialeg Quant a
-    bool recalculEfemeridesNecessari = false;
-    bool origenReferenciaSol = true;   // Sol vs Planeta com a origen
-    int cosEnfocatId = 0;              // Cos celeste enfocat per defecte (0 = Sol)
+    ModeSimulacio modeActual = ModeSimulacio::INTUITIU; // Mode de simulacio actiu (INTUITIU o ESCALA_REAL)
+    bool mostrarSelectorModes = true;  // Quan es true, mostra el modal inicial amb 2 targetes i bloqueja l'escena 3D
+    bool mostrarPanellTemps = false;   // Mostra el pop-up de control temporal (cantonada inferior dreta en ESCALA_REAL)
+    bool mostrarFitxaHUD = false;      // Mostra la fitxa flotant amb dades fisiques de l'astre enfocat
+    bool mostrarDialegQuantA = false;  // Mostra el dialeg informatiu "Quant al Simulador"
+    bool recalculEfemeridesNecessari = false; // Flag per notificar canvi manual de data/hora a futurs calculs d'efemerides
+    bool origenReferenciaSol = true;   // true: origen al Sol; false: centrat en el planeta seleccionat
+    int cosEnfocatId = 0;              // Index de l'astre enfocat (0=Sol, 1=Mercuri .. 8=Neptu)
 
-    // Flags de sincronitzacio amb el motor OpenGL (main.cpp)
-    bool configuracioInicialPendent = false;
-    bool canviCameraPendent = false;
+    // Flags de sincronitzacio amb el motor OpenGL (llegits i netejats a SincronitzarEstatSimuladorAmbOpenGL de main.cpp)
+    bool configuracioInicialPendent = false; // S'activa en iniciar o commutar de mode per reconfigurar shaders, llum i escenari
+    bool canviCameraPendent = false;         // S'activa en triar una camera o enfocar un nou planeta per actualitzar OPV / CAM_NAVEGA
 
     EstatTempsSimulacio tempsSimulacio;
     OpcionsVisualitzacio opcionsVisualitzacio;
@@ -198,32 +213,32 @@ struct EstatSimulacio {
     CosAstronomicDades dadesCosActiu;
 };
 
-// Classe principal d'interficie d'usuari Dear ImGui
+// Classe principal d'interficie d'usuari Dear ImGui (metodes estatiques sense estat propi; tot l'estat viu a EstatSimulacio)
 class InterficieUI
 {
 public:
-    // Inicialitzacio d'estils visuals (tema fosc espacial, arrodoniments)
+    // Inicialitza l'estil visual (tema fosc espacial, arrodoniments) i carrega les fonts sans-serif amb suport catala
     static void InicialitzarEstil();
 
-    // Actualitza les dades astronomiques del HUD segons el cos seleccionat (0..8)
+    // Actualitza estat.dadesCosActiu a partir del cataleg intern segons estat.cosEnfocatId (0..8)
     static void ActualitzarDadesCosActiu(EstatSimulacio& estat);
 
-    // Renderitzador principal que coordina tots els components
+    // Coordina i dibuixa tots els components actius de la UI a cada frame (cridada des de draw_Menu_ImGui a main.cpp)
     static void Renderitzar(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID, GLuint& shader_programIDNormalMap);
 
-    // 2.1 Selector Inicial de Modes (Modal Central amb 2 Quadrats)
+    // 2.1 Selector Inicial de Modes: modal central responsive amb 2 targetes (Mode Didactic i Mode a Escala Real)
     static void DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID, GLuint& shader_programIDNormalMap);
 
-    // 2.2 Barra de Menu Superior Dinamica per Mode (Main Menu Bar)
+    // 2.2 Barra de Menu Superior Dinamica: construeix els menus segons estat.modeActual i la zona dreta (estat, pausa, Canviar, FPS)
     static void DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID, GLuint& shader_programIDNormalMap);
 
-    // 2.3 Selector de Data, Hora i Control de Timelapse (Cantonada Inferior Dreta)
+    // 2.3 Panell de Control de Temps i Velocitat (cantonada inferior dreta, nomes visible en mode ESCALA_REAL)
     static void DibuixarPanellDataHoraTimelapse(EstatSimulacio& estat);
 
-    // 2.6 Panell d'Informacio i Telemetria Astronomica (HUD Flotant)
+    // 2.6 Panell d'Informacio i Telemetria Astronomica (HUD flotant a la cantonada superior dreta)
     static void DibuixarFitxaAstronomicaHUD(const CosAstronomicDades& dades, bool* pObert);
 
-    // 2.7 Projeccio d'Etiquetes 3D a Pantalla 2D amb ImDrawList
+    // 2.7 Projeccio d'Etiquetes 3D a Pantalla 2D amb glm::project i ImDrawList (dibuixada sobre el fons del viewport)
     static void DibuixarEtiquetaPlaneta(const std::string& nom, const glm::vec3& posicioMon, 
                                        const glm::mat4& viewMatrix, const glm::mat4& projMatrix, 
                                        const glm::vec4& viewport);

@@ -48,9 +48,14 @@ public:
 	Escenari(const Escenari&) = delete;
 	Escenari& operator=(const Escenari&) = delete;
 
+	// Inicialitza VAO, textures i cossos del sistema solar vinculant-los als shaders actius (cridat des de la UI en triar/canviar mode)
 	void creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID);
+
+	// Renderitza els cossos celestes, l'anell de Saturn i les orbites (controlades pel flag mostrarOrbites de la UI)
 	void dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5], bool mostrarOrbites = true);
 
+	// Actualitza els angles orbitals i de rotacio segons els parametres temporals d'EstatSimulacio
+	// (enPausa, direccioTemps [+1/-1], escalaReal i factorVelocitat del timelapse)
 	void updateVariables(double dt = 0.016, bool enPausa = false, int direccioTemps = 1, bool escalaReal = false, double factorVelocitat = 60.0);
 	// Allibera els objectes (i els seus VAO). Cal cridar-la ABANS de destruir el context OpenGL.
 	void alliberaEscenari() {

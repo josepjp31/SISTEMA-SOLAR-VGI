@@ -278,6 +278,8 @@ static glm::mat4 matriuOrbitaLluna(const glm::mat4& MatriuTG, const Object& terr
 
 
 
+// dibuixaEscenari: renderitza orbites (si mostrarOrbites es true des del menu Visualitzacio),
+// anells de Saturn i cossos celestes amb Phong i normal mapping.
 void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5], bool mostrarOrbites)
 {
 	(void)MatriuVista;
@@ -435,6 +437,10 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 
 }
 
+// updateVariables: avanca les orbites i rotacions dels 10 cossos segons els controls de la UI:
+// - enPausa: atura completament el moviment quan l'usuari prem Pausa o Espai.
+// - direccioTemps: +1 (endavant) o -1 (rebobinar) des del panell temporal / Backspace.
+// - escalaReal + factorVelocitat: ajusta el pas orbital segons el timelapse actiu en mode ESCALA_REAL.
 void Escenari::updateVariables(double dt, bool enPausa, int direccioTemps, bool escalaReal, double factorVelocitat)
 {
 	if (m_objectList == nullptr || enPausa) return;

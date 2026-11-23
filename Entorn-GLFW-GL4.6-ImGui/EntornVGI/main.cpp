@@ -20,11 +20,14 @@
 #include "escenari.h"
 #include "InterficieUI.h"
 
-// Escenari actiu i llista d'escenaris (0: Mode Didactic, 1: Mode a Escala Real)
+// Escenari actiu i llista d'escenaris reservats a main():
+// - escenaris[0]: Mode Didactic / Intuitiu
+// - escenaris[1]: Mode a Escala Real
 Escenari* escenariActual = nullptr;
 Escenari* escenaris = nullptr;
 
-// Estat global de la interficie d'usuari del simulador
+// Estat global de la interficie d'usuari (InterficieUI.h): controla el mode actiu,
+// el selector inicial, el panell de temps, les opcions visuals i la camera seleccionada.
 EstatSimulacio g_EstatSimulador;
 //VARIABLE GLOBALS COET
 // Posició i orientació de la Milano
@@ -384,10 +387,14 @@ void OnShaderNormalMap()
 	else fprintf(stderr, "GLSL_Error. Fitxers normal_mapping amb errors\n");
 }
 
-// SincronitzarEstatSimuladorAmbOpenGL: Sincronitza les opcions del menu ImGui (InterficieUI)
-// amb les variables internes d'OpenGL (il-luminacio del Sol, Skybox, eixos, camera i focus).
+// SincronitzarEstatSimuladorAmbOpenGL: Pont entre la interficie ImGui (g_EstatSimulador)
+// i les variables globals d'OpenGL/EntornVGI. S'executa a cada frame abans de renderitzar:
+// - Bloc 1 (configuracioInicialPendent): configura projeccio, shaders, llum solar #0, escenari i skybox.
+// - Bloc 2 (continu): aplica en temps real les opcions del menu "Visualitzacio".
+// - Bloc 3 (canviCameraPendent): canvia entre CAM_ESFERICA (orbital/25°/global) i CAM_NAVEGA (Pilota coet).
 void SincronitzarEstatSimuladorAmbOpenGL()
 {
+	// No inicialitzar ni sincronitzar escena mentre el selector inicial de modes esta obert
 	if (g_EstatSimulador.mostrarSelectorModes) return;
 
 	// 1. Configuracio inicial d'escena, il-luminacio i shaders quan s'inicia o es commuta de mode
@@ -456,7 +463,7 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		g_EstatSimulador.configuracioInicialPendent = false;
 	}
 
-	// 2. Sincronitzacio continua de les opcions de Visualitzacio del menu superior
+	// 2. Sincronitzacio continua a cada frame de les opcions commutables del menu "Visualitzacio"
 	if (objecte == SISTEMA_SOLAR)
 	{
 		SkyBoxCube = g_EstatSimulador.opcionsVisualitzacio.mostrarSkybox;
@@ -464,6 +471,7 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 
 		eixos = g_EstatSimulador.opcionsVisualitzacio.mostrarEixos;
 
+		// Llum directa del Sol (emissio del Sol + font punt #0) i mode Vista Clara (ambient)
 		sw_material[0] = g_EstatSimulador.opcionsVisualitzacio.iluminacioSolarDirecta;
 		llumGL[0].encesa = g_EstatSimulador.opcionsVisualitzacio.iluminacioSolarDirecta;
 
@@ -471,12 +479,13 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		sw_material[1] = g_EstatSimulador.opcionsVisualitzacio.vistaClaraAmbient;
 	}
 
-	// 3. Aplicacio dels canvis de mode de camera o d'astre enfocat des del menu
+	// 3. Aplicacio puntual dels canvis de mode de camera o d'astre enfocant demanats des de la UI o dreceres
 	if (g_EstatSimulador.canviCameraPendent)
 	{
 		int cid = g_EstatSimulador.cosEnfocatId;
 		if (cid < 0 || cid >= 9) cid = 0;
 
+		// Distancia de camera proporcional al radi del planeta seleccionat per garantir bon enquadrament
 		float distPerDefecte = 140.0f;
 		if (cid > 0 && escenariActual != nullptr)
 		{
@@ -489,7 +498,7 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 			camera = CAM_ESFERICA;
 			mobil = true;	zzoom = true;	satelit = false;	pan = false;
 			Vis_Polar = POLARZ;
-			OPV.alfa = 25.0;
+			OPV.alfa = 25.0; // Inclinacio vertical blocada a 25° (veure OnMouseMove)
 			OPV.R = distPerDefecte;
 		}
 		else if (g_EstatSimulador.cameraConfig.mode == ModeCamera::ORBITAL_CENTRADOR)
@@ -512,7 +521,7 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		}
 		else if (g_EstatSimulador.cameraConfig.mode == ModeCamera::COET_PRIMERA_PERSONA)
 		{
-			// Camera Lliure implementada a l'opcio Navega (CAM_NAVEGA)
+			// Mode "Pilota coet": activa CAM_NAVEGA, carrega el model de la Milano i situa la camera
 			OnCameraNavega();
 			Vis_Polar = POLARZ;
 			
@@ -544,7 +553,8 @@ void OnPaint(GLFWwindow* window)
 	// TODO: Agregue aquí su código de controlador de mensajes
 	GLdouble vpv[3] = { 0.0, 0.0, 1.0 };
 
-	// Neteja del framebuffer durant la visualitzacio del Selector Inicial de Modes (per no mostrar el sistema)
+	// Neteja del framebuffer durant la visualitzacio del Selector Inicial de Modes:
+	// evita dibuixar l'escena 3D darrere les dues targetes inicials.
 	if (g_EstatSimulador.mostrarSelectorModes)
 	{
 		glDisable(GL_SCISSOR_TEST);
@@ -555,7 +565,7 @@ void OnPaint(GLFWwindow* window)
 		return;
 	}
 
-	// Sincronitzar les opcions de la interficie ImGui amb l'estat d'OpenGL
+	// Sincronitzar les opcions de la interficie ImGui amb l'estat d'OpenGL abans de construir ViewMatrix
 	SincronitzarEstatSimuladorAmbOpenGL();
 
 	// Entorn VGI: Cridem a les funcions de l'escena i la projecció segons s'hagi 
@@ -580,7 +590,8 @@ void OnPaint(GLFWwindow* window)
 				ilumina, llum_ambient, llumGL, ifixe, ilum2sides,
 				eixos, grid, hgrid);
 
-			// Quan hi ha un planeta enfocat (cosEnfocatId > 0), centrar la camera sobre la posicio orbital (x, y, 0) de l'astre
+			// Quan hi ha un planeta enfocant des del menu (cosEnfocatId > 0), traslladem la vista
+			// cap a la seva posicio orbital (px, py, 0) perque la camera orbiti al seu voltant
 			if (objecte == SISTEMA_SOLAR && escenariActual != nullptr && g_EstatSimulador.cosEnfocatId > 0 && g_EstatSimulador.cosEnfocatId < 9)
 			{
 				int cid = g_EstatSimulador.cosEnfocatId;
@@ -701,7 +712,7 @@ void dibuixa_Escena() {
 /*                            MENUS ImGui                                    */
 /* ------------------------------------------------------------------------- */
 
-// Entorn VGI: Dibuixa el menú principal ImGui del Simulador del Sistema Solar
+// Entorn VGI: Construeix tot el frame de Dear ImGui (selector, menus, panells i etiquetes 2D)
 void draw_Menu_ImGui()
 {
 	// Start the Dear ImGui frame
@@ -709,10 +720,11 @@ void draw_Menu_ImGui()
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
 
-	// Renderitzar la interficie principal del Simulador del Sistema Solar (Selector inicial, barra superior, panell de temps, HUD)
+	// Renderitza la interficie principal del simulador (selector modal, barra de menu, panell de temps i HUD)
 	InterficieUI::Renderitzar(g_EstatSimulador, escenariActual, escenaris, shader_programID, shader_programIDNormalMap);
 
-	// Projeccio de les etiquetes 2D dels astres sobre la pantalla quan la simulacio esta activa
+	// Projeccio de les etiquetes 2D dels 9 astres sobre la pantalla:
+	// nomes s'executa amb la simulacio activa (selector tancat) i l'opcio del menu activada.
 	if (!g_EstatSimulador.mostrarSelectorModes &&
 		g_EstatSimulador.opcionsVisualitzacio.mostrarEtiquetes &&
 		objecte == SISTEMA_SOLAR &&
@@ -725,6 +737,7 @@ void draw_Menu_ImGui()
 		glm::vec4 viewport(0.0f, 0.0f, (float)w, (float)h);
 		for (int i = 0; i < 9; i++)
 		{
+			// Situa l'etiqueta lleugerament per sobre del pol nord de cada cos (z = rCos * 1.15)
 			float ang = escenariActual->m_objectList[i].m_angleOrbita * (float)PI / 180.0f;
 			float rOrb = escenariActual->m_objectList[i].m_radiOrbita;
 			float rCos = escenariActual->m_objectList[i].m_radiCos;
@@ -903,10 +916,11 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 			glfwSetWindowShouldClose(window, GL_TRUE);
 			return;
 		}
-		// Bloquejar teclat si el selector inicial de modes està obert
+		// Bloquejar dreceres i moviment d'escena mentre el selector modal inicial esta obert
 		if (g_EstatSimulador.mostrarSelectorModes) return;
 
-		// Dreceres de control del simulador (Pausa, Invertir temps, Reenquadrar vista, Vista Global)
+		// Dreceres globals del simulador sincronitzades amb els menus de la interficie:
+		// Espai -> Pausa/Reprendre, Backspace -> Invertir temps, R -> Reenquadrar vista, Home -> Vista Global
 		if (mods == 0 && action == GLFW_PRESS) {
 			if (key == GLFW_KEY_SPACE) {
 				g_EstatSimulador.tempsSimulacio.enPausa = !g_EstatSimulador.tempsSimulacio.enPausa;
@@ -938,6 +952,7 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 				key == GLFW_KEY_DOWN))
 		{
 			const double pasAngle = 5.0;
+			// Adapta el zoom minim i pas de distancia segons el radi del cos enfocant (cosEnfocatId)
 			int cosId = g_EstatSimulador.cosEnfocatId;
 			double radiCos = 35.0;
 			if (escenariActual != nullptr && cosId >= 0 && cosId < 9) {
@@ -1061,7 +1076,7 @@ void OnMouseButton(GLFWwindow* window, int button, int action, int mods)
 	ImGuiIO& io = ImGui::GetIO();
 	io.AddMouseButtonEvent(button, action);
 
-	// (2) ONLY forward mouse data to your underlying app/game.
+	// (2) Nomes reenviar clics de ratoli a l'escena 3D si ImGui no captura el punter i el selector modal esta tancat
 	if (!io.WantCaptureMouse && !g_EstatSimulador.mostrarSelectorModes) { //<Tractament mouse de l'aplicació>}
 		// OnLButtonDown
 		if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
@@ -1115,6 +1130,7 @@ void OnMouseButton(GLFWwindow* window, int button, int action, int mods)
 //					- ypos: Posició Y del cursor del mouse(coord.pantalla) quan el botó s'ha apretat.
 void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 {
+	// Ignorar moviment del ratoli a l'escena 3D mentre el selector modal inicial esta obert
 	if (g_EstatSimulador.mostrarSelectorModes) return;
 
 	// TODO: Agregue aquí su código de controlador de mensajes o llame al valor predeterminado
@@ -1381,13 +1397,13 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 	ImGuiIO& io = ImGui::GetIO();
 	//io.AddMouseButtonEvent(button, true);
 
-// (2) ONLY forward mouse data to your underlying app/game.
+// (2) Nomes aplicar zoom amb el rodet si ImGui no captura el ratoli i el selector inicial esta tancat
 	if (!io.WantCaptureMouse && !g_EstatSimulador.mostrarSelectorModes) { // <Tractament mouse de l'aplicació>}
 		// Funció de zoom quan està activada la funció pan o les T. Geomètriques
 		if ((zzoom || zzoomO) || (transX) || (transY) || (transZ))
 		{
 			if (camera == CAM_ESFERICA)
-			{	// Càmera Esfèrica
+			{	// Càmera Esfèrica: limits i velocitat de zoom adaptats al cos enfocant (cosEnfocatId)
 				int cosId = g_EstatSimulador.cosEnfocatId;
 				double radiCos = 35.0;
 				if (escenariActual != nullptr && cosId >= 0 && cosId < 9) {
@@ -1682,7 +1698,7 @@ int main()
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
-// Entorn VGI.ImGui: Setup Dear ImGui style
+// Entorn VGI.ImGui: Configuracio de tema fosc espacial i carrega de fonts (InterficieUI)
 	InterficieUI::InicialitzarEstil();
 
 	// Entorn VGI.ImGui: Setup Platform/Renderer backends
@@ -1690,7 +1706,7 @@ int main()
 	ImGui_ImplOpenGL3_Init("#version 130");
 	// Entorn VGI.ImGui: End Setup Dear ImGui context
 
-	// Reserva dels 5 escenaris disponibles.
+	// Reserva de l'array d'escenaris (0: Mode Didactic, 1: Mode a Escala Real).
 	// L'escena del sistema solar NO es carrega ni es dibuixa mentre el selector inicial de modes estigui obert.
 	escenaris = new Escenari[5];
 	escenariActual = &escenaris[0];
@@ -1722,11 +1738,12 @@ int main()
 		if (!g_EstatSimulador.mostrarSelectorModes) {
 			bool escalaReal = (g_EstatSimulador.modeActual == ModeSimulacio::ESCALA_REAL);
 			if (!g_EstatSimulador.tempsSimulacio.enPausa) {
-				// En mode didàctic el rellotge avança a ritme moderat; en escala real segons el timelapse
+				// En mode didàctic el rellotge avança a ritme moderat; en escala real segons el timelapse (factorVelocitatSegonsPerSegon)
 				double deltaRellotge = escalaReal ? (double)delta : ((double)delta * 0.25);
 				g_EstatSimulador.tempsSimulacio.AvancarSegons(deltaRellotge);
 			}
 
+			// Propaga pausa, direccio, mode i velocitat del timelapse cap a l'Escenari actiu
 			if (escenariActual != nullptr && objecte == SISTEMA_SOLAR) {
 				escenariActual->updateVariables(
 					(double)delta,

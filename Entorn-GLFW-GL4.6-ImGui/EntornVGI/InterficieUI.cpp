@@ -1,4 +1,10 @@
-﻿// InterficieUI.cpp : Implementacio dels components visuals (Selector de modes, Menus, Panells)
+﻿// InterficieUI.cpp : Implementacio dels components visuals (Selector de modes, Menus, Panells, Pop-ups i HUD)
+//
+// Guia rapida de manteniment:
+// - Per modificar dades fisiques mostrades a la Fitxa de l'Astre -> kCatalegCossos.
+// - Per afegir o editar opcions de menu -> DibuixarBarraMenuSuperior (blocs INTUITIU / ESCALA_REAL).
+// - Per ajustar l'aspecte dels pop-ups espacials -> DibuixarMarcFinestraEspacial i InicialitzarEstil.
+// - Per canviar els limits del timelapse -> kPosMarques / kValMarques i EstatTempsSimulacio (.h).
 
 #include "InterficieUI.h"
 #include "ImGui/imgui.h"
@@ -7,13 +13,14 @@
 #include <cmath>
 #include <algorithm>
 
-// Fonts sans-serif carregades per al panell de control de temps (mantenint la font per defecte com a base)
-static ImFont* s_fontPanellRegular = nullptr;
-static ImFont* s_fontPanellPetit   = nullptr;
-static ImFont* s_fontPanellTitol   = nullptr;
-static ImFont* s_fontPanellDigital = nullptr;
-static ImVector<ImWchar> s_rangCaractersCatala;
+// Fonts sans-serif carregades per als panells i etiquetes (la font 0 queda com a base d'ImGui)
+static ImFont* s_fontPanellRegular = nullptr; // Text estandard de controls i files (16 px)
+static ImFont* s_fontPanellPetit   = nullptr; // Subtitols i etiquetes de marques (13.5 px)
+static ImFont* s_fontPanellTitol   = nullptr; // Capcaleres de finestres en negreta (17.5 px)
+static ImFont* s_fontPanellDigital = nullptr; // Visor gran d'hora i data simulada (24.5 px)
+static ImVector<ImWchar> s_rangCaractersCatala; // Rang de glifs persistent per a accents, dieresi i simbols
 
+// Comprova si un fitxer de tipografia existeix al disc abans d'intentar carregar-lo amb ImGui
 static bool FitxerExisteix(const char* ruta)
 {
     FILE* f = nullptr;
@@ -24,11 +31,13 @@ static bool FitxerExisteix(const char* ruta)
     return false;
 }
 
+// Aplica una font nomes si s'ha carregat correctament (evita errors si falta al sistema)
 static void PushFontSegur(ImFont* f)
 {
     if (f != nullptr) ImGui::PushFont(f);
 }
 
+// Restaura la font anterior sempre que PushFontSegur n'hagi aplicat una
 static void PopFontSegur(ImFont* f)
 {
     if (f != nullptr) ImGui::PopFont();
@@ -36,6 +45,7 @@ static void PopFontSegur(ImFont* f)
 
 // =========================================================================
 // CATALEG DE DADES FISIQUES DELS 9 COSSOS DEL SISTEMA SOLAR (0: Sol .. 8: Neptu)
+// Ordre indexat igual que EstatSimulacio::cosEnfocatId i Escenari::m_objectList[0..8].
 // =========================================================================
 static const CosAstronomicDades kCatalegCossos[9] = {
     { "Sol",     696340.0,  0.000, 274.00,  609.12,   0.00 },
@@ -49,15 +59,16 @@ static const CosAstronomicDades kCatalegCossos[9] = {
     { "Neptú",    24622.0, 30.110,  11.15,   16.11, 164.79 }
 };
 
+// Copia les dades del cataleg de l'astre enfocant cap a estat.dadesCosActiu per al HUD
 void InterficieUI::ActualitzarDadesCosActiu(EstatSimulacio& estat)
 {
     int id = estat.cosEnfocatId;
-    if (id < 0 || id >= 9) id = 0;
+    if (id < 0 || id >= 9) id = 0; // Proteccio de rang (per defecte Sol)
     estat.dadesCosActiu = kCatalegCossos[id];
 }
 
 // =========================================================================
-// 1. INICIALITZACIO D'ESTIL VISUAL
+// 1. INICIALITZACIO D'ESTIL VISUAL I TIPOGRAFIES
 // =========================================================================
 void InterficieUI::InicialitzarEstil()
 {
@@ -69,7 +80,7 @@ void InterficieUI::InicialitzarEstil()
     style.ScrollbarRounding = 4.0f;
     style.TabRounding = 4.0f;
 
-    // Tema fosc adaptat a simulacio espacial
+    // Tema fosc base adaptat a simulacio espacial (colors blaus profunds i cian)
     ImGui::StyleColorsDark();
 
     ImVec4* colors = style.Colors;
@@ -87,7 +98,7 @@ void InterficieUI::InicialitzarEstil()
     colors[ImGuiCol_TitleBgActive]      = ImVec4(0.10f, 0.18f, 0.30f, 1.00f);
     colors[ImGuiCol_MenuBarBg]          = ImVec4(0.07f, 0.09f, 0.13f, 0.96f);
 
-    // Carregar font sans-serif neta amb suport complet de caracters catalans (com a font principal)
+    // Carrega de fonts del sistema (Segoe UI o Arial) amb rang estès de caracters catalans
     ImGuiIO& io = ImGui::GetIO();
     if (io.Fonts != nullptr && io.Fonts->Fonts.Size == 0) {
         const char* rutaFontRegular = nullptr;
@@ -107,16 +118,18 @@ void InterficieUI::InicialitzarEstil()
         if (rutaFontRegular != nullptr) {
             ImFontGlyphRangesBuilder builder;
             builder.AddRanges(io.Fonts->GetGlyphRangesDefault());
+            // Caracters catalans i unitats astronomiques necessaris als menus, panell i HUD
             builder.AddText("ÀÁÈÉÍÏÒÓÚÜÇàáèéíïòóúüç·—°²");
             builder.BuildRanges(&s_rangCaractersCatala);
 
-            // Font 0 per defecte a tota la interficie (menus, selector, etiquetes 2D i HUD)
+            // La primera font registrada passa a ser la font per defecte de tota la interficie
             io.Fonts->AddFontFromFileTTF(rutaFontRegular, 15.5f, nullptr, s_rangCaractersCatala.Data);
             s_fontPanellPetit   = io.Fonts->AddFontFromFileTTF(rutaFontRegular, 13.5f, nullptr, s_rangCaractersCatala.Data);
             s_fontPanellRegular = io.Fonts->AddFontFromFileTTF(rutaFontRegular, 16.0f, nullptr, s_rangCaractersCatala.Data);
             s_fontPanellTitol   = io.Fonts->AddFontFromFileTTF(rutaFontNegreta, 17.5f, nullptr, s_rangCaractersCatala.Data);
             s_fontPanellDigital = io.Fonts->AddFontFromFileTTF(rutaFontRegular, 24.5f, nullptr, s_rangCaractersCatala.Data);
         } else {
+            // Fallback a la font bitmap integrada d'ImGui si no es troben fonts TrueType
             io.Fonts->AddFontDefault();
         }
     }
@@ -125,6 +138,9 @@ void InterficieUI::InicialitzarEstil()
 // =========================================================================
 // HELPERS VISUALS COMPARTITS (ESTIL FOSC ESPACIAL CIAN)
 // =========================================================================
+
+// Dibuixa vectorialmente la icona de reproduccio (triangle verd/cian) si esta en pausa,
+// o les dues barres verticals de pausa (taronja) si la simulacio esta activa.
 static void DibuixarIconaPausaReproduccio(ImDrawList* dl, ImVec2 centre, float alt, bool enPausa)
 {
     float escala = alt / 46.0f;
@@ -157,6 +173,8 @@ static void DibuixarIconaPausaReproduccio(ImDrawList* dl, ImVec2 centre, float a
     }
 }
 
+// Dibuixa el marc comu dels pop-ups en estil espacial: resplendor cian exterior,
+// capcalera amb titol centrat i boto de tancament ("X") connectat a *pObert.
 static void DibuixarMarcFinestraEspacial(ImDrawList* dl, ImVec2 winPos, ImVec2 winSize, const char* titol, bool* pObert, const char* idBotoTancar, float alcadaCapcalera = 42.0f)
 {
     ImVec2 winMax(winPos.x + winSize.x, winPos.y + winSize.y);
@@ -209,13 +227,14 @@ static void DibuixarMarcFinestraEspacial(ImDrawList* dl, ImVec2 winPos, ImVec2 w
     dl->AddLine(ImVec2(cClose.x + 5.5f, cClose.y - 5.5f), ImVec2(cClose.x - 5.5f, cClose.y + 5.5f), colClose, 2.0f);
 }
 
+// Finestra flotant "Quant al Simulador" (oberta des del menu Ajuda)
 static void DibuixarDialegQuantA(bool* pObert)
 {
     if (!pObert || !*pObert) return;
 
     const ImGuiViewport* vp = ImGui::GetMainViewport();
-    const float ampleFinestra = 460.0f;
-    const float alcadaFinestra = 270.0f;
+    const float ampleFinestra = 500.0f;
+    const float alcadaFinestra = 356.0f;
 
     ImVec2 posInicial(
         vp->WorkPos.x + (vp->WorkSize.x - ampleFinestra) * 0.5f,
@@ -268,11 +287,35 @@ static void DibuixarDialegQuantA(bool* pObert)
         const char* linia3 = "• Mode a Escala Real: distàncies reals i control del temps.";
         const char* linia4 = "Projecte educatiu — Escola d'Enginyeria (UAB)";
 
-        dl->AddText(ImVec2(caixaMin.x + 16.0f, caixaMin.y + 44.0f), IM_COL32(235, 245, 255, 250), linia1);
-        dl->AddText(ImVec2(caixaMin.x + 16.0f, caixaMin.y + 72.0f), IM_COL32(195, 228, 250, 240), linia2);
-        dl->AddText(ImVec2(caixaMin.x + 16.0f, caixaMin.y + 96.0f), IM_COL32(195, 228, 250, 240), linia3);
+        dl->AddText(ImVec2(caixaMin.x + 16.0f, caixaMin.y + 40.0f), IM_COL32(235, 245, 255, 250), linia1);
+        dl->AddText(ImVec2(caixaMin.x + 16.0f, caixaMin.y + 64.0f), IM_COL32(195, 228, 250, 240), linia2);
+        dl->AddText(ImVec2(caixaMin.x + 16.0f, caixaMin.y + 86.0f), IM_COL32(195, 228, 250, 240), linia3);
+
+        // Separador i llista dels integrants del grup (Grup 05) en dues columnes
+        float ySep = caixaMin.y + 112.0f;
+        dl->AddLine(ImVec2(caixaMin.x + 14.0f, ySep), ImVec2(caixaMax.x - 14.0f, ySep), IM_COL32(55, 165, 220, 110), 1.0f);
+        dl->AddText(ImVec2(caixaMin.x + 16.0f, ySep + 8.0f), IM_COL32(115, 225, 255, 255), "Integrants del grup (Grup 05):");
+
+        static const char* integrantsCol1[3] = {
+            "• Carles Peiró",
+            "• Noa Gangolells Alcázar",
+            "• Josep Montoro Pascual"
+        };
+        static const char* integrantsCol2[3] = {
+            "• Lucas Luna Rodriguez",
+            "• Abel Paiz Ilias",
+            "• Ty Devia Ballesteros"
+        };
 
         PushFontSegur(s_fontPanellPetit);
+        float yMembres = ySep + 32.0f;
+        float xCol1 = caixaMin.x + 18.0f;
+        float xCol2 = caixaMin.x + (caixaMax.x - caixaMin.x) * 0.50f + 4.0f;
+        for (int i = 0; i < 3; ++i) {
+            dl->AddText(ImVec2(xCol1, yMembres + i * 20.0f), IM_COL32(225, 240, 255, 245), integrantsCol1[i]);
+            dl->AddText(ImVec2(xCol2, yMembres + i * 20.0f), IM_COL32(225, 240, 255, 245), integrantsCol2[i]);
+        }
+
         ImVec2 mLinia4 = ImGui::CalcTextSize(linia4);
         dl->AddText(
             ImVec2(winPos.x + (winSize.x - mLinia4.x) * 0.5f, caixaMax.y - mLinia4.y - 10.0f),
@@ -308,31 +351,31 @@ static void DibuixarDialegQuantA(bool* pObert)
 }
 
 // =========================================================================
-// 2. RENDERITZADOR PRINCIPAL
+// 2. RENDERITZADOR PRINCIPAL DE LA INTERFICIE
 // =========================================================================
 void InterficieUI::Renderitzar(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID, GLuint& shader_programIDNormalMap)
 {
-    // 1. Selector inicial de modes (2 quadrats centrals amb escalat adaptatiu)
-    // En aquesta fase inicial nomes es mostren els quadrats dels modes sobre fons fosc.
+    // Fase 1: mentre el selector de modes estigui obert, s'oculta la barra de menu i tots els panells
+    // per presentar les dues targetes centrals sobre el fons fosc.
     if (estat.mostrarSelectorModes) {
         DibuixarSelectorInicialModes(estat, currentEscenari, escenaris, shader_programID, shader_programIDNormalMap);
         return;
     }
 
-    // 2. Un cop seleccionat el mode, s'activen la barra de menu superior i els panells corresponents
+    // Fase 2: barra de menu superior adaptada a estat.modeActual (INTUITIU o ESCALA_REAL)
     DibuixarBarraMenuSuperior(estat, currentEscenari, escenaris, shader_programID, shader_programIDNormalMap);
 
-    // 3. Selector de data/hora i timelapse (cantonada inferior dreta, nomes en mode escala real)
+    // Fase 3: panell flotant de control de data, hora i timelapse (nomes visible en mode escala real)
     if (estat.modeActual == ModeSimulacio::ESCALA_REAL && estat.mostrarPanellTemps) {
         DibuixarPanellDataHoraTimelapse(estat);
     }
 
-    // 4. Fitxa de l'astre (HUD flotant)
+    // Fase 4: fitxa astronomica de l'astre enfocant (HUD a la cantonada superior dreta)
     if (estat.mostrarFitxaHUD) {
         DibuixarFitxaAstronomicaHUD(estat.dadesCosActiu, &estat.mostrarFitxaHUD);
     }
 
-    // 5. Dialeg "Quant al Simulador"
+    // Fase 5: dialeg informatiu sobre el projecte
     if (estat.mostrarDialegQuantA) {
         DibuixarDialegQuantA(&estat.mostrarDialegQuantA);
     }
@@ -341,6 +384,7 @@ void InterficieUI::Renderitzar(EstatSimulacio& estat, Escenari*& currentEscenari
 // =========================================================================
 // HELPER PER A ELEMENTS DE LLISTA AMB PUNT (BULLET) I SALT DE LINIA AUTOMATIC
 // =========================================================================
+// Escriu un element de llista amb vinyeta i ajust de linia automatic per evitar talls en finestres estretes
 static void DibuixarPuntLlista(const char* text)
 {
     ImGui::Bullet();
@@ -360,6 +404,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
     float viewW = viewport->WorkSize.x;
     float viewH = viewport->WorkSize.y;
 
+    // Factor d'escala responsive en funcio de l'amplada de la finestra (finestra normal, 1080p, 1440p, 4K)
     float factorEscala = 1.0f;
     if (viewW >= 2400.0f)      factorEscala = 1.35f;
     else if (viewW >= 1700.0f) factorEscala = 1.20f;
@@ -370,6 +415,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
     float ampleModal = 840.0f * factorEscala;
     float alcadaModal = 520.0f * factorEscala;
 
+    // Dimensions del contenidor modal adaptades amb limits minim i maxim per evitar desbordaments
     if (viewW >= 1600.0f) {
         ampleModal = (viewW * 0.62f < 1200.0f) ? 1200.0f : (viewW * 0.62f);
         if (ampleModal > 1350.0f) ampleModal = 1350.0f;
@@ -389,7 +435,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
     ImVec2 posModal(viewport->WorkPos.x + (viewW - midaModal.x) * 0.5f,
                     viewport->WorkPos.y + (viewH - midaModal.y) * 0.5f);
 
-    // Dibuixar un fons fosc complet sobre tota la pantalla (sense sistema solar darrere)
+    // Aillament visual: fons fosc complet sobre tota la pantalla mentre no s'ha triat mode
     ImDrawList* bgDrawList = ImGui::GetBackgroundDrawList();
     if (bgDrawList != nullptr)
     {
@@ -418,6 +464,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
     {
         ImGui::SetWindowFontScale(factorEscala);
 
+        // Capcalera principal centrada
         ImGui::Spacing();
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 255, 255));
         float ampleTitol = ImGui::CalcTextSize("SIMULADOR INTERACTIU DEL SISTEMA SOLAR").x;
@@ -438,6 +485,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
         ImGui::PopStyleColor();
         ImGui::Spacing();
 
+        // Geometria simetrica per a les dues targetes i el boto inferior de cada una
         float espaiCapcalera = ImGui::GetCursorPosY();
         float margeInferior = 18.0f * factorEscala;
         float alcadaTargeta = midaModal.y - espaiCapcalera - margeInferior;
@@ -450,12 +498,13 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
         ImVec2 midaTargeta(ampleTargeta, alcadaTargeta);
         float alcadaBoto = 44.0f * factorEscala;
 
+        // Amplada del boto dimensionada a partir de l'etiqueta mes llarga per evitar talls
         float textBotoMax = ImGui::CalcTextSize("INICIAR MODE A ESCALA REAL").x;
         float ampleBoto = (midaTargeta.x * 0.85f > textBotoMax + 32.0f) ? (midaTargeta.x * 0.85f) : (textBotoMax + 32.0f);
         if (ampleBoto > 420.0f * factorEscala) ampleBoto = 420.0f * factorEscala;
         if (ampleBoto > midaTargeta.x - 16.0f) ampleBoto = midaTargeta.x - 16.0f;
 
-        // TARGETA 1: MODE DIDACTIC / INTUITIU
+        // TARGETA 1: MODE DIDACTIC / INTUITIU (tons blaus/cian)
         ImGui::SetCursorPosX(margeLateral);
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 10.0f * factorEscala);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f * factorEscala, 16.0f * factorEscala));
@@ -491,6 +540,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
             DibuixarPuntLlista("Focus directe a qualsevol planeta.");
             ImGui::PopStyleColor();
 
+            // Posicionament resilient: fixa el boto a la base si hi ha espai, o just sota la llista
             float padY = 16.0f * factorEscala;
             float espaiFinal = ImGui::GetStyle().ItemSpacing.y;
             float yBotoDesejat = midaTargeta.y - alcadaBoto - padY - espaiFinal - 4.0f;
@@ -509,6 +559,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
             ImGui::SetCursorPosX((midaTargeta.x - ampleBoto) * 0.5f);
             if (ImGui::Button("INICIAR MODE DIDÀCTIC", ImVec2(ampleBoto, alcadaBoto)))
             {
+                // Configura l'estat per al Mode Didactic, tanca el selector i demana sincronitzar OpenGL
                 estat.modeActual = ModeSimulacio::INTUITIU;
                 estat.mostrarSelectorModes = false;
                 estat.mostrarPanellTemps = false;
@@ -519,7 +570,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
                 estat.canviCameraPendent = true;
                 ActualitzarDadesCosActiu(estat);
 
-                // Creacio de l'escenari corresponent (index 0: Mode Didactic)
+                // Creacio i vinculacio de l'escenari didactic (index 0) amb els shaders actius
                 if (escenaris != nullptr)
                 {
                     currentEscenari = &escenaris[0];
@@ -564,7 +615,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
             DibuixarPuntLlista("Control complet de Data, Hora i Velocitat.");
             DibuixarPuntLlista("Velocitat regulable: 1 min/s a 20 dies/s.");
             DibuixarPuntLlista("Possibilitat d'avançar o rebobinar.");
-            DibuixarPuntLlista("Vista en 1a persona i focus a cada astre.");
+            DibuixarPuntLlista("Focus directe a cada astre.");
             ImGui::PopStyleColor();
 
             float padY = 16.0f * factorEscala;
@@ -585,6 +636,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
             ImGui::SetCursorPosX((midaTargeta.x - ampleBoto) * 0.5f);
             if (ImGui::Button("INICIAR MODE A ESCALA REAL", ImVec2(ampleBoto, alcadaBoto)))
             {
+                // Activa el mode a escala real amb el panell temporal obert i camera orbital lliure
                 estat.modeActual = ModeSimulacio::ESCALA_REAL;
                 estat.mostrarSelectorModes = false;
                 estat.mostrarPanellTemps = true;
@@ -594,7 +646,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
                 estat.canviCameraPendent = true;
                 ActualitzarDadesCosActiu(estat);
 
-                // Creacio de l'escenari corresponent (index 1: Mode a Escala Real)
+                // Creacio i vinculacio de l'escenari a escala real (index 1)
                 if (escenaris != nullptr)
                 {
                     currentEscenari = &escenaris[1];
@@ -615,11 +667,15 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
 // =========================================================================
 // 2.2 BARRA DE MENU SUPERIOR DINAMICA PER MODE (MAIN MENU BAR)
 // =========================================================================
+// Construeix la barra superior amb opcions filtrades segons estat.modeActual.
+// Per afegir un nou menu o opcio, seguiu l'estructura BeginMenu/MenuItem dins
+// del bloc corresponent (INTUITIU o ESCALA_REAL) i propagueu SetWindowFontScale.
 void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID, GLuint& shader_programIDNormalMap)
 {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     float viewW = vp->WorkSize.x;
 
+    // Interpolacio lineal [0..1.25] per escalar tipografia i marges entre 900px i 1920px+
     float t = (viewW - 900.0f) / (1920.0f - 900.0f);
     if (t < 0.0f) t = 0.0f;
     if (t > 1.25f) t = 1.25f;
@@ -641,6 +697,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
 
     ImGui::SetWindowFontScale(factorFontMenu);
 
+    // Noms mostrables dels 9 astres indexats segons Escenari::m_objectList[0..8]
     static const char* nomsPlanetesMenu[9] = {
         "Sol (Centre)", "Mercuri", "Venus", "Terra",
         "Mart", "Júpiter", "Saturn", "Urà", "Neptú"
@@ -649,6 +706,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
     if (estat.modeActual == ModeSimulacio::INTUITIU)
     {
         // ==================== MENUS MODE DIDACTIC / INTUITIU ====================
+        // 1) Canvi de mode, control rapid de pausa, reinici de vista i sortida
         if (ImGui::BeginMenu("Escenari"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
@@ -684,6 +742,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             ImGui::EndMenu();
         }
 
+        // 2) Seleccio de l'astre sobre el qual orbita la camera (0=Sol .. 8=Neptu)
         if (ImGui::BeginMenu("Planetes & Focus"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
@@ -706,6 +765,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             ImGui::EndMenu();
         }
 
+        // 3) Tipus de camera disponibles al Mode Didactic (orbital, 25 graus, pilota coet i global)
         if (ImGui::BeginMenu("Càmera"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
@@ -718,6 +778,11 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 estat.cameraConfig.angleInclinacio = 25.0f;
                 estat.canviCameraPendent = true;
             }
+            // Activa la càmera de seguiment en mode coet (CAM_NAVEGA)
+            if (ImGui::MenuItem("Pilota coet", nullptr, estat.cameraConfig.mode == ModeCamera::COET_PRIMERA_PERSONA)) {
+                estat.cameraConfig.mode = ModeCamera::COET_PRIMERA_PERSONA;
+                estat.canviCameraPendent = true;
+            }
             if (ImGui::MenuItem("Vista Global del Sistema", nullptr, estat.cameraConfig.mode == ModeCamera::GLOBAL_SISTEMA)) {
                 estat.cosEnfocatId = 0;
                 estat.cameraConfig.mode = ModeCamera::GLOBAL_SISTEMA;
@@ -727,6 +792,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             ImGui::EndMenu();
         }
 
+        // 4) Capes visuals i il-luminacio (sincronitzades automaticament a SincronitzarEstatSimuladorAmbOpenGL)
         if (ImGui::BeginMenu("Visualització"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
@@ -752,6 +818,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             ImGui::EndMenu();
         }
 
+        // 5) Telemetria de l'astre i dialeg informatiu
         if (ImGui::BeginMenu("Ajuda"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
@@ -766,6 +833,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
     else if (estat.modeActual == ModeSimulacio::ESCALA_REAL)
     {
         // ==================== MENUS MODE A ESCALA REAL ====================
+        // 1) Commutacio de mode, reinici de vista centrada al Sol i sortida
         if (ImGui::BeginMenu("Escenari"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
@@ -799,6 +867,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             ImGui::EndMenu();
         }
 
+        // 2) Visibilitat del panell flotant de temps, pausa/direccio, dates i presets de velocitat
         if (ImGui::BeginMenu("Temps & Data"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
@@ -839,6 +908,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             ImGui::EndMenu();
         }
 
+        // 3) Seleccio d'origen/astre centrat i modalitat de camera (incloent Pilota coet)
         if (ImGui::BeginMenu("Origen & Càmeres"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
@@ -876,7 +946,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 estat.cameraConfig.angleInclinacio = 25.0f;
                 estat.canviCameraPendent = true;
             }
-            if (ImGui::MenuItem("Vista en 1a Persona", nullptr, estat.cameraConfig.mode == ModeCamera::COET_PRIMERA_PERSONA)) {
+            if (ImGui::MenuItem("Pilota coet", nullptr, estat.cameraConfig.mode == ModeCamera::COET_PRIMERA_PERSONA)) {
                 estat.cameraConfig.mode = ModeCamera::COET_PRIMERA_PERSONA;
                 estat.canviCameraPendent = true;
             }
@@ -890,6 +960,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             ImGui::EndMenu();
         }
 
+        // 4) Capes visuals del renderitzat en mode a escala real
         if (ImGui::BeginMenu("Visualització"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
@@ -903,6 +974,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             ImGui::EndMenu();
         }
 
+        // 5) Telemetria de l'astre i dialeg informatiu
         if (ImGui::BeginMenu("Ajuda"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
@@ -916,6 +988,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
     }
 
     // ==================== ZONA DRETA: MODE, PAUSA/REPRENDRE, CANVIAR I FPS ====================
+    // Calcula l'amplada exacta de tots els widgets de la dreta per ancorar-los sense solapaments
     float ampleTotal = ImGui::GetWindowWidth();
 
     const char* etiquetaMode = (estat.modeActual == ModeSimulacio::INTUITIU) 
@@ -983,11 +1056,13 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
 
     ImGui::SameLine();
 
+    // Reobre el selector inicial per canviar entre Mode Didactic i Escala Real
     if (ImGui::Button("Canviar")) {
         estat.mostrarSelectorModes = true;
     }
     ImGui::SameLine();
 
+    // Comptador de FPS (verd si > 45 FPS, vermell si cau per sota)
     ImGui::TextColored(fps > 45.0f ? ImVec4(0.3f, 1.0f, 0.3f, 1.0f) : ImVec4(1.0f, 0.4f, 0.4f, 1.0f), 
                        "%s", bufferFps);
 
@@ -999,6 +1074,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
 // =========================================================================
 // HELPERS DEL PANELL DE CONTROL DE TEMPS I VELOCITAT
 // =========================================================================
+// Marques equiespaiades del slider [0..1] amb mapeig logaritmic per trams de velocitat
 static const int kNumMarquesSlider = 5;
 static const float kPosMarques[kNumMarquesSlider] = { 0.00f, 0.25f, 0.50f, 0.75f, 1.00f };
 static const double kValMarques[kNumMarquesSlider] = { 60.0, 3600.0, 86400.0, 864000.0, 1728000.0 };
@@ -1006,6 +1082,7 @@ static const char* kEtiquetesMarques[kNumMarquesSlider] = {
     "1 min/s", "1 h/s", "1 dia/s", "10 dies/s", "20 dies/s"
 };
 
+// Converteix una velocitat (en segons simulats/segon) a posicio normalitzada [0..1] del slider
 static float VelocitatANormalitzat(double vel)
 {
     if (vel <= kValMarques[0]) return 0.0f;
@@ -1019,6 +1096,7 @@ static float VelocitatANormalitzat(double vel)
     return 1.0f;
 }
 
+// Inversa de VelocitatANormalitzat: transforma una posicio normalitzada [0..1] del slider a segons/segon
 static double NormalitzatAVelocitat(float u)
 {
     if (u <= 0.0f) return kValMarques[0];
@@ -1032,6 +1110,7 @@ static double NormalitzatAVelocitat(float u)
     return kValMarques[kNumMarquesSlider - 1];
 }
 
+// Formata la velocitat de simulacio en unitats llegibles (minuts, hores o dies/s) i afegeix l'estat (PAUSADA/ENRERE)
 static void FormatarVelocitatActual(double vel, bool enPausa, int direccioTemps, char* outBuf, size_t bufSize)
 {
     char base[96];
@@ -1073,6 +1152,7 @@ static void FormatarVelocitatActual(double vel, bool enPausa, int direccioTemps,
     snprintf(outBuf, bufSize, "VELOCITAT ACTUAL: %s%s", base, estatTxt);
 }
 
+// Interpola linealment dos colors RGBA empacats (ImU32) segons t en [0..1] per al degradat del slider
 static ImU32 InterpolarColor(ImU32 colA, ImU32 colB, float t)
 {
     if (t < 0.0f) t = 0.0f;
@@ -1092,6 +1172,7 @@ static ImU32 InterpolarColor(ImU32 colA, ImU32 colB, float t)
     return IM_COL32(r, g, b, a);
 }
 
+// Icona vectorial de rellotge per al boto de seleccio d'hora
 static void DibuixarIconaRellotge(ImDrawList* dl, ImVec2 centre, float radi, ImU32 col)
 {
     dl->AddCircle(centre, radi, col, 28, 2.2f);
@@ -1100,6 +1181,7 @@ static void DibuixarIconaRellotge(ImDrawList* dl, ImVec2 centre, float radi, ImU
     dl->AddCircleFilled(centre, 1.8f, col);
 }
 
+// Icona vectorial de calendari (marc + anelles + graella 3x2) per al boto de seleccio de data
 static void DibuixarIconaCalendari(ImDrawList* dl, ImVec2 centre, float mida, ImU32 col)
 {
     float hw = mida * 0.50f;
@@ -1128,6 +1210,7 @@ static void DibuixarIconaCalendari(ImDrawList* dl, ImVec2 centre, float mida, Im
     }
 }
 
+// Icona vectorial de doble fletxa (<< amb dir=-1 per rebobinar, >> amb dir=+1 per avancar)
 static void DibuixarIconaFletxesDobles(ImDrawList* dl, ImVec2 centre, float mida, int dir, ImU32 col)
 {
     float s = (float)dir; // -1 esquerra, +1 dreta
@@ -1144,6 +1227,7 @@ static void DibuixarIconaFletxesDobles(ImDrawList* dl, ImVec2 centre, float mida
     }
 }
 
+// Pop-up emergent per editar manualment Hora, Minut i Segon (o aplicar presets 00:00 / 12:00 / Ara)
 static void DibuixarPopupSelectorHora(EstatSimulacio& estat, bool& canviDataSollicitat)
 {
     ImGui::PushStyleColor(ImGuiCol_PopupBg, IM_COL32(12, 26, 46, 248));
@@ -1199,6 +1283,7 @@ static void DibuixarPopupSelectorHora(EstatSimulacio& estat, bool& canviDataSoll
     ImGui::PopStyleColor(2);
 }
 
+// Pop-up emergent amb graella mensual gregoriana per seleccionar Dia, Mes i Any
 static void DibuixarPopupSelectorData(EstatSimulacio& estat, bool& canviDataSollicitat)
 {
     static const char* nomsMesosComplets[12] = {
@@ -1317,6 +1402,10 @@ static void DibuixarPopupSelectorData(EstatSimulacio& estat, bool& canviDataSoll
 // =========================================================================
 // 2.3 CONTROL DE TEMPS I VELOCITAT (POP-UP FLOTANT EN MODE ESCALA REAL)
 // =========================================================================
+// Panell ancorat inicialment a la cantonada inferior dreta amb:
+// 1) Marc espacial i titol; 2) Visor digital d'hora/data amb pop-ups;
+// 3) Botons de reproduccio (<<, ||/>, >>); 4) Slider logaritmic de velocitat;
+// 5) Dreceres rapides (1h/s, 1dia/s, 20dies/s); 6) Indicador d'estat inferior.
 void InterficieUI::DibuixarPanellDataHoraTimelapse(EstatSimulacio& estat)
 {
     if (estat.modeActual != ModeSimulacio::ESCALA_REAL || !estat.mostrarPanellTemps) return;
@@ -1746,6 +1835,8 @@ void InterficieUI::DibuixarPanellDataHoraTimelapse(EstatSimulacio& estat)
 // =========================================================================
 // 2.6 FITXA DE L'ASTRE (HUD FLOTANT)
 // =========================================================================
+// Mostra les dades fisiques de estat.dadesCosActiu (actualitzades amb ActualitzarDadesCosActiu)
+// a la cantonada superior dreta mentre estat.mostrarFitxaHUD sigui true.
 void InterficieUI::DibuixarFitxaAstronomicaHUD(const CosAstronomicDades& dades, bool* pObert)
 {
     if (!pObert || !*pObert) return;
@@ -1852,6 +1943,8 @@ void InterficieUI::DibuixarFitxaAstronomicaHUD(const CosAstronomicDades& dades, 
 // =========================================================================
 // 2.7 PROJECCIO D'ETIQUETES 3D A PANTALLA 2D AMB IMDRAWLIST
 // =========================================================================
+// Projecta una posicio 3D del mon cap a coordenades de pantalla (invertint Y respecte OpenGL)
+// i dibuixa un punt cian + el nom de l'astre al fons del viewport quan es davant la camera.
 void InterficieUI::DibuixarEtiquetaPlaneta(const std::string& nom, const glm::vec3& posicioMon, 
                                           const glm::mat4& viewMatrix, const glm::mat4& projMatrix, 
                                           const glm::vec4& viewport)
