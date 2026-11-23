@@ -3,9 +3,19 @@
 #include "framework.h"
 #include "material.h"
 #include "visualitzacio.h"
+#include <vector>
 
-// Nombre maxim d'objectes per escenari (0 Sol, 1..8 planetes, 9 Lluna)
-#define MAX_OBJECTES_ESCENARI 10
+
+#define SOL 0
+#define MERCURIO 1
+#define VENUS 2
+#define TIERRA 3
+#define MARTE 4
+#define JUPITER 5
+#define SATURNO 6
+#define URANO 7
+#define NEPTUNO 8
+#define LUNA 9
 
 // Dades individuals de cada cos celeste (Sol, planetes i Lluna) dins de l'escenari
 class Object
@@ -22,6 +32,9 @@ public:
 	float m_angleRotacio;
 	float m_velRotacio;
 
+	GLuint m_textureID;
+	GLuint m_normalMapID;
+
 	glm::mat4 m_mMatrix;
 };
 
@@ -32,13 +45,6 @@ class Escenari
 public:
 	Escenari()
 	{
-		m_objectList = new Object[MAX_OBJECTES_ESCENARI];
-		m_colObj.r = 1.0; m_colObj.g = 1.0; m_colObj.b = 1.0; m_colObj.a = 1.0;
-		for (int i = 0; i < NUM_MAX_TEXTURES; i++)
-		{
-			m_texturesID[i] = 0;
-			m_fitxers[i] = nullptr;
-		}
 		// CVAO no s'inicialitza sol: posar-lo a 0 evita alliberar identificadors brossa
 		m_orbitVAO = { 0, 0, 0, 0, 0 };
 	}
@@ -63,26 +69,21 @@ public:
 		deleteVAOList(GLU_DISK);
 		deleteVAOList(GLUT_TORUS);
 		alliberaOrbita();
-		for (int i = 0; i < NUM_MAX_TEXTURES; i++) {
-			if (m_texturesID[i]) { glDeleteTextures(1, &m_texturesID[i]); m_texturesID[i] = 0; }
+		for (int i = 0; i < m_objectList.size(); i++) {
+			if (m_objectList[i].m_textureID) { glDeleteTextures(1, &m_objectList[i].m_textureID); m_objectList[i].m_textureID = 0; }
 		}
-		for (int i = 0; i < 9; i++) {
-			if (m_normalTexturesID[i]) { glDeleteTextures(1, &m_normalTexturesID[i]); m_normalTexturesID[i] = 0; }
+		for (int i = 0; i < m_objectList.size(); i++) {
+			if (m_objectList[i].m_normalMapID) { glDeleteTextures(1, &m_objectList[i].m_normalMapID); m_objectList[i].m_normalMapID = 0; }
 		}
-		delete[] m_objectList; m_objectList = nullptr;
 	}
 
-	Object* m_objectList;
-	GLuint m_texturesID[NUM_MAX_TEXTURES];
-	char* m_fitxers[NUM_MAX_TEXTURES];
-	CColor m_colObj;
+	std::vector<Object> m_objectList;
+	
 	// Orbites: un unic cercle de radi 1 dibuixat com a linia (GL_LINE_LOOP). Cada orbita
 	// (8 planetes + Lluna) el reutilitza escalant-lo al seu radi amb la modelMatrix.
 	CVAO m_orbitVAO;
 
 	// Mapes normals per al shader de normal mapping (index = cos; 0 Sol i 7 Urà sense mapa)
-	GLuint m_normalTexturesID[9] = { 0 };
-	char* m_normalFitxers[9] = { nullptr };
 
 private:
 	void creaOrbita();

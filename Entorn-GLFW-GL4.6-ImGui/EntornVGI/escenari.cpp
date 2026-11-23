@@ -1,5 +1,6 @@
 #include "escenari.h"
 #include <cmath>
+#include <vector>
 
 // NOTA: no s'ha d'incloure "main.cpp" ni "main.h" aqui (definirien totes les variables
 // globals dues vegades -> error de linker LNK2005). El shader es rep com a parametre.
@@ -65,31 +66,33 @@ static void copiaUniformsShader(GLuint src, GLuint dst)
 
 void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 {
-
-	m_fitxers[0] = (char*)".\\textures\\sun\\\\2k_sun.jpg";
-	m_fitxers[1] = (char*)".\\textures\\planet\\Mercury\\2k_mercury.jpg";	// 1
-	m_fitxers[2] = (char*)".\\textures\\planet\\Venus\\2k_venus_surface.jpg";		// 2
-	m_fitxers[3] = (char*)".\\textures\\planet\\Earth\\earth2048.bmp";		// 3
-	m_fitxers[4] = (char*)".\\textures\\planet\\Mars\\2k_mars.jpg";		// 4
-	m_fitxers[5] = (char*)".\\textures\\planet\\Jupiter\\2k_jupiter.jpg";	// 5
-	m_fitxers[6] = (char*)".\\textures\\planet\\Saturn\\2k_saturn.jpg";	// 6
-	m_fitxers[7] = (char*)".\\textures\\planet\\Uranus\\2k_uranus.jpg";	// 7
-	m_fitxers[8] = (char*)".\\textures\\planet\\Neptune\\2k_neptune.jpg";		// 8
-	m_fitxers[9] = (char*)".\\textures\\planet\\Saturn\\2k_saturn_ring_alpha.png";	// 6
-	m_fitxers[10] = (char*)".\\textures\\planet\\Moon\\2k_moon.jpg";	// Lluna (cos 9)
+	std::vector<char*> texturePaths;
+	texturePaths.push_back((char*)".\\textures\\planet\\Mercury\\2k_mercury.jpg");	// 1
+	texturePaths.push_back((char*)".\\textures\\sun\\\\2k_sun.jpg");
+	texturePaths.push_back((char*)".\\textures\\planet\\Venus\\2k_venus_surface.jpg");		// 2
+	texturePaths.push_back((char*)".\\textures\\planet\\Earth\\earth2048.bmp");		// 3
+	texturePaths.push_back((char*)".\\textures\\planet\\Mars\\2k_mars.jpg");		// 4
+	texturePaths.push_back((char*)".\\textures\\planet\\Jupiter\\2k_jupiter.jpg");	// 5
+	texturePaths.push_back((char*)".\\textures\\planet\\Saturn\\2k_saturn.jpg");	// 6
+	texturePaths.push_back((char*)".\\textures\\planet\\Uranus\\2k_uranus.jpg");	// 7
+	texturePaths.push_back((char*)".\\textures\\planet\\Neptune\\2k_neptune.jpg");		// 8
+	texturePaths.push_back((char*)".\\textures\\planet\\Saturn\\2k_saturn_ring_alpha.png");	// 6
+	texturePaths.push_back((char*)".\\textures\\planet\\Moon\\2k_moon.jpg");	// Lluna (cos 9)
 
 	// Mapas normales de los planetas
-	m_normalFitxers[0] = nullptr; // Sol
-	m_normalFitxers[1] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapMercury.png";
-	m_normalFitxers[2] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapVenus.png";
-	m_normalFitxers[3] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapEarth.png";
-	m_normalFitxers[4] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapMars.png";
-	m_normalFitxers[5] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapJupiter.png";
-	m_normalFitxers[6] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapSaturn.png";
-	m_normalFitxers[7] = nullptr; // Urano: sin mapa normal
-	m_normalFitxers[8] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapNeptune.png";
+	std::vector<char*> normalMapPaths;
+	normalMapPaths.push_back(nullptr); // Sol
+	normalMapPaths.push_back((char*)".\\textures\\planet\\NormalTextures\\NormalMapMercury.png");
+	normalMapPaths.push_back((char*)".\\textures\\planet\\NormalTextures\\NormalMapVenus.png");
+	normalMapPaths.push_back((char*)".\\textures\\planet\\NormalTextures\\NormalMapEarth.png");
+	normalMapPaths.push_back((char*)".\\textures\\planet\\NormalTextures\\NormalMapMars.png");
+	normalMapPaths.push_back((char*)".\\textures\\planet\\NormalTextures\\NormalMapJupiter.png");
+	normalMapPaths.push_back((char*)".\\textures\\planet\\NormalTextures\\NormalMapSaturn.png");
+	normalMapPaths.push_back(nullptr); // Urano: sin mapa normal
+	normalMapPaths.push_back((char*)".\\textures\\planet\\NormalTextures\\NormalMapNeptune.png");
 
-	m_colObj.r = 1.0; m_colObj.g = 1.0; m_colObj.b = 1.0; m_colObj.a = 1.0;
+	CColor colObj;
+	colObj.r = 1.0; colObj.g = 1.0; colObj.b = 1.0; colObj.a = 1.0;
 
 
 	glUseProgram(shader_programID);
@@ -97,24 +100,24 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	deleteVAOList(GLU_SPHERE);
 	deleteVAOList(GLU_DISK);
 	deleteVAOList(GLUT_TORUS);
-	SetColor4d(m_colObj.r, m_colObj.g, m_colObj.b, m_colObj.a);
+	SetColor4d(colObj.r, colObj.g, colObj.b, colObj.a);
 	Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(1.0, 40, 40));				// Esfera de radi 1 (cossos)
 	Set_VAOList(GLU_DISK, loadgluDisk_EBO(8.0f, 12.0f, 80, 5)); //anell saturn
 	Set_VAOList(GLUT_TORUS, loadglutSolidTorus_EBO(0.005, 1.0, 8, 120));	// Anell fi de radi 1 (orbites)
 
 
-	for (int i = 0; i < NUM_MAX_TEXTURES; i++)
-		if (m_texturesID[i]) { glDeleteTextures(1, &m_texturesID[i]); m_texturesID[i] = 0; }
+	for (int i = 0; i < m_objectList.size(); i++)
+		if (m_objectList[i].m_textureID) { glDeleteTextures(1, &m_objectList[i].m_textureID); m_objectList[i].m_textureID = 0; }
 
 	// Carregar textures i configurar parametres de filtratge i repeticio un sol cop
-	for (int i = 0; i < 11; i++)
+	for (int i = 0; i < m_objectList.size(); i++)
 	{
-		m_texturesID[i] = loadIMA_SOIL(m_fitxers[i]);
-		if (m_texturesID[i] == 0) {
-			fprintf(stderr, "No s'ha pogut carregar: %s\n", m_fitxers[i]);
+		m_objectList[i].m_textureID = loadIMA_SOIL(texturePaths[i]);
+		if (m_objectList[i].m_textureID == 0) {
+			fprintf(stderr, "No s'ha pogut carregar: %s\n", texturePaths[i]);
 		}
 		else {
-			glBindTexture(GL_TEXTURE_2D, m_texturesID[i]);
+			glBindTexture(GL_TEXTURE_2D, m_objectList[i].m_textureID);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -126,24 +129,25 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 
 	//carrega mapas normales
 	glActiveTexture(GL_TEXTURE0);
-	for (int i = 0; i < 9; i++){
-		if (m_normalTexturesID[i] != 0){
-			glDeleteTextures(1, &m_normalTexturesID[i]);
-			m_normalTexturesID[i] = 0;
+	for (int i = 0; i < m_objectList.size(); i++){
+		if (m_objectList[i].m_normalMapID != 0){
+			glDeleteTextures(1, &m_objectList[i].m_normalMapID);
+			m_objectList[i].m_normalMapID = 0;
 		}
 	}
 
-	for (int i = 1; i < 9; i++){
-		if (m_normalFitxers[i] == nullptr) continue;
+	//Load normal maps
+	for (int i = 1; i < m_objectList.size(); i++){
+		if (normalMapPaths[i] == nullptr) continue;
 
-		m_normalTexturesID[i] = loadIMA_SOIL(m_normalFitxers[i]);
+		m_objectList[i].m_normalMapID = loadIMA_SOIL(normalMapPaths[i]);
 
-		if (m_normalTexturesID[i] == 0) {
+		if (m_objectList[i].m_normalMapID == 0) {
 			fprintf(stderr, "No s'ha pogut carregar el mapa normal: %s\n",
-				m_normalFitxers[i]);
+				normalMapPaths[i]);
 		}
 		else {
-			glBindTexture(GL_TEXTURE_2D, m_normalTexturesID[i]);
+			glBindTexture(GL_TEXTURE_2D, m_objectList[i].m_normalMapID);
 
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -193,7 +197,7 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 
 	const float angleOrbita[10] = { 0.0f,  0.0f, 40.0f, 80.0f,120.0f,160.0f,200.0f,240.0f,280.0f, 0.0f };
 
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < m_objectList.size(); i++)
 	{
 		m_objectList[i].m_radiCos = radiCos[i];
 		m_objectList[i].m_radiOrbita = radiOrbita[i];
@@ -203,7 +207,7 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	// Orbites: un unic cercle de linies de radi 1, compartit per les 8 orbites planetaries i la lunar
 	creaOrbita();
 
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < m_objectList.size(); i++)
 	{
 		m_objectList[i].m_angleRotacio = 0.0f;
 	}
@@ -299,7 +303,7 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 		GLint locModelMatOrb = glGetUniformLocation(sh_programID, "modelMatrix");
 		GLint locTwoSidedOrb = glGetUniformLocation(sh_programID, "sw_twoSided");
 		if (m_orbitVAO.vaoId != 0) glBindVertexArray(m_orbitVAO.vaoId);
-		for (i = 1; i < 10; i++)
+		for (i = 1; i < m_objectList.size(); i++)
 		{
 			// Les orbites planetaries es centren al Sol; la de la Lluna (i == 9) a la Terra
 			glm::mat4 MatriuCentre = (i == 9) ? matriuOrbitaLluna(MatriuTG, m_objectList[3]) : MatriuTG;
@@ -322,9 +326,9 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 		glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), GL_TRUE);
 		SeleccionaColorMaterial(sh_programID, col_blanc, sw_mat_no_emisio);
 
-		if (m_texturesID[9] != 0) {
+		if (m_objectList[9].m_textureID != 0) {
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, m_texturesID[9]);
+			glBindTexture(GL_TEXTURE_2D, m_objectList[9].m_textureID);
 		}
 
 		float x = m_objectList[6].m_radiOrbita * (float)cos(m_objectList[6].m_angleOrbita * PI / 180.0f);
@@ -362,15 +366,15 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 	GLint locSwInt = glGetUniformLocation(sh_programID, "sw_intensity");
 
 	// Planetes amb mapa normal (1..8, excepte Urà): es dibuixen despres amb el shader de normal mapping
-	auto teNormalMap = [&](int k) { return k > 0 && k < 9 && m_normalTexturesID[k] != 0 && shaderNormalMapID != 0; };
-	for (i = 0; i < 10; i++)
+	auto teNormalMap = [&](int k) { return k > 0 && k < 9 && m_objectList[k].m_normalMapID != 0 && shaderNormalMapID != 0; };
+	for (i = 0; i < m_objectList.size(); i++)
 	{
 		if (teNormalMap(i)) continue;
 		// La textura 9 es l'anell de Saturn: la Lluna (cos 9) fa servir la textura 10
 		int tex = (i == 9) ? 10 : i;
-		if (m_texturesID[tex] != 0) {
+		if (m_objectList[tex].m_textureID != 0) {
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, m_texturesID[tex]);
+			glBindTexture(GL_TEXTURE_2D, m_objectList[tex].m_textureID);
 		}
 
 		float x = m_objectList[i].m_radiOrbita * (float)cos(m_objectList[i].m_angleOrbita * PI / 180.0);
@@ -405,14 +409,14 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 		locSwInt =glGetUniformLocation(shaderNormalMapID, "sw_intensity");
 
 		// Planetas con mapas normales: Mercurio, Venus, Tierra,Marte, Júpiter, Saturno y Neptuno.
-		for (int i = 1; i < 9; i++){
+		for (int i = 1; i < m_objectList.size(); i++){
 			// Urano no tiene mapa normal !textura plana sin gracia se puede canviar despues si hace falta!
 			if(!teNormalMap(i)) continue;		// Textura difusa: unidad 0
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, m_texturesID[i]);
+			glBindTexture(GL_TEXTURE_2D, m_objectList[i].m_textureID);
 			// Mapa normal: unidad 1
 			glActiveTexture(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_2D, m_normalTexturesID[i]);
+			glBindTexture(GL_TEXTURE_2D, m_objectList[i].m_normalMapID);
 
 			float x = m_objectList[i].m_radiOrbita *(float)cos(m_objectList[i].m_angleOrbita * PI / 180.0);
 			float y = m_objectList[i].m_radiOrbita *(float)sin(m_objectList[i].m_angleOrbita * PI / 180.0);
@@ -443,7 +447,7 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 // - escalaReal + factorVelocitat: ajusta el pas orbital segons el timelapse actiu en mode ESCALA_REAL.
 void Escenari::updateVariables(double dt, bool enPausa, int direccioTemps, bool escalaReal, double factorVelocitat)
 {
-	if (m_objectList == nullptr || enPausa) return;
+	if (m_objectList.empty() || enPausa) return;
 
 	// Limit de seguretat per a dt
 	if (dt < 0.0) dt = 0.0;
@@ -453,7 +457,7 @@ void Escenari::updateVariables(double dt, bool enPausa, int direccioTemps, bool 
 	float factorTemps = 1.0f;
 	if (escalaReal) factorTemps = (float)std::sqrt(factorVelocitat / 300.0);
 
-	for (int i = 0; i < 10; i++)
+	for (int i = 0; i < m_objectList.size(); i++)
 	{
 		// Gir orbital al voltant del Sol (la Lluna, i == 9, al voltant de la Terra)
 		if (i > 0)
