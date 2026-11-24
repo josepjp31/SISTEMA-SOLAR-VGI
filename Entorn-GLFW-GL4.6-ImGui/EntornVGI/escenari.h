@@ -32,8 +32,8 @@ public:
 	float m_angleRotacio;
 	float m_velRotacio;
 
-	GLuint m_textureID;
-	GLuint m_normalMapID;
+	GLuint m_textureID = 0;
+	GLuint m_normalMapID = 0;
 
 	glm::mat4 m_mMatrix;
 };

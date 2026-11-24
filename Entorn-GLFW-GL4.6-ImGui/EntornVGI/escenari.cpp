@@ -67,8 +67,8 @@ static void copiaUniformsShader(GLuint src, GLuint dst)
 void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 {
 	std::vector<char*> texturePaths;
-	texturePaths.push_back((char*)".\\textures\\planet\\Mercury\\2k_mercury.jpg");	// 1
 	texturePaths.push_back((char*)".\\textures\\sun\\\\2k_sun.jpg");
+	texturePaths.push_back((char*)".\\textures\\planet\\Mercury\\2k_mercury.jpg");	// 1
 	texturePaths.push_back((char*)".\\textures\\planet\\Venus\\2k_venus_surface.jpg");		// 2
 	texturePaths.push_back((char*)".\\textures\\planet\\Earth\\earth2048.bmp");		// 3
 	texturePaths.push_back((char*)".\\textures\\planet\\Mars\\2k_mars.jpg");		// 4
@@ -76,8 +76,8 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	texturePaths.push_back((char*)".\\textures\\planet\\Saturn\\2k_saturn.jpg");	// 6
 	texturePaths.push_back((char*)".\\textures\\planet\\Uranus\\2k_uranus.jpg");	// 7
 	texturePaths.push_back((char*)".\\textures\\planet\\Neptune\\2k_neptune.jpg");		// 8
-	texturePaths.push_back((char*)".\\textures\\planet\\Saturn\\2k_saturn_ring_alpha.png");	// 6
 	texturePaths.push_back((char*)".\\textures\\planet\\Moon\\2k_moon.jpg");	// Lluna (cos 9)
+	texturePaths.push_back((char*)".\\textures\\planet\\Saturn\\2k_saturn_ring_alpha.png");	// 6
 
 	// Mapas normales de los planetas
 	std::vector<char*> normalMapPaths;
@@ -90,6 +90,10 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	normalMapPaths.push_back((char*)".\\textures\\planet\\NormalTextures\\NormalMapSaturn.png");
 	normalMapPaths.push_back(nullptr); // Urano: sin mapa normal
 	normalMapPaths.push_back((char*)".\\textures\\planet\\NormalTextures\\NormalMapNeptune.png");
+	normalMapPaths.push_back(nullptr);
+	normalMapPaths.push_back(nullptr);
+
+	m_objectList.resize(11);
 
 	CColor colObj;
 	colObj.r = 1.0; colObj.g = 1.0; colObj.b = 1.0; colObj.a = 1.0;
@@ -112,6 +116,7 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	// Carregar textures i configurar parametres de filtratge i repeticio un sol cop
 	for (int i = 0; i < m_objectList.size(); i++)
 	{
+		if (texturePaths[i] == nullptr) continue;
 		m_objectList[i].m_textureID = loadIMA_SOIL(texturePaths[i]);
 		if (m_objectList[i].m_textureID == 0) {
 			fprintf(stderr, "No s'ha pogut carregar: %s\n", texturePaths[i]);
@@ -129,15 +134,11 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 
 	//carrega mapas normales
 	glActiveTexture(GL_TEXTURE0);
-	for (int i = 0; i < m_objectList.size(); i++){
-		if (m_objectList[i].m_normalMapID != 0){
-			glDeleteTextures(1, &m_objectList[i].m_normalMapID);
-			m_objectList[i].m_normalMapID = 0;
-		}
-	}
+	for (int i = 0; i < m_objectList.size(); i++)
+		if (m_objectList[i].m_normalMapID != 0){ glDeleteTextures(1, &m_objectList[i].m_normalMapID); m_objectList[i].m_normalMapID = 0; }
 
 	//Load normal maps
-	for (int i = 1; i < m_objectList.size(); i++){
+	for (int i = 0; i < m_objectList.size(); i++){
 		if (normalMapPaths[i] == nullptr) continue;
 
 		m_objectList[i].m_normalMapID = loadIMA_SOIL(normalMapPaths[i]);
@@ -326,9 +327,9 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 		glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), GL_TRUE);
 		SeleccionaColorMaterial(sh_programID, col_blanc, sw_mat_no_emisio);
 
-		if (m_objectList[9].m_textureID != 0) {
+		if (m_objectList[10].m_textureID != 0) {
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, m_objectList[9].m_textureID);
+			glBindTexture(GL_TEXTURE_2D, m_objectList[10].m_textureID);
 		}
 
 		float x = m_objectList[6].m_radiOrbita * (float)cos(m_objectList[6].m_angleOrbita * PI / 180.0f);
@@ -356,89 +357,69 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 		if (locTwoSided != -1) glUniform1i(locTwoSided, GL_FALSE);
 
 	// 3. Cossos: esfera amb la seva textura, situada sobre la seva òrbita
+	// Preparamos el shader de normal mapping una sola vez antes del bucle
+	if (shaderNormalMapID != 0) {
+		glUseProgram(shaderNormalMapID);
+		copiaUniformsShader(sh_programID, shaderNormalMapID);
+		glUniform1i(glGetUniformLocation(shaderNormalMapID, "textur"), GL_TRUE);
+		glUniform1i(glGetUniformLocation(shaderNormalMapID, "modulate"), GL_TRUE);
+		glUniform1i(glGetUniformLocation(shaderNormalMapID, "flag_invert_y"), GL_TRUE);
+		SeleccionaColorMaterial(shaderNormalMapID, col_blanc, sw_mat);
+	}
 
+	// Preparamos el shader estándar (Phong)
+	glUseProgram(sh_programID);
 	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_TRUE);
 	glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_TRUE);
 	glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), GL_TRUE);
 	SeleccionaColorMaterial(sh_programID, col_blanc, sw_mat);
 
-	GLint locModelMatCos = glGetUniformLocation(sh_programID, "modelMatrix");
-	GLint locSwInt = glGetUniformLocation(sh_programID, "sw_intensity");
+	GLuint shaderActual = sh_programID;
 
-	// Planetes amb mapa normal (1..8, excepte Urà): es dibuixen despres amb el shader de normal mapping
-	auto teNormalMap = [&](int k) { return k > 0 && k < 9 && m_objectList[k].m_normalMapID != 0 && shaderNormalMapID != 0; };
+	auto teNormalMap = [&](int k) { return m_objectList[k].m_normalMapID != 0 && shaderNormalMapID != 0; };
 	for (i = 0; i < m_objectList.size(); i++)
 	{
-		if (teNormalMap(i)) continue;
-		// La textura 9 es l'anell de Saturn: la Lluna (cos 9) fa servir la textura 10
-		int tex = (i == 9) ? 10 : i;
-		if (m_objectList[tex].m_textureID != 0) {
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, m_objectList[tex].m_textureID);
+		bool usaNormalMap = teNormalMap(i);
+		GLuint shaderObjetivo = usaNormalMap ? shaderNormalMapID : sh_programID;
+
+		// Cambiar de shader solo cuando sea necesario
+		if (shaderActual != shaderObjetivo) {
+			glUseProgram(shaderObjetivo);
+			shaderActual = shaderObjetivo;
 		}
 
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, m_objectList[i].m_textureID);
+		// Mapa normal (unidad 1)
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, usaNormalMap ? m_objectList[i].m_normalMapID : 0);
+
+		// Cálculo de posición y matriz de modelo (ahora sirve para todos, incluida la Luna)
 		float x = m_objectList[i].m_radiOrbita * (float)cos(m_objectList[i].m_angleOrbita * PI / 180.0);
 		float y = m_objectList[i].m_radiOrbita * (float)sin(m_objectList[i].m_angleOrbita * PI / 180.0);
 
-		// Els planetes orbiten el Sol; la Lluna (i == 9) orbita la Terra, en el seu pla inclinat
 		glm::mat4 MatriuCentre = (i == 9) ? matriuOrbitaLluna(MatriuTG, m_objectList[3]) : MatriuTG;
 		ModelMatrix = glm::translate(MatriuCentre, vec3(x, y, 0.0f));
 		ModelMatrix = glm::rotate(ModelMatrix, glm::radians(m_objectList[i].m_angleRotacio), vec3(0.0f, 0.0f, 1.0f));
 		ModelMatrix = glm::scale(ModelMatrix, vec3(m_objectList[i].m_radiCos, m_objectList[i].m_radiCos, m_objectList[i].m_radiCos));
 
-		glUniformMatrix4fv(locModelMatCos, 1, GL_FALSE, &ModelMatrix[0][0]);
+		glUniformMatrix4fv(glGetUniformLocation(shaderActual, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
+		glUniform4i(glGetUniformLocation(shaderActual, "sw_intensity"), (i == 0 && sw_mat[0]), sw_mat[1], sw_mat[2], sw_mat[3]);
 
-		// El Sol (i == 0) brilla amb llum propia (emissio activa si sw_mat[0] es true);
-		// els planetes i la Lluna (i > 0) no emeten llum propia i reben nomes la llum difusa/ambient del Sol.
-		glUniform4i(locSwInt, (i == 0 && sw_mat[0]), sw_mat[1], sw_mat[2], sw_mat[3]);
 		draw_TriEBO_Object(GLU_SPHERE);
 	}
 
-	if (shaderNormalMapID != 0) {
-		// Shader de normal mapping
-		glUseProgram(shaderNormalMapID);
-		copiaUniformsShader(sh_programID, shaderNormalMapID);
-		// Configuración de texturas
-		glUniform1i(glGetUniformLocation(shaderNormalMapID, "textur"), GL_TRUE);
-		glUniform1i(glGetUniformLocation(shaderNormalMapID, "modulate"), GL_TRUE);
-		glUniform1i(glGetUniformLocation(shaderNormalMapID, "flag_invert_y"), GL_TRUE);
-		// Configuración de material
-		SeleccionaColorMaterial(shaderNormalMapID, col_blanc, sw_mat);
+	// Restaurar estado de texturas y volver al shader principal
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE0);
 
-		locModelMatCos =glGetUniformLocation(shaderNormalMapID, "modelMatrix");
-		locSwInt =glGetUniformLocation(shaderNormalMapID, "sw_intensity");
-
-		// Planetas con mapas normales: Mercurio, Venus, Tierra,Marte, Júpiter, Saturno y Neptuno.
-		for (int i = 1; i < m_objectList.size(); i++){
-			// Urano no tiene mapa normal !textura plana sin gracia se puede canviar despues si hace falta!
-			if(!teNormalMap(i)) continue;		// Textura difusa: unidad 0
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, m_objectList[i].m_textureID);
-			// Mapa normal: unidad 1
-			glActiveTexture(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_2D, m_objectList[i].m_normalMapID);
-
-			float x = m_objectList[i].m_radiOrbita *(float)cos(m_objectList[i].m_angleOrbita * PI / 180.0);
-			float y = m_objectList[i].m_radiOrbita *(float)sin(m_objectList[i].m_angleOrbita * PI / 180.0);
-
-			ModelMatrix = glm::translate(MatriuTG, vec3(x, y, 0.0f));
-			ModelMatrix = glm::rotate(ModelMatrix,glm::radians(m_objectList[i].m_angleRotacio),vec3(0.0f, 0.0f, 1.0f));
-			ModelMatrix = glm::scale(ModelMatrix,vec3(m_objectList[i].m_radiCos,m_objectList[i].m_radiCos,m_objectList[i].m_radiCos));
-			glUniformMatrix4fv(locModelMatCos, 1, GL_FALSE, &ModelMatrix[0][0]);
-			glUniform4i(locSwInt,0,sw_mat[1],sw_mat[2],sw_mat[3]);
-			draw_TriEBO_Object(GLU_SPHERE);
-		}
-		//restaurar shader id
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, 0);
-		glActiveTexture(GL_TEXTURE0);
+	if (shaderActual != sh_programID) {
 		glUseProgram(sh_programID);
 	}
 
-	// Restaurar l'estat dels uniforms de material i textura
 	glUniform4i(glGetUniformLocation(sh_programID, "sw_intensity"), sw_mat[0], sw_mat[1], sw_mat[2], sw_mat[3]);
 	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_FALSE);
-
 }
 
 // updateVariables: avanca les orbites i rotacions dels 10 cossos segons els controls de la UI:

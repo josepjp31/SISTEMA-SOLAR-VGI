@@ -729,7 +729,7 @@ void draw_Menu_ImGui()
 		g_EstatSimulador.opcionsVisualitzacio.mostrarEtiquetes &&
 		objecte == SISTEMA_SOLAR &&
 		escenariActual != nullptr &&
-		escenariActual->m_objectList != nullptr)
+		!escenariActual->m_objectList.empty())
 	{
 		static const char* nomsEtiquetes[9] = {
 			"Sol", "Mercuri", "Venus", "Terra", "Mart", "Júpiter", "Saturn", "Urà", "Neptú"
