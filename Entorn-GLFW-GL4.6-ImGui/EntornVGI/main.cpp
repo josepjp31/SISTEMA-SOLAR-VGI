@@ -547,6 +547,30 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 	}
 }
 
+//SONDES: carrega dels models OBJ (mateix sistema que la Milano a OnCameraNavega)
+void carregaSondes()
+{
+	const char* fitxers[NUM_SONDES] = {
+		"textures/sondes/International Space Station/iss.obj",
+		"textures/sondes/Hubble Space Telescope/hubble.obj",
+		"textures/sondes/James Webb Space Telescope/jwst.obj",
+		"textures/sondes/Juno/juno.obj",
+		"textures/sondes/Cassini-Huygens/cassini.obj",
+		"textures/sondes/Parker Solar Probe/parker.obj",
+		"textures/sondes/voyager/voyager.obj",
+		"textures/sondes/Pioneer 10/pioneer.obj"
+	};
+	for (int i = 0; i < NUM_SONDES; i++)
+	{
+		ObSondes[i] = new COBJModel;
+		char nomFitxer[_MAX_PATH];
+		strcpy_s(nomFitxer, fitxers[i]);
+		int error = ObSondes[i]->LoadModel(nomFitxer);
+		if (error == 0) printf("Sonda carregada correctament: %s\n", fitxers[i]);
+		else { printf("Error carregant la sonda %s: %d\n", fitxers[i], error); delete ObSondes[i]; ObSondes[i] = NULL; }
+	}
+}
+
 // OnPaint: Funció de dibuix i visualització en frame buffer del frame
 void OnPaint(GLFWwindow* window)
 {
@@ -699,10 +723,15 @@ void dibuixa_Escena() {
 	// Escalat d'objectes, per adequar-los a les vistes ortogràfiques (Pràctica 2)
 	//	GTMatrix = glm::scale();
 
+	//SONDES: carregar-les nomes el primer cop
+	static bool sondesCarregades = false;
+	if (!sondesCarregades) { carregaSondes(); sondesCarregades = true; }
+
 	//	Dibuix geometria de l'escena amb comandes GL.
 	dibuixa_EscenaGL(shader_programID, shader_programIDNormalMap, ViewMatrix, GTMatrix, sw_material,
 		escenariActual,
 		ObOBJ,				// COET: model OBJ de la nau Milano
+		ObSondes,			// SONDES: models OBJ de les sondes
 		g_EstatSimulador.opcionsVisualitzacio.mostrarOrbites,
 		camera == CAM_NAVEGA);
 }

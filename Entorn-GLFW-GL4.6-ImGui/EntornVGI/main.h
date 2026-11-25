@@ -120,6 +120,9 @@ Shader shaderLighting;		// Shader que implementa els codis GLSL d'il.luminació.
 // COET: Model OBJ de la nau Milano (es carrega en activar la camera Navega)
 COBJModel* ObOBJ = NULL;
 
+//SONDES: models OBJ de les sondes (es carreguen el primer cop que es dibuixa l'escena)
+COBJModel* ObSondes[NUM_SONDES] = { NULL };
+
 // Entorn VGI: Variables de control dels botons de mouse
 CPoint m_PosEAvall, m_PosDAvall;	// Coordenades del cursor quan el boto esquerre(E) o dret(D) del 
 //    mouse ha estat clicat.

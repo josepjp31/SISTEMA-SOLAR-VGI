@@ -1,0 +1,92 @@
+# Blender 5.3.0 MTL File: 'juno.blend'
+# www.blender.org
+
+newmtl black_krinkle
+Ns 100.000015
+Ka 0.150000 0.150000 0.150000
+Ks 0.192187 0.192187 0.192187
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd textures/black_krinkle.png
+
+newmtl foil_ant
+Ns 96.078453
+Ka 0.150000 0.150000 0.150000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd textures/foil_antenna.png
+
+newmtl foil_gold
+Ns 96.078453
+Ka 0.150000 0.150000 0.150000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd textures/foil_gold_2.png
+
+newmtl foil_silver
+Ns 96.078453
+Ka 0.150000 0.150000 0.150000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd textures/foil_silver.png
+
+newmtl new
+Ns 96.078453
+Ka 0.150000 0.150000 0.150000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 1
+map_Kd textures/foil_antenna.png
+
+newmtl shiny_panels
+Ns 1000.000000
+Ka 0.150000 0.150000 0.150000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd textures/Juno_Texture_Solar.png
+
+newmtl solar_panels
+Ns 754.901978
+Ka 0.150000 0.150000 0.150000
+Ks 0.361526 0.361526 0.361526
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd textures/Juno_Texture_Solar2.png
+
+newmtl tex_01
+Ns 96.078453
+Ka 0.150000 0.150000 0.150000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd textures/Juno_Texture.png
+
+newmtl tex_01_A
+Ns 96.078453
+Ka 0.150000 0.150000 0.150000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd textures/Juno_Texture.png
