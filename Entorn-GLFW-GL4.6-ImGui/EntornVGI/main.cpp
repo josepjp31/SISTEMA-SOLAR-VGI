@@ -735,11 +735,11 @@ void draw_Menu_ImGui()
 		glm::vec4 viewport(0.0f, 0.0f, (float)w, (float)h);
 		for (int i = 0; i < 9; i++)
 		{
-			// Situa l'etiqueta lleugerament per sobre del pol nord de cada cos (z = rCos * 1.15)
-			float ang = escenariActual->m_objectList[IDEtiquetes[i]]->m_angleOrbita * (float)PI / 180.0f;
-			float rOrb = escenariActual->m_objectList[IDEtiquetes[i]]->m_radiOrbita;
-			float rCos = escenariActual->m_objectList[IDEtiquetes[i]]->m_radiCos;
-			glm::vec3 posMon(rOrb * cos(ang), rOrb * sin(ang), rCos * 1.15f);
+			// Situa l'etiqueta lleugerament per sobre de cada cos (z = rCos * 1.15)
+			glm::vec3 centreCos = glm::vec3(escenariActual->m_objectList[IDEtiquetes[i]]->m_mMatrix[3]);
+			float radiCos = glm::length(glm::vec3(escenariActual->m_objectList[IDEtiquetes[i]]->m_mMatrix[2]));
+			glm::vec3 posMon = centreCos + glm::vec3(0.0f, 0.0f, radiCos * 1.15f);
+
 			InterficieUI::DibuixarEtiquetaPlaneta(escenariActual->m_objectList[IDEtiquetes[i]]->m_nom, posMon, ViewMatrix, ProjectionMatrix, viewport);
 		}
 	}

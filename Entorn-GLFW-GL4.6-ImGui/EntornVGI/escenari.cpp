@@ -384,7 +384,7 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 		else
 			ModelMatrix = glm::rotate(ModelMatrix, glm::radians(m_objectList[mainBodies[i]]->m_angleRotacio), vec3(0.0f, 0.0f, 1.0f));
 		ModelMatrix = glm::scale(ModelMatrix, vec3(m_objectList[mainBodies[i]]->m_radiCos, m_objectList[mainBodies[i]]->m_radiCos, m_objectList[mainBodies[i]]->m_radiCos));
-
+		m_objectList[mainBodies[i]]->m_mMatrix = ModelMatrix;
 		glUniformMatrix4fv(glGetUniformLocation(shaderActual, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
 		glUniform4i(glGetUniformLocation(shaderActual, "sw_intensity"), (i == 0 && sw_mat[0]), sw_mat[1], sw_mat[2], sw_mat[3]);
 
