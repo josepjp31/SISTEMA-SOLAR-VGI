@@ -201,7 +201,7 @@ struct EstatSimulacio {
     bool mostrarDialegQuantA = false;  // Mostra el dialeg informatiu "Quant al Simulador"
     bool recalculEfemeridesNecessari = false; // Flag per notificar canvi manual de data/hora a futurs calculs d'efemerides
     bool origenReferenciaSol = true;   // true: origen al Sol; false: centrat en el planeta seleccionat
-    int cosEnfocatId = 0;              // Index de l'astre enfocat (0=Sol, 1=Mercuri .. 8=Neptu)
+    CelestialBodyId cosEnfocatId = CB_SUN;              // Index de l'astre enfocat (0=Sol, 1=Mercuri .. 8=Neptu)
 
     // Flags de sincronitzacio amb el motor OpenGL (llegits i netejats a SincronitzarEstatSimuladorAmbOpenGL de main.cpp)
     bool configuracioInicialPendent = false; // S'activa en iniciar o commutar de mode per reconfigurar shaders, llum i escenari

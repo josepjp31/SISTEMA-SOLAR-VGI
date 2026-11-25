@@ -64,6 +64,8 @@ static void copiaUniformsShader(GLuint src, GLuint dst)
 	}
 }
 
+CelestialBodyId mainBodies[10] = { CB_SUN, CB_MERCURY, CB_VENUS, CB_EARTH, CB_MARS, CB_JUPITER, CB_SATURN, CB_URANUS, CB_NEPTUNE, CB_MOON };
+
 void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 {
 	std::vector<char*> texturePaths;
@@ -93,7 +95,13 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	normalMapPaths.push_back(nullptr);
 	normalMapPaths.push_back(nullptr);
 
-	m_objectList.resize(11);
+	static const char* nomsEtiquetes[10] = {
+	"Sol", "Mercuri", "Venus", "Terra", "Mart", "Júpiter", "Saturn", "Urà", "Neptú", "Lluna"
+	};
+	for (CelestialBodyId cbi : mainBodies)
+	{
+		m_objectList[cbi] = new Object;
+	}
 
 	CColor colObj;
 	colObj.r = 1.0; colObj.g = 1.0; colObj.b = 1.0; colObj.a = 1.0;
@@ -111,18 +119,19 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 
 
 	for (int i = 0; i < m_objectList.size(); i++)
-		if (m_objectList[i].m_textureID) { glDeleteTextures(1, &m_objectList[i].m_textureID); m_objectList[i].m_textureID = 0; }
+		if (m_objectList[mainBodies[i]]->m_textureID) { glDeleteTextures(1, &m_objectList[mainBodies[i]]->m_textureID); m_objectList[mainBodies[i]]->m_textureID = 0; }
 
 	// Carregar textures i configurar parametres de filtratge i repeticio un sol cop
 	for (int i = 0; i < m_objectList.size(); i++)
 	{
+		m_objectList[mainBodies[i]]->m_nom = nomsEtiquetes[i];
 		if (texturePaths[i] == nullptr) continue;
-		m_objectList[i].m_textureID = loadIMA_SOIL(texturePaths[i]);
-		if (m_objectList[i].m_textureID == 0) {
+		m_objectList[mainBodies[i]]->m_textureID = loadIMA_SOIL(texturePaths[i]);
+		if (m_objectList[mainBodies[i]]->m_textureID == 0) {
 			fprintf(stderr, "No s'ha pogut carregar: %s\n", texturePaths[i]);
 		}
 		else {
-			glBindTexture(GL_TEXTURE_2D, m_objectList[i].m_textureID);
+			glBindTexture(GL_TEXTURE_2D, m_objectList[mainBodies[i]]->m_textureID);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -135,20 +144,20 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	//carrega mapas normales
 	glActiveTexture(GL_TEXTURE0);
 	for (int i = 0; i < m_objectList.size(); i++)
-		if (m_objectList[i].m_normalMapID != 0){ glDeleteTextures(1, &m_objectList[i].m_normalMapID); m_objectList[i].m_normalMapID = 0; }
+		if (m_objectList[mainBodies[i]]->m_normalMapID != 0) { glDeleteTextures(1, &m_objectList[mainBodies[i]]->m_normalMapID); m_objectList[mainBodies[i]]->m_normalMapID = 0; }
 
 	//Load normal maps
 	for (int i = 0; i < m_objectList.size(); i++){
 		if (normalMapPaths[i] == nullptr) continue;
 
-		m_objectList[i].m_normalMapID = loadIMA_SOIL(normalMapPaths[i]);
+		m_objectList[mainBodies[i]]->m_normalMapID = loadIMA_SOIL(normalMapPaths[i]);
 
-		if (m_objectList[i].m_normalMapID == 0) {
+		if (m_objectList[mainBodies[i]]->m_normalMapID == 0) {
 			fprintf(stderr, "No s'ha pogut carregar el mapa normal: %s\n",
 				normalMapPaths[i]);
 		}
 		else {
-			glBindTexture(GL_TEXTURE_2D, m_objectList[i].m_normalMapID);
+			glBindTexture(GL_TEXTURE_2D, m_objectList[mainBodies[i]]->m_normalMapID);
 
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -202,9 +211,9 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 
 	for (int i = 0; i < m_objectList.size(); i++)
 	{
-		m_objectList[i].m_radiCos = radiCos[i];
-		m_objectList[i].m_radiOrbita = radiOrbita[i];
-		m_objectList[i].m_angleOrbita = angleOrbita[i];
+		m_objectList[mainBodies[i]]->m_radiCos = radiCos[i];
+		m_objectList[mainBodies[i]]->m_radiOrbita = radiOrbita[i];
+		m_objectList[mainBodies[i]]->m_angleOrbita = angleOrbita[i];
 	}
 
 	// Orbites: un unic cercle de linies de radi 1, compartit per les 8 orbites planetaries i la lunar
@@ -212,35 +221,35 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 
 	for (int i = 0; i < m_objectList.size(); i++)
 	{
-		m_objectList[i].m_angleRotacio = 0.0f;
+		m_objectList[mainBodies[i]]->m_angleRotacio = 0.0f;
 	}
 
 	//velocitats al voltant de sol
 	float x = 3650;
 	// Velocitats angulars orbitals en graus per segon (molt mes suaus i proporcionals a la distancia al Sol)
-	m_objectList[0].m_velAngular = 0.0f; // Sol (estatic al centre)
-	m_objectList[1].m_velAngular = x / 88.0f; // Mercuri
-	m_objectList[2].m_velAngular = x / 225.0f; // Venus
-	m_objectList[3].m_velAngular = x / 365.0f; // Terra
-	m_objectList[4].m_velAngular = x / 687.0f; // Mart
-	m_objectList[5].m_velAngular = x / 4333.0f; // Jupiter
-	m_objectList[6].m_velAngular = x / 10756.0f; // Saturn
-	m_objectList[7].m_velAngular = x / 30687.0f; // Ura
-	m_objectList[8].m_velAngular = x / 60190.0f; // Neptu
-	m_objectList[9].m_velAngular = x / 27.32f; // Lluna (al voltant de la Terra)
+	m_objectList[CB_SUN]->m_velAngular = 0.0f; // Sol (estatic al centre)
+	m_objectList[CB_MERCURY]->m_velAngular = x / 88.0f; // Mercuri
+	m_objectList[CB_VENUS]->m_velAngular = x / 225.0f; // Venus
+	m_objectList[CB_EARTH]->m_velAngular = x / 365.0f; // Terra
+	m_objectList[CB_MARS]->m_velAngular = x / 687.0f; // Mart
+	m_objectList[CB_JUPITER]->m_velAngular = x / 4333.0f; // Jupiter
+	m_objectList[CB_SATURN]->m_velAngular = x / 10756.0f; // Saturn
+	m_objectList[CB_URANUS]->m_velAngular = x / 30687.0f; // Ura
+	m_objectList[CB_NEPTUNE]->m_velAngular = x / 60190.0f; // Neptu
+	m_objectList[CB_MOON]->m_velAngular = x / 27.32f; // Lluna (al voltant de la Terra)
 
 	float factorRotacio = 1.0f;
 	// Velocitats de rotació sobre el propi eix
-	m_objectList[0].m_velRotacio = 14.184f * factorRotacio;    // Sol (360 / 25.38 dies, periode sideri a l'equador)
-	m_objectList[1].m_velRotacio = 6.136f * factorRotacio;     // Mercuri
-	m_objectList[2].m_velRotacio = -1.481f * factorRotacio;    // Venus
-	m_objectList[3].m_velRotacio = 361.015f * factorRotacio;   // Terra
-	m_objectList[4].m_velRotacio = 351.220f * factorRotacio;   // Mart
-	m_objectList[5].m_velRotacio = 871.249f * factorRotacio;   // Jupiter
-	m_objectList[6].m_velRotacio = 818.182f * factorRotacio;   // Saturn
-	m_objectList[7].m_velRotacio = -501.393f * factorRotacio;  // Urà
-	m_objectList[8].m_velRotacio = 545.455f * factorRotacio;   // Neptú
-	m_objectList[9].m_velRotacio = 0.0f;   // Lluna: rotacio sincrona, es calcula a updateVariables()
+	m_objectList[CB_SUN]->m_velRotacio = 14.184f * factorRotacio;    // Sol (360 / 25.38 dies, periode sideri a l'equador)
+	m_objectList[CB_MERCURY]->m_velRotacio = 6.136f * factorRotacio;     // Mercuri
+	m_objectList[CB_VENUS]->m_velRotacio = -1.481f * factorRotacio;    // Venus
+	m_objectList[CB_EARTH]->m_velRotacio = 361.015f * factorRotacio;   // Terra
+	m_objectList[CB_MARS]->m_velRotacio = 351.220f * factorRotacio;   // Mart
+	m_objectList[CB_JUPITER]->m_velRotacio = 871.249f * factorRotacio;   // Jupiter
+	m_objectList[CB_SATURN]->m_velRotacio = 818.182f * factorRotacio;   // Saturn
+	m_objectList[CB_URANUS]->m_velRotacio = -501.393f * factorRotacio;  // Urà
+	m_objectList[CB_NEPTUNE]->m_velRotacio = 545.455f * factorRotacio;   // Neptú
+	m_objectList[CB_MOON]->m_velRotacio = 0.0f;   // Lluna: rotacio sincrona, es calcula a updateVariables()
 
 }
 
@@ -275,10 +284,10 @@ static const float INCLINACIO_ORBITA_LLUNA = 5.145f;
 
 // Matriu del sistema de referencia de l'orbita lunar: centrat a la Terra i inclinat respecte l'ecliptica.
 // La fan servir tant l'orbita lunar com la Lluna, perque quedin sempre alineades.
-static glm::mat4 matriuOrbitaLluna(const glm::mat4& MatriuTG, const Object& terra)
+static glm::mat4 matriuOrbitaLluna(const glm::mat4& MatriuTG, const Object *terra)
 {
-	float xT = terra.m_radiOrbita * (float)cos(terra.m_angleOrbita * PI / 180.0);
-	float yT = terra.m_radiOrbita * (float)sin(terra.m_angleOrbita * PI / 180.0);
+	float xT = terra->m_radiOrbita * (float)cos(terra->m_angleOrbita * PI / 180.0);
+	float yT = terra->m_radiOrbita * (float)sin(terra->m_angleOrbita * PI / 180.0);
 	glm::mat4 M = glm::translate(MatriuTG, vec3(xT, yT, 0.0f));
 	return glm::rotate(M, glm::radians(INCLINACIO_ORBITA_LLUNA), vec3(1.0f, 0.0f, 0.0f));
 }
@@ -309,8 +318,8 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 		for (i = 0; i < m_objectList.size(); i++)
 		{
 			// Les orbites planetaries es centren al Sol; la de la Lluna (i == 9) a la Terra
-			glm::mat4 MatriuCentre = (i == 9) ? matriuOrbitaLluna(MatriuTG, m_objectList[3]) : MatriuTG;
-			ModelMatrix = glm::scale(MatriuCentre, vec3(m_objectList[i].m_radiOrbita, m_objectList[i].m_radiOrbita, m_objectList[i].m_radiOrbita));
+			glm::mat4 MatriuCentre = (i == 9) ? matriuOrbitaLluna(MatriuTG, m_objectList[CB_EARTH]) : MatriuTG;
+			ModelMatrix = glm::scale(MatriuCentre, vec3(m_objectList[mainBodies[i]]->m_radiOrbita, m_objectList[mainBodies[i]]->m_radiOrbita, m_objectList[mainBodies[i]]->m_radiOrbita));
 			glUniformMatrix4fv(locModelMatOrb, 1, GL_FALSE, &ModelMatrix[0][0]);
 
 			// L'orbita lunar no esta centrada al Sol: la seva normal no sempre mira cap a la llum.
@@ -348,7 +357,7 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 	for (i = 0; i < m_objectList.size(); i++)
 	{
 		bool esAnell = (i == 10);
-		bool usaNormalMap = (m_objectList[i].m_normalMapID != 0 && shaderNormalMapID != 0);
+		bool usaNormalMap = (m_objectList[mainBodies[i]]->m_normalMapID != 0 && shaderNormalMapID != 0);
 		GLuint shaderObjetivo = usaNormalMap ? shaderNormalMapID : sh_programID;
 
 		// Cambiar de shader solo cuando sea necesario
@@ -358,23 +367,23 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 		}
 
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, m_objectList[i].m_textureID);
+		glBindTexture(GL_TEXTURE_2D, m_objectList[mainBodies[i]]->m_textureID);
 		// Mapa normal (unidad 1)
 		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, usaNormalMap ? m_objectList[i].m_normalMapID : 0);
+		glBindTexture(GL_TEXTURE_2D, usaNormalMap ? m_objectList[mainBodies[i]]->m_normalMapID : 0);
 
 		int idxOrbita = esAnell ? 6 : i;
-		float x = m_objectList[idxOrbita].m_radiOrbita * (float)cos(m_objectList[idxOrbita].m_angleOrbita * PI / 180.0);
-		float y = m_objectList[idxOrbita].m_radiOrbita * (float)sin(m_objectList[idxOrbita].m_angleOrbita * PI / 180.0);
+		float x = m_objectList[mainBodies[idxOrbita]]->m_radiOrbita * (float)cos(m_objectList[mainBodies[idxOrbita]]->m_angleOrbita * PI / 180.0);
+		float y = m_objectList[mainBodies[idxOrbita]]->m_radiOrbita * (float)sin(m_objectList[mainBodies[idxOrbita]]->m_angleOrbita * PI / 180.0);
 
 		// Cálculo de posición y matriz de modelo (ahora sirve para todos, incluida la Luna)
-		glm::mat4 MatriuCentre = (i == 9) ? matriuOrbitaLluna(MatriuTG, m_objectList[3]) : MatriuTG;
+		glm::mat4 MatriuCentre = (i == 9) ? matriuOrbitaLluna(MatriuTG, m_objectList[CB_EARTH]) : MatriuTG;
 		ModelMatrix = glm::translate(MatriuCentre, vec3(x, y, 0.0f));
 		if (esAnell)
 			ModelMatrix = glm::rotate(ModelMatrix, glm::radians(20.0f), vec3(1.0f, 0.0f, 0.0f));
 		else
-			ModelMatrix = glm::rotate(ModelMatrix, glm::radians(m_objectList[i].m_angleRotacio), vec3(0.0f, 0.0f, 1.0f));
-		ModelMatrix = glm::scale(ModelMatrix, vec3(m_objectList[i].m_radiCos, m_objectList[i].m_radiCos, m_objectList[i].m_radiCos));
+			ModelMatrix = glm::rotate(ModelMatrix, glm::radians(m_objectList[mainBodies[i]]->m_angleRotacio), vec3(0.0f, 0.0f, 1.0f));
+		ModelMatrix = glm::scale(ModelMatrix, vec3(m_objectList[mainBodies[i]]->m_radiCos, m_objectList[mainBodies[i]]->m_radiCos, m_objectList[mainBodies[i]]->m_radiCos));
 
 		glUniformMatrix4fv(glGetUniformLocation(shaderActual, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
 		glUniform4i(glGetUniformLocation(shaderActual, "sw_intensity"), (i == 0 && sw_mat[0]), sw_mat[1], sw_mat[2], sw_mat[3]);
@@ -428,21 +437,21 @@ void Escenari::updateVariables(double dt, bool enPausa, int direccioTemps, bool 
 		// Gir orbital al voltant del Sol (la Lluna, i == 9, al voltant de la Terra)
 		if (i > 0)
 		{
-			float incrementOrbita = m_objectList[i].m_velAngular * (float)dt * (float)direccioTemps * factorTemps;
-			m_objectList[i].m_angleOrbita += incrementOrbita;
-			while (m_objectList[i].m_angleOrbita >= 360.0f) m_objectList[i].m_angleOrbita -= 360.0f;
-			while (m_objectList[i].m_angleOrbita < 0.0f) m_objectList[i].m_angleOrbita += 360.0f;
+			float incrementOrbita = m_objectList[mainBodies[i]]->m_velAngular * (float)dt * (float)direccioTemps * factorTemps;
+			m_objectList[mainBodies[i]]->m_angleOrbita += incrementOrbita;
+			while (m_objectList[mainBodies[i]]->m_angleOrbita >= 360.0f) m_objectList[mainBodies[i]]->m_angleOrbita -= 360.0f;
+			while (m_objectList[mainBodies[i]]->m_angleOrbita < 0.0f) m_objectList[mainBodies[i]]->m_angleOrbita += 360.0f;
 		}
 
-		m_objectList[i].m_angleRotacio += m_objectList[i].m_velRotacio * (float)dt * (float)direccioTemps;
-		while (m_objectList[i].m_angleRotacio >= 360.0f) m_objectList[i].m_angleRotacio -= 360.0f;
-		while (m_objectList[i].m_angleRotacio < 0.0f) m_objectList[i].m_angleRotacio += 360.0f;
+		m_objectList[mainBodies[i]]->m_angleRotacio += m_objectList[mainBodies[i]]->m_velRotacio * (float)dt * (float)direccioTemps;
+		while (m_objectList[mainBodies[i]]->m_angleRotacio >= 360.0f) m_objectList[mainBodies[i]]->m_angleRotacio -= 360.0f;
+		while (m_objectList[mainBodies[i]]->m_angleRotacio < 0.0f) m_objectList[mainBodies[i]]->m_angleRotacio += 360.0f;
 	}
 
 	// Lluna: rotacio sincrona (sempre mostra la mateixa cara a la Terra).
 	// El centre de la textura (cara visible, u = 0.5) queda a la direccio (0,-1,0) de l'esfera de
 	// glut_geometry. Girar-la (angleOrbita - 90) graus la fa apuntar sempre cap a la Terra.
-	m_objectList[9].m_angleRotacio = m_objectList[9].m_angleOrbita - 90.0f;
+	m_objectList[CB_MOON]->m_angleRotacio = m_objectList[CB_MOON]->m_angleOrbita - 90.0f;
 }
 
 

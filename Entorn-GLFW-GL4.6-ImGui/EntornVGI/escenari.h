@@ -4,25 +4,16 @@
 #include "material.h"
 #include "visualitzacio.h"
 #include <vector>
-
-
-#define SOL 0
-#define MERCURIO 1
-#define VENUS 2
-#define TIERRA 3
-#define MARTE 4
-#define JUPITER 5
-#define SATURNO 6
-#define URANO 7
-#define NEPTUNO 8
-#define LUNA 9
+#include "CelestialBodyData.h"
 
 // Dades individuals de cada cos celeste (Sol, planetes i Lluna) dins de l'escenari
 class Object
 {
 public:
 	Object() : m_mMatrix(glm::mat4(1.0f)), m_radiCos(0.0f), m_radiOrbita(0.0f), m_angleOrbita(0.0f), m_velAngular(0.0f) {}
-	~Object() {}
+	~Object() { if (m_textureID != 0) { glDeleteTextures(1, &m_textureID); m_textureID = 0; }
+				if (m_normalMapID != 0) { glDeleteTextures(1, &m_normalMapID); m_normalMapID = 0; }
+	}
 
 	float m_radiCos;
 	float m_radiOrbita;
@@ -36,6 +27,7 @@ public:
 	GLuint m_normalMapID = 0;
 
 	glm::mat4 m_mMatrix;
+	std::string m_nom = "";
 };
 
 
@@ -69,15 +61,10 @@ public:
 		deleteVAOList(GLU_DISK);
 		deleteVAOList(GLUT_TORUS);
 		alliberaOrbita();
-		for (int i = 0; i < m_objectList.size(); i++) {
-			if (m_objectList[i].m_textureID) { glDeleteTextures(1, &m_objectList[i].m_textureID); m_objectList[i].m_textureID = 0; }
-		}
-		for (int i = 0; i < m_objectList.size(); i++) {
-			if (m_objectList[i].m_normalMapID) { glDeleteTextures(1, &m_objectList[i].m_normalMapID); m_objectList[i].m_normalMapID = 0; }
-		}
+		for (auto& p : m_objectList) delete p.second;
 	}
 
-	std::vector<Object> m_objectList;
+	std::unordered_map<CelestialBodyId, Object*> m_objectList;
 	
 	// Orbites: un unic cercle de radi 1 dibuixat com a linia (GL_LINE_LOOP). Cada orbita
 	// (8 planetes + Lluna) el reutilitza escalant-lo al seu radi amb la modelMatrix.

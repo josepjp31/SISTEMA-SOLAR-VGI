@@ -563,7 +563,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
                 estat.modeActual = ModeSimulacio::INTUITIU;
                 estat.mostrarSelectorModes = false;
                 estat.mostrarPanellTemps = false;
-                estat.cosEnfocatId = 0;
+                estat.cosEnfocatId = CB_SUN;
                 estat.cameraConfig.angleInclinacio = 25.0f;
                 estat.cameraConfig.mode = ModeCamera::FIXA_INCLINADA_25;
                 estat.configuracioInicialPendent = true;
@@ -640,7 +640,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
                 estat.modeActual = ModeSimulacio::ESCALA_REAL;
                 estat.mostrarSelectorModes = false;
                 estat.mostrarPanellTemps = true;
-                estat.cosEnfocatId = 0;
+                estat.cosEnfocatId = CB_SUN;
                 estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
                 estat.configuracioInicialPendent = true;
                 estat.canviCameraPendent = true;
@@ -728,7 +728,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 estat.tempsSimulacio.enPausa = !estat.tempsSimulacio.enPausa;
             }
             if (ImGui::MenuItem("Reiniciar Vista", "R")) {
-                estat.cosEnfocatId = 0;
+                estat.cosEnfocatId = CB_SUN;
                 estat.cameraConfig.angleInclinacio = 25.0f;
                 estat.cameraConfig.mode = ModeCamera::FIXA_INCLINADA_25;
                 estat.canviCameraPendent = true;
@@ -743,13 +743,15 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
         }
 
         // 2) Seleccio de l'astre sobre el qual orbita la camera (0=Sol .. 8=Neptu)
+        CelestialBodyId mainBodies[9] = { CB_SUN, CB_MERCURY, CB_VENUS, CB_EARTH, CB_MARS, CB_JUPITER, CB_SATURN, CB_URANUS, CB_NEPTUNE };
+
         if (ImGui::BeginMenu("Planetes & Focus"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
             for (int i = 0; i < 9; ++i) {
                 bool seleccionat = (estat.cosEnfocatId == i);
                 if (ImGui::MenuItem(nomsPlanetesMenu[i], nullptr, seleccionat)) {
-                    estat.cosEnfocatId = i;
+                    estat.cosEnfocatId = mainBodies[i];
                     estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
                     estat.canviCameraPendent = true;
                     ActualitzarDadesCosActiu(estat);
@@ -757,7 +759,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Vista Global del Sol", "Home")) {
-                estat.cosEnfocatId = 0;
+                estat.cosEnfocatId = CB_SUN;
                 estat.cameraConfig.mode = ModeCamera::GLOBAL_SISTEMA;
                 estat.canviCameraPendent = true;
                 ActualitzarDadesCosActiu(estat);
@@ -784,7 +786,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 estat.canviCameraPendent = true;
             }
             if (ImGui::MenuItem("Vista Global del Sistema", nullptr, estat.cameraConfig.mode == ModeCamera::GLOBAL_SISTEMA)) {
-                estat.cosEnfocatId = 0;
+                estat.cosEnfocatId = CB_SUN;
                 estat.cameraConfig.mode = ModeCamera::GLOBAL_SISTEMA;
                 estat.canviCameraPendent = true;
                 ActualitzarDadesCosActiu(estat);
@@ -853,7 +855,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Reiniciar Vista", "R")) {
-                estat.cosEnfocatId = 0;
+                estat.cosEnfocatId = CB_SUN;
                 estat.origenReferenciaSol = true;
                 estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
                 estat.canviCameraPendent = true;
@@ -909,13 +911,15 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
         }
 
         // 3) Seleccio d'origen/astre centrat i modalitat de camera (incloent Pilota coet)
+        CelestialBodyId mainBodies[9] = { CB_SUN, CB_MERCURY, CB_VENUS, CB_EARTH, CB_MARS, CB_JUPITER, CB_SATURN, CB_URANUS, CB_NEPTUNE };
+
         if (ImGui::BeginMenu("Origen & Càmeres"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
             ImGui::TextDisabled("Centrar Vista en:");
             if (ImGui::MenuItem("El Sol", nullptr, estat.origenReferenciaSol && estat.cosEnfocatId == 0)) {
                 estat.origenReferenciaSol = true;
-                estat.cosEnfocatId = 0;
+                estat.cosEnfocatId = CB_SUN;
                 estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
                 estat.canviCameraPendent = true;
                 ActualitzarDadesCosActiu(estat);
@@ -925,7 +929,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 for (int i = 1; i < 9; ++i) {
                     bool seleccionat = (!estat.origenReferenciaSol && estat.cosEnfocatId == i);
                     if (ImGui::MenuItem(nomsPlanetesMenu[i], nullptr, seleccionat)) {
-                        estat.cosEnfocatId = i;
+                        estat.cosEnfocatId = mainBodies[i];
                         estat.origenReferenciaSol = false;
                         estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
                         estat.canviCameraPendent = true;
@@ -951,7 +955,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 estat.canviCameraPendent = true;
             }
             if (ImGui::MenuItem("Vista Global del Sistema", nullptr, estat.cameraConfig.mode == ModeCamera::GLOBAL_SISTEMA)) {
-                estat.cosEnfocatId = 0;
+                estat.cosEnfocatId = CB_SUN;
                 estat.origenReferenciaSol = true;
                 estat.cameraConfig.mode = ModeCamera::GLOBAL_SISTEMA;
                 estat.canviCameraPendent = true;

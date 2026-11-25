@@ -482,14 +482,14 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 	// 3. Aplicacio puntual dels canvis de mode de camera o d'astre enfocant demanats des de la UI o dreceres
 	if (g_EstatSimulador.canviCameraPendent)
 	{
-		int cid = g_EstatSimulador.cosEnfocatId;
-		if (cid < 0 || cid >= 9) cid = 0;
+		CelestialBodyId cid = g_EstatSimulador.cosEnfocatId;
+		if (cid < 0 || cid >= 9) cid = CB_SUN;
 
 		// Distancia de camera proporcional al radi del planeta seleccionat per garantir bon enquadrament
 		float distPerDefecte = 140.0f;
 		if (cid > 0 && escenariActual != nullptr)
 		{
-			distPerDefecte = escenariActual->m_objectList[cid].m_radiCos * 4.5f;
+			distPerDefecte = escenariActual->m_objectList[cid]->m_radiCos * 4.5f;
 			if (distPerDefecte < 14.0f) distPerDefecte = 14.0f;
 		}
 
@@ -514,7 +514,7 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 			camera = CAM_ESFERICA;
 			mobil = true;	zzoom = true;	satelit = false;	pan = false;
 			Vis_Polar = POLARZ;
-			g_EstatSimulador.cosEnfocatId = 0;
+			g_EstatSimulador.cosEnfocatId = CB_SUN;
 			OPV.R = 550.0;
 			OPV.alfa = 65.0;
 			OPV.beta = 0.0;
@@ -594,9 +594,9 @@ void OnPaint(GLFWwindow* window)
 			// cap a la seva posicio orbital (px, py, 0) perque la camera orbiti al seu voltant
 			if (objecte == SISTEMA_SOLAR && escenariActual != nullptr && g_EstatSimulador.cosEnfocatId > 0 && g_EstatSimulador.cosEnfocatId < 9)
 			{
-				int cid = g_EstatSimulador.cosEnfocatId;
-				float ang = escenariActual->m_objectList[cid].m_angleOrbita * (float)PI / 180.0f;
-				float rOrb = escenariActual->m_objectList[cid].m_radiOrbita;
+				CelestialBodyId cid = g_EstatSimulador.cosEnfocatId;
+				float ang = escenariActual->m_objectList[cid]->m_angleOrbita * (float)PI / 180.0f;
+				float rOrb = escenariActual->m_objectList[cid]->m_radiOrbita;
 				float px = rOrb * cos(ang);
 				float py = rOrb * sin(ang);
 
@@ -731,18 +731,16 @@ void draw_Menu_ImGui()
 		escenariActual != nullptr &&
 		!escenariActual->m_objectList.empty())
 	{
-		static const char* nomsEtiquetes[9] = {
-			"Sol", "Mercuri", "Venus", "Terra", "Mart", "Júpiter", "Saturn", "Urà", "Neptú"
-		};
+		static const CelestialBodyId IDEtiquetes[9] = { CB_SUN, CB_MERCURY, CB_VENUS, CB_EARTH, CB_MARS, CB_JUPITER, CB_SATURN, CB_URANUS, CB_NEPTUNE};
 		glm::vec4 viewport(0.0f, 0.0f, (float)w, (float)h);
 		for (int i = 0; i < 9; i++)
 		{
 			// Situa l'etiqueta lleugerament per sobre del pol nord de cada cos (z = rCos * 1.15)
-			float ang = escenariActual->m_objectList[i].m_angleOrbita * (float)PI / 180.0f;
-			float rOrb = escenariActual->m_objectList[i].m_radiOrbita;
-			float rCos = escenariActual->m_objectList[i].m_radiCos;
+			float ang = escenariActual->m_objectList[IDEtiquetes[i]]->m_angleOrbita * (float)PI / 180.0f;
+			float rOrb = escenariActual->m_objectList[IDEtiquetes[i]]->m_radiOrbita;
+			float rCos = escenariActual->m_objectList[IDEtiquetes[i]]->m_radiCos;
 			glm::vec3 posMon(rOrb * cos(ang), rOrb * sin(ang), rCos * 1.15f);
-			InterficieUI::DibuixarEtiquetaPlaneta(nomsEtiquetes[i], posMon, ViewMatrix, ProjectionMatrix, viewport);
+			InterficieUI::DibuixarEtiquetaPlaneta(escenariActual->m_objectList[IDEtiquetes[i]]->m_nom, posMon, ViewMatrix, ProjectionMatrix, viewport);
 		}
 	}
 
@@ -936,7 +934,7 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 			}
 			else if (key == GLFW_KEY_HOME) {
 				g_EstatSimulador.cameraConfig.mode = ModeCamera::GLOBAL_SISTEMA;
-				g_EstatSimulador.cosEnfocatId = 0;
+				g_EstatSimulador.cosEnfocatId = CB_SUN;
 				InterficieUI::ActualitzarDadesCosActiu(g_EstatSimulador);
 				g_EstatSimulador.canviCameraPendent = true;
 				return;
@@ -953,10 +951,10 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 		{
 			const double pasAngle = 5.0;
 			// Adapta el zoom minim i pas de distancia segons el radi del cos enfocant (cosEnfocatId)
-			int cosId = g_EstatSimulador.cosEnfocatId;
+			CelestialBodyId cosId = g_EstatSimulador.cosEnfocatId;
 			double radiCos = 35.0;
 			if (escenariActual != nullptr && cosId >= 0 && cosId < 9) {
-				radiCos = escenariActual->m_objectList[cosId].m_radiCos;
+				radiCos = escenariActual->m_objectList[cosId]->m_radiCos;
 			}
 			double minR = (cosId == 0) ? 42.0 : std::max(2.5, radiCos * 2.2);
 			double maxR = 800.0;
@@ -1404,10 +1402,10 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 		{
 			if (camera == CAM_ESFERICA)
 			{	// Càmera Esfèrica: limits i velocitat de zoom adaptats al cos enfocant (cosEnfocatId)
-				int cosId = g_EstatSimulador.cosEnfocatId;
+				CelestialBodyId cosId = g_EstatSimulador.cosEnfocatId;
 				double radiCos = 35.0;
 				if (escenariActual != nullptr && cosId >= 0 && cosId < 9) {
-					radiCos = escenariActual->m_objectList[cosId].m_radiCos;
+					radiCos = escenariActual->m_objectList[cosId]->m_radiCos;
 				}
 				double minR = (cosId == 0) ? 42.0 : std::max(2.5, radiCos * 2.2);
 				double maxR = 800.0;
