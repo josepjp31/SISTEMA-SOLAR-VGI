@@ -306,7 +306,7 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 		GLint locModelMatOrb = glGetUniformLocation(sh_programID, "modelMatrix");
 		GLint locTwoSidedOrb = glGetUniformLocation(sh_programID, "sw_twoSided");
 		if (m_orbitVAO.vaoId != 0) glBindVertexArray(m_orbitVAO.vaoId);
-		for (i = 1; i < m_objectList.size(); i++)
+		for (i = 0; i < m_objectList.size(); i++)
 		{
 			// Les orbites planetaries es centren al Sol; la de la Lluna (i == 9) a la Terra
 			glm::mat4 MatriuCentre = (i == 9) ? matriuOrbitaLluna(MatriuTG, m_objectList[3]) : MatriuTG;
@@ -345,11 +345,10 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 	GLuint shaderActual = sh_programID;
 
 	GLint locTwoSided = glGetUniformLocation(sh_programID, "sw_twoSided");
-	auto teNormalMap = [&](int k) { return m_objectList[k].m_normalMapID != 0 && shaderNormalMapID != 0; };
 	for (i = 0; i < m_objectList.size(); i++)
 	{
 		bool esAnell = (i == 10);
-		bool usaNormalMap = teNormalMap(i);
+		bool usaNormalMap = (m_objectList[i].m_normalMapID != 0 && shaderNormalMapID != 0);
 		GLuint shaderObjetivo = usaNormalMap ? shaderNormalMapID : sh_programID;
 
 		// Cambiar de shader solo cuando sea necesario
@@ -364,10 +363,11 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, usaNormalMap ? m_objectList[i].m_normalMapID : 0);
 
-		// Cálculo de posición y matriz de modelo (ahora sirve para todos, incluida la Luna)
-		float x = m_objectList[i].m_radiOrbita * (float)cos(m_objectList[i].m_angleOrbita * PI / 180.0);
-		float y = m_objectList[i].m_radiOrbita * (float)sin(m_objectList[i].m_angleOrbita * PI / 180.0);
+		int idxOrbita = esAnell ? 6 : i;
+		float x = m_objectList[idxOrbita].m_radiOrbita * (float)cos(m_objectList[idxOrbita].m_angleOrbita * PI / 180.0);
+		float y = m_objectList[idxOrbita].m_radiOrbita * (float)sin(m_objectList[idxOrbita].m_angleOrbita * PI / 180.0);
 
+		// Cálculo de posición y matriz de modelo (ahora sirve para todos, incluida la Luna)
 		glm::mat4 MatriuCentre = (i == 9) ? matriuOrbitaLluna(MatriuTG, m_objectList[3]) : MatriuTG;
 		ModelMatrix = glm::translate(MatriuCentre, vec3(x, y, 0.0f));
 		if (esAnell)
