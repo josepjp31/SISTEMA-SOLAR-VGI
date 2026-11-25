@@ -170,7 +170,7 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 
 	//Initialize class variables
 	// NOTA: la Lluna (index 9) orbita la Terra, no el Sol: el seu radi i angle d'orbita son relatius a la Terra
-	const float radiCos[10] = {
+	const float radiCos[11] = {
 		16.0f,  // Sol
 		2.0f,   // Mercurio
 		3.5f,   // Venus
@@ -180,10 +180,11 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 		7.5f,   // Saturno
 		5.5f,   // Urano
 		5.3f,   // Neptuno
-		1.0f    // Luna (0.27 x Tierra, proporcio real 1737 km / 6371 km)
+		1.0f,    // Luna (0.27 x Tierra, proporcio real 1737 km / 6371 km)
+		1.0f   // anell
 	};
 
-	const float radiOrbita[10] = {
+	const float radiOrbita[11] = {
 		0.0f,   // Sol
 		27.0f,  // Mercurio
 		40.0f,  // Venus
@@ -193,10 +194,11 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 		140.0f, // Saturno
 		175.0f, // Urano
 		210.0f, // Neptuno
-		7.0f    // Luna (distancia a la Tierra)
+		7.0f,    // Luna (distancia a la Tierra)
+		140.0f // anell
 	};
 
-	const float angleOrbita[10] = { 0.0f,  0.0f, 40.0f, 80.0f,120.0f,160.0f,200.0f,240.0f,280.0f, 0.0f };
+	const float angleOrbita[11] = { 0.0f,  0.0f, 40.0f, 80.0f,120.0f,160.0f,200.0f,240.0f,280.0f, 0.0f, 200.0f };
 
 	for (int i = 0; i < m_objectList.size(); i++)
 	{
@@ -321,40 +323,6 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 		if (locTwoSidedOrb != -1) glUniform1i(locTwoSidedOrb, GL_FALSE);
 		glBindVertexArray(0);
 	}
-	//2.Anell saturn
-		glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_TRUE);
-		glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_TRUE);
-		glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), GL_TRUE);
-		SeleccionaColorMaterial(sh_programID, col_blanc, sw_mat_no_emisio);
-
-		if (m_objectList[10].m_textureID != 0) {
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, m_objectList[10].m_textureID);
-		}
-
-		float x = m_objectList[6].m_radiOrbita * (float)cos(m_objectList[6].m_angleOrbita * PI / 180.0f);
-
-		float y = m_objectList[6].m_radiOrbita * (float)sin(m_objectList[6].m_angleOrbita * PI / 180.0f);
-
-		ModelMatrix = glm::translate(MatriuTG, vec3(x, y, 0.0f));
-
-		// Inclinar ligeramente los anillos
-		ModelMatrix = glm::rotate(ModelMatrix, glm::radians(20.0f), vec3(1.0f, 0.0f, 0.0f));
-
-		// Escalar los anillos
-		ModelMatrix = glm::scale(ModelMatrix, vec3(1.0f, 1.0f, 1.0f));
-
-		glUniformMatrix4fv(glGetUniformLocation(sh_programID, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
-
-		// Activar alpha blending per respectar el canal alfa de la textura de l'anell
-		// i il.luminacio bilateral per rebre llum solar per ambdues cares de l'anell
-		GLint locTwoSided = glGetUniformLocation(sh_programID, "sw_twoSided");
-		if (locTwoSided != -1) glUniform1i(locTwoSided, GL_TRUE);
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		draw_TriEBO_Object(GLU_DISK);
-		glDisable(GL_BLEND);
-		if (locTwoSided != -1) glUniform1i(locTwoSided, GL_FALSE);
 
 	// 3. Cossos: esfera amb la seva textura, situada sobre la seva òrbita
 	// Preparamos el shader de normal mapping una sola vez antes del bucle
@@ -376,9 +344,11 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 
 	GLuint shaderActual = sh_programID;
 
+	GLint locTwoSided = glGetUniformLocation(sh_programID, "sw_twoSided");
 	auto teNormalMap = [&](int k) { return m_objectList[k].m_normalMapID != 0 && shaderNormalMapID != 0; };
 	for (i = 0; i < m_objectList.size(); i++)
 	{
+		bool esAnell = (i == 10);
 		bool usaNormalMap = teNormalMap(i);
 		GLuint shaderObjetivo = usaNormalMap ? shaderNormalMapID : sh_programID;
 
@@ -400,13 +370,28 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 
 		glm::mat4 MatriuCentre = (i == 9) ? matriuOrbitaLluna(MatriuTG, m_objectList[3]) : MatriuTG;
 		ModelMatrix = glm::translate(MatriuCentre, vec3(x, y, 0.0f));
-		ModelMatrix = glm::rotate(ModelMatrix, glm::radians(m_objectList[i].m_angleRotacio), vec3(0.0f, 0.0f, 1.0f));
+		if (esAnell)
+			ModelMatrix = glm::rotate(ModelMatrix, glm::radians(20.0f), vec3(1.0f, 0.0f, 0.0f));
+		else
+			ModelMatrix = glm::rotate(ModelMatrix, glm::radians(m_objectList[i].m_angleRotacio), vec3(0.0f, 0.0f, 1.0f));
 		ModelMatrix = glm::scale(ModelMatrix, vec3(m_objectList[i].m_radiCos, m_objectList[i].m_radiCos, m_objectList[i].m_radiCos));
 
 		glUniformMatrix4fv(glGetUniformLocation(shaderActual, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
 		glUniform4i(glGetUniformLocation(shaderActual, "sw_intensity"), (i == 0 && sw_mat[0]), sw_mat[1], sw_mat[2], sw_mat[3]);
 
-		draw_TriEBO_Object(GLU_SPHERE);
+		if (esAnell) {
+			if (locTwoSided != -1) glUniform1i(locTwoSided, GL_TRUE);
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+			draw_TriEBO_Object(GLU_DISK);
+
+			glDisable(GL_BLEND);
+			if (locTwoSided != -1) glUniform1i(locTwoSided, GL_FALSE);
+		}
+		else {
+			draw_TriEBO_Object(GLU_SPHERE);
+		}
 	}
 
 	// Restaurar estado de texturas y volver al shader principal
