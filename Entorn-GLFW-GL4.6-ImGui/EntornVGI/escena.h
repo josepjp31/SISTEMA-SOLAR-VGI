@@ -30,4 +30,6 @@ extern glm::vec3 posMilano;
 extern float angleMilano;
 extern float inclinacioMilano;
 
+extern BoundingBox boundingBoxMilano; //COLISIONS
+
 #endif

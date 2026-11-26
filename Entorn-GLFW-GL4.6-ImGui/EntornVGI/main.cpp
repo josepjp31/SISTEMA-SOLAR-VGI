@@ -22,6 +22,9 @@
 #include <thread>
 #include <atomic>
 
+#include "colisions.h"//COLISIONS
+#include <iostream>
+
 // Escenari actiu i llista d'escenaris (0: Mode Didactic, 1: Mode a Escala Real)
 Escenari* escenariActual = nullptr;
 Escenari* escenaris = nullptr;
@@ -34,6 +37,8 @@ glm::vec3 posMilano(120.0f, 0.0f, 0.0f);
 float angleMilano = 0.0f;
 float velocitatMilano = 0.5f;
 float inclinacioMilano = 0.0f;
+
+glm::vec3 posMilanoAnterior(120.0f, 0.0f, 0.0f);
 
 void InitGL()
 {
@@ -1045,6 +1050,9 @@ void Teclat_Navega(int key, int action)
 	if (action != GLFW_PRESS && action != GLFW_REPEAT)
 		return;
 
+	// Guardar l'última posició abans del moviment
+	posMilanoAnterior = posMilano;
+
 	float pas = 2.0f;
 	float gir = 5.0f;
 
@@ -1209,7 +1217,7 @@ void OnMouseMove(GLFWwindow* window, double xpos, double ypos)
 		girn.cy = m_PosEAvall.y - ypos;
 
 		// Gir horitzontal
-		angleMilano -= girn.cx * 0.2f;
+		angleMilano += girn.cx * 0.2f;
 
 		// Inclinació vertical
 		inclinacioMilano += girn.cy * 0.2f;
@@ -1801,6 +1809,42 @@ int main()
 
 		// Crida a OnPaint() per redibuixar l'escena
 		OnPaint(window);
+		 //COLISIONS
+		// Comprovació de col·lisions entre la Milano i els astres
+		if (camera == CAM_NAVEGA &&
+			escenariActual != nullptr &&
+			objecte == SISTEMA_SOLAR &&
+			ObOBJ != nullptr)
+		{
+			const char* nomsAstres[10] = {"Sol", "Mercuri", "Venus", "Terra", "Mart","Jupiter", "Saturn", "Urà", "Neptu", "Lluna"};
+
+			static int ultimaColisio = -1;
+
+			int cosColisio = -1;
+
+			for (int i = 0; i < 10; i++)
+			{
+				if (colisioAABBEsfera(boundingBoxMilano,escenariActual->m_boundingSpheres[i]))
+				{
+					cosColisio = i;
+					break;
+				}
+			}
+
+			// Recuperar l'última posició vàlida si hi ha col·lisió
+			if (cosColisio != -1)
+			{
+				posMilano = posMilanoAnterior;
+			}
+
+			if (cosColisio != ultimaColisio)
+			{
+				if (cosColisio != -1)
+					std::cout << "COL·LISIÓ AMB " << nomsAstres[cosColisio] << std::endl;
+
+				ultimaColisio = cosColisio;
+			}
+		}
 
 		// Entorn VGI.ImGui: Capta dades del menú InGui
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

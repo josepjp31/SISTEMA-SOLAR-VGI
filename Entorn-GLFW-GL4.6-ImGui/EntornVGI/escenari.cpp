@@ -379,6 +379,8 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 		ModelMatrix = glm::translate(MatriuCentre, vec3(x, y, 0.0f));
 		ModelMatrix = glm::rotate(ModelMatrix, glm::radians(m_objectList[i].m_angleRotacio), vec3(0.0f, 0.0f, 1.0f));
 		ModelMatrix = glm::scale(ModelMatrix, vec3(m_objectList[i].m_radiCos, m_objectList[i].m_radiCos, m_objectList[i].m_radiCos));
+		
+		m_boundingSpheres[i] = creaBoundingSphere(ModelMatrix);//COLISIONS
 
 		glUniformMatrix4fv(locModelMatCos, 1, GL_FALSE, &ModelMatrix[0][0]);
 
@@ -418,6 +420,9 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 			ModelMatrix = glm::translate(MatriuTG, vec3(x, y, 0.0f));
 			ModelMatrix = glm::rotate(ModelMatrix,glm::radians(m_objectList[i].m_angleRotacio),vec3(0.0f, 0.0f, 1.0f));
 			ModelMatrix = glm::scale(ModelMatrix,vec3(m_objectList[i].m_radiCos,m_objectList[i].m_radiCos,m_objectList[i].m_radiCos));
+			
+			m_boundingSpheres[i] = creaBoundingSphere(ModelMatrix);//COLISIONS
+			
 			glUniformMatrix4fv(locModelMatCos, 1, GL_FALSE, &ModelMatrix[0][0]);
 			glUniform4i(locSwInt,0,sw_mat[1],sw_mat[2],sw_mat[3]);
 			draw_TriEBO_Object(GLU_SPHERE);

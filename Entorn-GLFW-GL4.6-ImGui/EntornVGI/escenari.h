@@ -3,6 +3,7 @@
 #include "framework.h"
 #include "material.h"
 #include "visualitzacio.h"
+#include "colisions.h"//COLISIONS
 
 // Nombre maxim d'objectes per escenari (0 Sol, 1..8 planetes, 9 Lluna)
 #define MAX_OBJECTES_ESCENARI 10
@@ -66,7 +67,7 @@ public:
 		}
 		delete[] m_objectList; m_objectList = nullptr;
 	}
-
+	BoundingSphere m_boundingSpheres[MAX_OBJECTES_ESCENARI];//COLISIONS
 	Object* m_objectList;
 	GLuint m_texturesID[NUM_MAX_TEXTURES];
 	char* m_fitxers[NUM_MAX_TEXTURES];

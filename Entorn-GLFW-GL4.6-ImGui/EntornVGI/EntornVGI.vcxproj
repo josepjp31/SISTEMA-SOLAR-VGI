@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -158,6 +158,7 @@
     <ClCompile Include="..\include\ImGui\imgui_tables.cpp" />
     <ClCompile Include="..\include\ImGui\imgui_widgets.cpp" />
     <ClCompile Include="CelestialBodyData.cpp" />
+    <ClCompile Include="colisions.cpp" />
     <ClCompile Include="escena.cpp" />
     <ClCompile Include="escenari.cpp" />
     <ClCompile Include="glut_geometry.cpp" />
@@ -198,6 +199,7 @@
     <ClInclude Include="..\include\ImGui\imstb_textedit.h" />
     <ClInclude Include="..\include\ImGui\nfd.h" />
     <ClInclude Include="CelestialBodyData.h" />
+    <ClInclude Include="colisions.h" />
     <ClInclude Include="constants.h" />
     <ClInclude Include="escena.h" />
     <ClInclude Include="escenari.h" />

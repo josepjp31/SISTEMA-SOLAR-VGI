@@ -18,6 +18,9 @@
 #include "visualitzacio.h"
 #include "escena.h"
 
+
+BoundingBox boundingBoxMilano;//COLISIONS
+
 // Dibuixa Eixos Coordenades Món i Reixes, activant un shader propi.
 void dibuixa_Eixos(GLuint ax_programID, bool eix, GLuint axis_Id, CMask3D reixa, CPunt3D hreixa,
 	glm::mat4 MatriuProjeccio, glm::mat4 MatriuVista)
@@ -170,6 +173,11 @@ void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, glm
 		);
 
 		ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.5f));
+
+		const glm::vec3 minMilano(-6.3877f, -2.90362f, -12.7207f);
+		const glm::vec3 maxMilano(16.4814f, 4.31772f, -2.36932f);
+
+		boundingBoxMilano = creaBoundingBox(ModelMatrix, minMilano, maxMilano);//COLISIONS
 
 		if (s_locModelMatrix != -1)
 			glUniformMatrix4fv(s_locModelMatrix, 1, GL_FALSE, &ModelMatrix[0][0]);
