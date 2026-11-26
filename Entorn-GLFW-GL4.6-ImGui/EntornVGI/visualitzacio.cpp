@@ -669,6 +669,35 @@ GLint loadIMA_SOIL(const char * filename)
 // +Z (front) 
 // -Z (back)
 // -------------------------------------------------------
+GLuint loadPanoramaTexture(const char* path)
+{
+	GLuint textureID;
+	glGenTextures(1, &textureID);
+
+	int width, height;
+
+	unsigned char* data = SOIL_load_image(path,&width,&height,0,SOIL_LOAD_RGB);
+
+	if (!data)
+	{
+		fprintf(stderr, "Error carregant panorama: %s\n", path);
+		return 0;
+	}
+
+	glBindTexture(GL_TEXTURE_2D, textureID);
+	glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,width,height,0,GL_RGB,GL_UNSIGNED_BYTE,data);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	SOIL_free_image_data(data);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	// La panorámica se repite horizontalmente
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	// Los polos no deben repetirse
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	return textureID;
+}
 unsigned int loadCubemap(std::vector<std::string> faces)
 {
 	unsigned int textureID;

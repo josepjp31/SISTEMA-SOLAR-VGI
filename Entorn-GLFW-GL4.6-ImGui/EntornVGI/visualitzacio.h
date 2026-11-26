@@ -44,6 +44,7 @@ void Fons(CColor int_fons);
 // Entorn VGI: Carregar fitxer imatge de formats admesos per la llibreria DevIL/OpenIL 
 //				com a textura
 GLint loadIMA_SOIL(const char *filename);
+GLuint loadPanoramaTexture(const char* path);
 unsigned int loadCubemap(std::vector<std::string> faces);
 void SetTextureParameters(GLint num, GLint IDText, bool extensT, bool filterT, bool blendT, bool genMipmpT);
 #endif

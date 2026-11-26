@@ -95,7 +95,30 @@ void dibuixa_Eixos(GLuint ax_programID, bool eix, GLuint axis_Id, CMask3D reixa,
 	//  Dibuix dels eixos
 	if (eix) draw_Eixos(axis_Id);
 }
+void dibuixa_SkyboxPanorama(GLuint sk_programID,GLuint panoramaTexture,char eix_Polar,glm::mat4 MatriuProjeccio,glm::mat4 MatriuVista)
+{
+	if (!sk_programID || !panoramaTexture ||Get_VAOId(CUBE_SKYBOX) == 0)
+		return;
 
+	glm::mat4 ModelMatrix(1.0f);
+	glDepthFunc(GL_LEQUAL);
+	glDepthMask(GL_FALSE);
+
+	glUseProgram(sk_programID);
+	glUniformMatrix4fv(glGetUniformLocation(sk_programID, "projectionMatrix"),1, GL_FALSE, &MatriuProjeccio[0][0]);
+	glm::mat4 viewSenseTranslacio =glm::mat4(glm::mat3(MatriuVista));
+	glUniformMatrix4fv(glGetUniformLocation(sk_programID, "viewMatrix"),1, GL_FALSE, &viewSenseTranslacio[0][0]);
+
+	ModelMatrix = glm::scale(ModelMatrix, vec3(5000.0f));
+	glUniformMatrix4fv(glGetUniformLocation(sk_programID, "modelMatrix"),1, GL_FALSE, &ModelMatrix[0][0]);
+	// Textura panoramica 2D
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, panoramaTexture);
+	glUniform1i(glGetUniformLocation(sk_programID, "panorama"),0);
+	drawCubeSkybox();
+	glDepthMask(GL_TRUE);
+	glDepthFunc(GL_LESS);
+}
 // Dibuixa Skybox en forma de Cub, activant un shader propi.
 void dibuixa_Skybox(GLuint sk_programID, GLuint cmTexture, char eix_Polar, glm::mat4 MatriuProjeccio, glm::mat4 MatriuVista)
 {

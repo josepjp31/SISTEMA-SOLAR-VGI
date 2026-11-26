@@ -19,6 +19,7 @@ void dibuixa_Eixos(GLuint ax_programID, bool eix, GLuint axis_Id, CMask3D reixa,
 
 // Dibuixa el cubemap Skybox de fons
 void dibuixa_Skybox(GLuint sk_programID, GLuint cmTexture, char eix_Polar, glm::mat4 MatriuProjeccio, glm::mat4 MatriuVista);
+void dibuixa_SkyboxPanorama(GLuint sk_programID, GLuint panoramaTexture, char eix_Polar, glm::mat4 MatriuProjeccio, glm::mat4 MatriuVista);
 
 // Dibuixa l'escena OpenGL principal delegant el Sistema Solar a Escenari
 // (shader_programIDNormalMap: shader de normal mapping dels planetes; objecteOBJ: model de la nau Milano)

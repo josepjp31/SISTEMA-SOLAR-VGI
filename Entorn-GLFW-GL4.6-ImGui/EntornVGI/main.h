@@ -66,6 +66,13 @@ char objecte;					// Menú Objecte: Tipus d'Objecte
 
 // Entorn VGI: Variables de control Skybox Cube
 bool SkyBoxCube;			// Booleana que controla si es visualitza Skybox [TRUE] o no [FALSE].
+bool usarSkyboxPanoramico = true;
+
+//skybox panoramico
+GLuint skP_programID = 0;
+GLuint panoramaTexture = 0;
+Shader shader_SkyBoxPanorama;
+
 Shader shader_SkyBoxC;		// Shader Skybox Cub
 GLuint skC_programID;		// Identificador program Skybox Cube
 CVAO skC_VAOID;				// Identificador VAO List (vaoId, vboId, nVertexs) per a Skybox Cube
@@ -163,6 +170,7 @@ void draw_Menu_ImGui();
 // EntornVGI: RECURSOS DE MENU (persianes) DE L'APLICACIO:
 void OnCameraNavega();
 void OnVistaSkyBox();
+void OnVistaSkyBoxPanorama();
 void OnProjeccioPerspectiva();
 void OnShaderPhong();
 

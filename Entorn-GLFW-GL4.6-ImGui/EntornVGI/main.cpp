@@ -81,6 +81,10 @@ void InitGL()
 	// Entorn VGI: Variables de control Skybox Cube
 	SkyBoxCube = false;
 	skC_programID = 0;
+
+	skP_programID = 0;
+	panoramaTexture = 0;
+
 	skC_VAOID.vaoId = 0;	skC_VAOID.vboId = 0;	skC_VAOID.nVertexs = 0;
 	cubemapTexture = 0;
 
@@ -298,7 +302,7 @@ void InitGL()
 	{	// load Skybox textures
 		// -------------
 		std::vector<std::string> faces =
-		{ ".\\textures\\skybox\\right.png",
+		{ ".\\textures\\skybox\\rifght.png",
 			".\\textures\\skybox\\left.png",
 			".\\textures\\skybox\\top.png",
 			".\\textures\\skybox\\bottom.png",
@@ -458,8 +462,13 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		// Assegurar que el Skybox i els Eixos estan carregats
 		if (!eixos_Id) eixos_Id = deixos();
 		SkyBoxCube = g_EstatSimulador.opcionsVisualitzacio.mostrarSkybox;
-		if (SkyBoxCube) OnVistaSkyBox();
-
+		if (SkyBoxCube)
+		{
+			if (usarSkyboxPanoramico)
+				OnVistaSkyBoxPanorama();
+			else
+				OnVistaSkyBox();
+		}
 		g_EstatSimulador.configuracioInicialPendent = false;
 	}
 
@@ -467,8 +476,19 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 	if (objecte == SISTEMA_SOLAR)
 	{
 		SkyBoxCube = g_EstatSimulador.opcionsVisualitzacio.mostrarSkybox;
-		if (SkyBoxCube && skC_VAOID.vaoId == 0) OnVistaSkyBox();
-
+		if (SkyBoxCube)
+		{
+			if (usarSkyboxPanoramico)
+			{
+				if (!skP_programID || !panoramaTexture || skC_VAOID.vaoId == 0)
+					OnVistaSkyBoxPanorama();
+			}
+			else
+			{
+				if (!skC_programID || !cubemapTexture || skC_VAOID.vaoId == 0)
+					OnVistaSkyBox();
+			}
+		}
 		eixos = g_EstatSimulador.opcionsVisualitzacio.mostrarEixos;
 
 		// Llum directa del Sol (emissio del Sol + font punt #0) i mode Vista Clara (ambient)
@@ -691,8 +711,17 @@ void dibuixa_Escena() {
 	//glUseProgram(shader_programID);
 
 //	Dibuix SkyBox Cúbic.
-	if (SkyBoxCube) dibuixa_Skybox(skC_programID, cubemapTexture, Vis_Polar, ProjectionMatrix, ViewMatrix);
-
+	if (SkyBoxCube)
+	{
+		if (usarSkyboxPanoramico)
+		{
+			dibuixa_SkyboxPanorama(skP_programID,panoramaTexture,Vis_Polar,ProjectionMatrix,ViewMatrix);
+		}
+		else
+		{
+			dibuixa_Skybox(skC_programID,cubemapTexture,Vis_Polar,ProjectionMatrix,ViewMatrix);
+		}
+	}
 	//	Dibuix Coordenades Món i Reixes.
 	dibuixa_Eixos(eixos_programID, eixos, eixos_Id, grid, hgrid, ProjectionMatrix, ViewMatrix);
 
@@ -823,6 +852,33 @@ void OnCameraNavega()
 			n[0] = 0.0;		n[1] = 0.0;		n[2] = 0.0;
 			angleZ = 0.0;
 		}
+	}
+}
+
+//skybox panoramico
+void OnVistaSkyBoxPanorama()
+{
+	fprintf(stderr, "SkyBox Panoramico: \n");
+
+	// Cargar shader panoramico
+	if (!skP_programID)
+	{
+		skP_programID = shader_SkyBoxPanorama.loadFileShaders(
+			".\\shaders\\skybox_panorama.vert",
+			".\\shaders\\skybox_panorama.frag"
+		);
+	}
+
+	// Reutilizar el mismo cubo
+	if (skC_VAOID.vaoId == 0)
+		skC_VAOID = loadCubeSkybox_VAO();
+
+	Set_VAOList(CUBE_SKYBOX, skC_VAOID);
+
+	// Cargar textura panoramica
+	if (!panoramaTexture)
+	{
+		panoramaTexture = loadPanoramaTexture(".\\textures\\skybox\\MilkyWayPanorama8K.jpg");
 	}
 }
 
