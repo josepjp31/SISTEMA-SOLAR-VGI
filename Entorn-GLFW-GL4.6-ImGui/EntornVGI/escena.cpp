@@ -18,6 +18,65 @@
 #include "visualitzacio.h"
 #include "escena.h"
 
+// Copia matrius i llums del shader Phong al shader de normal mapping (perque tots dos il.luminin igual)
+static void copiaUniformsShader(GLuint src, GLuint dst)
+{
+	auto locs = [&](const char* nom, GLint& ls, GLint& ld) {
+		ls = glGetUniformLocation(src, nom);
+		ld = glGetUniformLocation(dst, nom);
+		return ls >= 0 && ld >= 0;
+		};
+	auto copiaMat4 = [&](const char* nom) {
+		GLint ls, ld; GLfloat m[16];
+		if (!locs(nom, ls, ld)) return;
+		glGetUniformfv(src, ls, m);
+		glProgramUniformMatrix4fv(dst, ld, 1, GL_FALSE, m);
+		};
+	auto copiaF = [&](const char* nom, int n) {	// vecN de floats (n = 1..4)
+		GLint ls, ld; GLfloat v[4];
+		if (!locs(nom, ls, ld)) return;
+		glGetUniformfv(src, ls, v);
+		if (n == 1) glProgramUniform1fv(dst, ld, 1, v);
+		else if (n == 3) glProgramUniform3fv(dst, ld, 1, v);
+		else glProgramUniform4fv(dst, ld, 1, v);
+		};
+	auto copiaI = [&](const char* nom) {		// int / bool
+		GLint ls, ld, v;
+		if (!locs(nom, ls, ld)) return;
+		glGetUniformiv(src, ls, &v);
+		glProgramUniform1i(dst, ld, v);
+		};
+
+	copiaMat4("projectionMatrix");
+	copiaMat4("viewMatrix");
+
+	// normalMatrix (solo la usa el frag para spots): inversa-transpuesta de la vista
+	GLint lsV = glGetUniformLocation(src, "viewMatrix");
+	GLint ldN = glGetUniformLocation(dst, "normalMatrix");
+	if (lsV >= 0 && ldN >= 0) {
+		glm::mat4 V; glGetUniformfv(src, lsV, &V[0][0]);
+		glm::mat4 NM = glm::transpose(glm::inverse(V));
+		glProgramUniformMatrix4fv(dst, ldN, 1, GL_FALSE, &NM[0][0]);
+	}
+
+	copiaF("LightModelAmbient", 4);
+	copiaI("fixedLight");
+
+	char n[64];
+	for (int i = 0; i < 8; i++) {
+		sprintf_s(n, "LightSource[%d].sw_light", i);		copiaI(n);
+		sprintf_s(n, "LightSource[%d].position", i);		copiaF(n, 4);
+		sprintf_s(n, "LightSource[%d].ambient", i);		copiaF(n, 4);
+		sprintf_s(n, "LightSource[%d].diffuse", i);		copiaF(n, 4);
+		sprintf_s(n, "LightSource[%d].specular", i);		copiaF(n, 4);
+		sprintf_s(n, "LightSource[%d].attenuation", i);	copiaF(n, 3);
+		sprintf_s(n, "LightSource[%d].restricted", i);		copiaI(n);
+		sprintf_s(n, "LightSource[%d].spotDirection", i);	copiaF(n, 3);
+		sprintf_s(n, "LightSource[%d].spotCosCutoff", i);	copiaF(n, 1);
+		sprintf_s(n, "LightSource[%d].spotExponent", i);	copiaF(n, 1);
+	}
+}
+
 // Dibuixa Eixos Coordenades Món i Reixes, activant un shader propi.
 void dibuixa_Eixos(GLuint ax_programID, bool eix, GLuint axis_Id, CMask3D reixa, CPunt3D hreixa,
 	glm::mat4 MatriuProjeccio, glm::mat4 MatriuVista)
@@ -103,6 +162,7 @@ void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, glm
 	//COET
 	if (mostrarMilano && objecteOBJ != nullptr)
 	{
+
 		// Centre geomètric del model
 		glm::vec3 centreModel(5.05f, 0.71f, -7.55f);
 
@@ -130,7 +190,7 @@ void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, glm
 		// Gir horitzontal de la nau
 		ModelMatrix = glm::rotate(
 			ModelMatrix,
-			glm::radians(angleMilano ),
+			glm::radians(angleMilano),
 			glm::vec3(0.0f, 0.0f, 1.0f)
 		);
 
@@ -164,6 +224,34 @@ void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, glm
 			1, GL_FALSE, &ModelMatrix[0][0]
 		);
 
-		objecteOBJ->draw_TriVAO_OBJ(sh_programID);
+		if (shader_programIDNormalMap != 0 && objecteOBJ->iNormalMapID != 0)
+		{
+			CColor col_blanc;
+			col_blanc.r = 1.0; col_blanc.g = 1.0; col_blanc.b = 1.0; col_blanc.a = 1.0;
+			
+			glUseProgram(shader_programIDNormalMap);
+			copiaUniformsShader(sh_programID, shader_programIDNormalMap);	// llums, càmera, etc.
+			glUniform1i(glGetUniformLocation(shader_programIDNormalMap, "texture0"), 0);
+			glUniform1i(glGetUniformLocation(shader_programIDNormalMap, "textur"), GL_TRUE);
+			glUniform1i(glGetUniformLocation(shader_programIDNormalMap, "modulate"), GL_TRUE);
+			glUniform1i(glGetUniformLocation(shader_programIDNormalMap, "flag_invert_y"), GL_TRUE);
+			SeleccionaColorMaterial(shader_programIDNormalMap, col_blanc, sw_mat);
+			glUniformMatrix4fv(glGetUniformLocation(shader_programIDNormalMap, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
+			glUniform4i(glGetUniformLocation(shader_programIDNormalMap, "sw_intensity"),sw_mat[0], sw_mat[1], sw_mat[2], sw_mat[3]);
+			glUniform1f(glGetUniformLocation(shader_programIDNormalMap, "emissionScale"), 0.3f);
+			glUniform1f(glGetUniformLocation(shader_programIDNormalMap, "bumpStrength"), 1.0f);
+			
+			objecteOBJ->draw_TriVAO_OBJ_NormalMap(shader_programIDNormalMap);
+			
+			glUniform1f(glGetUniformLocation(shader_programIDNormalMap, "emissionScale"), 1.0f);
+			glUniform1f(glGetUniformLocation(shader_programIDNormalMap, "bumpStrength"), 0.3f);
+			glUseProgram(sh_programID);
+		}
+		else {
+			glUniformMatrix4fv(glGetUniformLocation(sh_programID, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
+			objecteOBJ->draw_TriVAO_OBJ(sh_programID);		// fallback sin normal map	}
+
+		}
 	}
 }
+

@@ -784,6 +784,8 @@ void OnCameraNavega()
 			{
 				
 				printf("Milano carregada correctament!\n");
+				if (!ObOBJ->LoadNormalMap("textures/coet/NormalMap.png"))
+					printf("No s'ha pogut carregar el mapa normal de la Milano\n");
 			}
 			else
 			{
@@ -1695,6 +1697,9 @@ int main()
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+	//sky box hot fix
+	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
 	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 

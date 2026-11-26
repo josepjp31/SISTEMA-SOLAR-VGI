@@ -81,8 +81,8 @@ public:
 	CVAO m_orbitVAO;
 
 	// Mapes normals per al shader de normal mapping (index = cos; 0 Sol i 7 Urà sense mapa)
-	GLuint m_normalTexturesID[9] = { 0 };
-	char* m_normalFitxers[9] = { nullptr };
+	GLuint m_normalTexturesID[NUM_MAX_TEXTURES] = { 0 };
+	char* m_normalFitxers[NUM_MAX_TEXTURES] = { nullptr };
 
 private:
 	void creaOrbita();

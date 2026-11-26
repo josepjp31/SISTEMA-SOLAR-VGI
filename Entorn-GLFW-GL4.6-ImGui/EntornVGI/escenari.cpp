@@ -73,7 +73,7 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	m_fitxers[4] = (char*)".\\textures\\planet\\Mars\\2k_mars.jpg";		// 4
 	m_fitxers[5] = (char*)".\\textures\\planet\\Jupiter\\2k_jupiter.jpg";	// 5
 	m_fitxers[6] = (char*)".\\textures\\planet\\Saturn\\2k_saturn.jpg";	// 6
-	m_fitxers[7] = (char*)".\\textures\\planet\\Uranus\\2k_uranus.jpg";	// 7
+	m_fitxers[7] = (char*)".\\textures\\planet\\Uranus\\uranus.jpg";	// 7
 	m_fitxers[8] = (char*)".\\textures\\planet\\Neptune\\2k_neptune.jpg";		// 8
 	m_fitxers[9] = (char*)".\\textures\\planet\\Saturn\\2k_saturn_ring_alpha.png";	// 6
 	m_fitxers[10] = (char*)".\\textures\\planet\\Moon\\2k_moon.jpg";	// Lluna (cos 9)
@@ -86,8 +86,9 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	m_normalFitxers[4] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapMars.png";
 	m_normalFitxers[5] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapJupiter.png";
 	m_normalFitxers[6] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapSaturn.png";
-	m_normalFitxers[7] = nullptr; // Urano: sin mapa normal
+	m_normalFitxers[6] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapUranus.png";
 	m_normalFitxers[8] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapNeptune.png";
+	m_normalFitxers[9] = (char*)".\\textures\\planet\\NormalTextures\\NormalMapMoon.png";	// Lluna
 
 	m_colObj.r = 1.0; m_colObj.g = 1.0; m_colObj.b = 1.0; m_colObj.a = 1.0;
 
@@ -126,7 +127,7 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 
 	//carrega mapas normales
 	glActiveTexture(GL_TEXTURE0);
-	for (int i = 0; i < 9; i++){
+	for (int i = 0; i < 10; i++){
 		if (m_normalTexturesID[i] != 0){
 			glDeleteTextures(1, &m_normalTexturesID[i]);
 			m_normalTexturesID[i] = 0;
@@ -362,7 +363,7 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 	GLint locSwInt = glGetUniformLocation(sh_programID, "sw_intensity");
 
 	// Planetes amb mapa normal (1..8, excepte Urà): es dibuixen despres amb el shader de normal mapping
-	auto teNormalMap = [&](int k) { return k > 0 && k < 9 && m_normalTexturesID[k] != 0 && shaderNormalMapID != 0; };
+	auto teNormalMap = [&](int k) { return k > 0 && k < 10 && m_normalTexturesID[k] != 0 && shaderNormalMapID != 0; };
 	for (i = 0; i < 10; i++)
 	{
 		if (teNormalMap(i)) continue;
@@ -405,23 +406,24 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 		locSwInt =glGetUniformLocation(shaderNormalMapID, "sw_intensity");
 
 		// Planetas con mapas normales: Mercurio, Venus, Tierra,Marte, Júpiter, Saturno y Neptuno.
-		for (int i = 1; i < 9; i++){
-			// Urano no tiene mapa normal !textura plana sin gracia se puede canviar despues si hace falta!
-			if(!teNormalMap(i)) continue;		// Textura difusa: unidad 0
+		for (int i = 1; i < 10; i++) {
+			if (!teNormalMap(i)) continue;
+			int tex = (i == 9) ? 10 : i;
+
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, m_texturesID[i]);
-			// Mapa normal: unidad 1
+			glBindTexture(GL_TEXTURE_2D, m_texturesID[tex]);
 			glActiveTexture(GL_TEXTURE1);
 			glBindTexture(GL_TEXTURE_2D, m_normalTexturesID[i]);
 
-			float x = m_objectList[i].m_radiOrbita *(float)cos(m_objectList[i].m_angleOrbita * PI / 180.0);
-			float y = m_objectList[i].m_radiOrbita *(float)sin(m_objectList[i].m_angleOrbita * PI / 180.0);
+			float x = m_objectList[i].m_radiOrbita * (float)cos(m_objectList[i].m_angleOrbita * PI / 180.0);
+			float y = m_objectList[i].m_radiOrbita * (float)sin(m_objectList[i].m_angleOrbita * PI / 180.0);
 
-			ModelMatrix = glm::translate(MatriuTG, vec3(x, y, 0.0f));
-			ModelMatrix = glm::rotate(ModelMatrix,glm::radians(m_objectList[i].m_angleRotacio),vec3(0.0f, 0.0f, 1.0f));
-			ModelMatrix = glm::scale(ModelMatrix,vec3(m_objectList[i].m_radiCos,m_objectList[i].m_radiCos,m_objectList[i].m_radiCos));
+			glm::mat4 MatriuCentre = (i == 9) ? matriuOrbitaLluna(MatriuTG, m_objectList[3]) : MatriuTG;
+			ModelMatrix = glm::translate(MatriuCentre, vec3(x, y, 0.0f));
+			ModelMatrix = glm::rotate(ModelMatrix, glm::radians(m_objectList[i].m_angleRotacio), vec3(0.0f, 0.0f, 1.0f));
+			ModelMatrix = glm::scale(ModelMatrix, vec3(m_objectList[i].m_radiCos, m_objectList[i].m_radiCos, m_objectList[i].m_radiCos));
 			glUniformMatrix4fv(locModelMatCos, 1, GL_FALSE, &ModelMatrix[0][0]);
-			glUniform4i(locSwInt,0,sw_mat[1],sw_mat[2],sw_mat[3]);
+			glUniform4i(locSwInt, 0, sw_mat[1], sw_mat[2], sw_mat[3]);
 			draw_TriEBO_Object(GLU_SPHERE);
 		}
 		//restaurar shader id

@@ -61,6 +61,9 @@ struct Material
   float fSpecular[3];		 // Specular component
   float fEmmissive[3];		 // Emmissive component
   float fShininess;			 // Specular exponent
+  //normal map
+  char szNormalTexture[_MAX_PATH];
+  uint iNormalTextureID;
 };
 
 class OBJLOADER_CLASS_DECL COBJModel  
@@ -71,6 +74,11 @@ class OBJLOADER_CLASS_DECL COBJModel
 	_stdcall COBJModel();
 	virtual _stdcall ~COBJModel();
 	void _stdcall EliminaLlista(int prim_Id);
+
+// normal map
+	GLuint iNormalMapID = 0;
+	bool _stdcall LoadNormalMap(const char* szFileName);
+	void _stdcall draw_TriVAO_OBJ_NormalMap(GLuint sh_programID);
 
 // Funcions CVAO
 	void _stdcall netejaVAOList_OBJ();

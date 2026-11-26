@@ -13,6 +13,8 @@
 
 #include "framework.h"
 #include "objLoader.h"
+#include <vector>
+#include <glm/glm.hpp>
 
 // OBJ File string indentifiers
 #define VERTEX_ID		 "v"
@@ -725,6 +727,46 @@ CVAO _stdcall COBJModel::RenderToVAOList(const Face* pFaces,
 	return objVAO;
 }
 
+CVAO load_TRIANGLES_EBOver2(std::vector<double> vertices, std::vector<double> normals,std::vector<double> colors, std::vector<double> textures,std::vector<double> tangents, std::vector<uint> indices);
+
+// Igual que load_TRIANGLES_VAO pero calculando tangentes (atributo 4)
+static CVAO load_TRIANGLES_VAO_Tangents(const std::vector<double>& vertices, const std::vector<double>& normals,const std::vector<double>& colors, const std::vector<double>& textures)
+{
+	size_t nVert = vertices.size() / 3;
+	std::vector<double> tangents(nVert * 3, 0.0);
+
+	for (size_t t = 0; t + 2 < nVert; t += 3)
+	{
+		glm::vec3 p[3]; glm::vec2 uv[3];
+		for (int k = 0; k < 3; k++) {
+			p[k] = glm::vec3((float)vertices[(t + k) * 3], (float)vertices[(t + k) * 3 + 1], (float)vertices[(t + k) * 3 + 2]);
+			uv[k] = glm::vec2((float)textures[(t + k) * 2], (float)textures[(t + k) * 2 + 1]);
+		}
+		glm::vec3 E1 = p[1] - p[0], E2 = p[2] - p[0];
+		glm::vec2 d1 = uv[1] - uv[0], d2 = uv[2] - uv[0];
+		float det = d1.x * d2.y - d2.x * d1.y;
+
+		glm::vec3 T(0.0f);
+		if (fabs(det) > 1e-12f) T = (d2.y * E1 - d1.y * E2) / det;
+
+		for (int k = 0; k < 3; k++) {
+			size_t v = t + k;
+			glm::vec3 N = glm::normalize(glm::vec3((float)normals[v * 3], (float)normals[v * 3 + 1], (float)normals[v * 3 + 2]));
+			glm::vec3 Tk = T - glm::dot(T, N) * N;			// Gram-Schmidt
+			if (glm::length(Tk) < 1e-8f) {					// tangente degenerada
+				glm::vec3 ref = (fabs(N.z) < 0.9f) ? glm::vec3(0, 0, 1) : glm::vec3(0, 1, 0);
+				Tk = glm::cross(ref, N);
+			}
+			Tk = glm::normalize(Tk);
+			tangents[v * 3] = Tk.x; tangents[v * 3 + 1] = Tk.y; tangents[v * 3 + 2] = Tk.z;
+		}
+	}
+
+	std::vector<uint> indices(nVert);
+	for (size_t i = 0; i < nVert; i++) indices[i] = (uint)i;	// se dibuja con glDrawArrays, el EBO no se usa
+
+	return load_TRIANGLES_EBOver2(vertices, normals, colors, textures, tangents, indices);
+}
 
 void _stdcall COBJModel::loadToVAOList(const Face* pFaces,
 	const unsigned int iFaceCount,
@@ -771,7 +813,7 @@ void _stdcall COBJModel::loadToVAOList(const Face* pFaces,
 				{	// Canvi de material per a les cares del fitxer OBJ
 					if (nv > 0) {
 						// Creació d'un VAO i un VBO i càrrega de la geometria. Guardar identificador VAO identificador VBO a struct CVAO.
-						objVAO = load_TRIANGLES_VAO(vertices, normals, colors, textures);
+						objVAO = load_TRIANGLES_VAO_Tangents(vertices, normals, colors, textures);
 						Set_VAOList_OBJ(index_VAO, objVAO);
 						index_VAO = index_VAO + 1;
 						vertices.resize(0);		colors.resize(0);	normals.resize(0);		textures.resize(0);// Reinicialitzar vectors
@@ -965,7 +1007,7 @@ void _stdcall COBJModel::loadToVAOList(const Face* pFaces,
 
 	if (nv != 0) 
 	{	// Creació del darrer VAO i un VBO i càrrega de la geometria. Guardar identificador VAO identificador VBO a struct CVAO.
-		objVAO = load_TRIANGLES_VAO(vertices, normals, colors, textures);
+		objVAO = load_TRIANGLES_VAO_Tangents(vertices, normals, colors, textures);
 		Set_VAOList_OBJ(index_VAO, objVAO);
 	}
 
@@ -1424,6 +1466,7 @@ void _stdcall COBJModel::netejaVAOList_OBJ()
 	for (i = 0; i < MAX_SIZE_VAOLIST; i++)
 	{
 		if (VAOList_OBJ[i].vaoId != 0) deleteVAOList_OBJ(i);
+		if (iNormalMapID) { glDeleteTextures(1, &iNormalMapID); iNormalMapID = 0; }
 	}
 }
 
@@ -1503,4 +1546,35 @@ void _stdcall COBJModel::draw_TriVAO_OBJ(GLuint sh_programID)
 		
 		draw_TriVAO_Object_OBJ(i);							// Dibuix objecte i-èssim
 	}
+}
+
+bool _stdcall COBJModel::LoadNormalMap(const char* szFileName)
+{
+	// Mismos flags que la textura difusa (SOIL_FLAG_INVERT_Y) para que coincidan las UV
+	if (iNormalMapID) { glDeleteTextures(1, &iNormalMapID); iNormalMapID = 0; }
+	iNormalMapID = LoadTexture2(szFileName);
+	if (iNormalMapID == 0) return false;
+
+	glBindTexture(GL_TEXTURE_2D, iNormalMapID);
+	glGenerateMipmap(GL_TEXTURE_2D);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	return true;
+}
+
+void _stdcall COBJModel::draw_TriVAO_OBJ_NormalMap(GLuint sh_programID)
+{
+	glUniform1i(glGetUniformLocation(sh_programID, "normalMap"), 1);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, iNormalMapID);
+	glActiveTexture(GL_TEXTURE0);			// draw_TriVAO_OBJ bindea la difusa en la unidad 0
+
+	draw_TriVAO_OBJ(sh_programID);
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE0);
 }

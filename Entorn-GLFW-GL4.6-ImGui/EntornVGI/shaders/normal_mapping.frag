@@ -50,6 +50,8 @@ uniform mat4 projectionMatrix;	// Projection Matrix
 uniform mat4 viewMatrix; 	// View Matrix
 uniform mat4 modelMatrix;	// Model Matrix
 uniform sampler2D normalMap;
+uniform float emissionScale = 1.0;   // 1.0 = como hasta ahora (planetas)
+uniform float bumpStrength  = 0.3;   // 0.3 = como hasta ahora (planetas)
 
 uniform sampler2D texture0;	// Imatge textura
 uniform bool textur;		// Booleana d’activació (TRUE) de textures o no (FALSE).
@@ -94,7 +96,7 @@ vec3 phongModel(vec3 N, inout int numMat, inout float aValue)
 					        aValue = material.emission.a;
                                               }
 				else Iemissive = vertexColor.rgb;
-			    Iemissive = clamp(Iemissive, 0.0, 1.0);
+			    Iemissive = clamp(Iemissive, 0.0, 1.0)*emissionScale;
 		          }
     
 // ---- L98- Compute ambient term
@@ -179,7 +181,7 @@ void main ()
 
 // ---- L178- Calcul intensitat final del pixel
 // Obtener normal del mapa normal
-vec2 nxy = (texture(normalMap, vertexTexCoord).rg * 2.0 - 1.0) * 0.3;   // fuerza del relieve
+vec2 nxy = (texture(normalMap, vertexTexCoord).rg * 2.0 - 1.0) * bumpStrength;   // fuerza del relieve
 vec3 normalTangent = vec3(nxy, sqrt(max(1.0 - dot(nxy, nxy), 0.0)));    // z siempre positiva
 vec3 N = normalize(TBN_PV * normalTangent);
 // Calcular iluminación Phong con la nueva normal
