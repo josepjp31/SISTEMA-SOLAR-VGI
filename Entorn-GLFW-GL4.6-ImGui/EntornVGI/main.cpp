@@ -483,13 +483,13 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 	if (g_EstatSimulador.canviCameraPendent)
 	{
 		CelestialBodyId cid = g_EstatSimulador.cosEnfocatId;
-		if (cid < 0 || cid >= 9) cid = CB_SUN;
+		if (cid == CB_NONE) cid = CB_SUN;
 
 		// Distancia de camera proporcional al radi del planeta seleccionat per garantir bon enquadrament
-		float distPerDefecte = 140.0f;
-		if (cid > 0 && escenariActual != nullptr)
+		double distPerDefecte = 140.0f;
+		if (cid != CB_NONE && escenariActual != nullptr)
 		{
-			distPerDefecte = escenariActual->m_objectList[cid]->m_radiCos * 4.5f;
+			distPerDefecte = escenariActual->m_objectList[cid]->m_scale * 4.5f;
 			if (distPerDefecte < 14.0f) distPerDefecte = 14.0f;
 		}
 
@@ -592,15 +592,12 @@ void OnPaint(GLFWwindow* window)
 
 			// Quan hi ha un planeta enfocant des del menu (cosEnfocatId > 0), traslladem la vista
 			// cap a la seva posicio orbital (px, py, 0) perque la camera orbiti al seu voltant
-			if (objecte == SISTEMA_SOLAR && escenariActual != nullptr && g_EstatSimulador.cosEnfocatId > 0 && g_EstatSimulador.cosEnfocatId < 9)
+			if (objecte == SISTEMA_SOLAR && escenariActual != nullptr && g_EstatSimulador.cosEnfocatId != CB_NONE)
 			{
 				CelestialBodyId cid = g_EstatSimulador.cosEnfocatId;
-				float ang = escenariActual->m_objectList[cid]->m_angleOrbita * (float)PI / 180.0f;
-				float rOrb = escenariActual->m_objectList[cid]->m_radiOrbita;
-				float px = rOrb * cos(ang);
-				float py = rOrb * sin(ang);
+				glm::vec3 posPlaneta = glm::vec3(escenariActual->m_objectList[cid]->m_trMatrix[3]);
 
-				ViewMatrix = glm::translate(ViewMatrix, glm::vec3(-px, -py, 0.0f));
+				ViewMatrix = glm::translate(ViewMatrix, -posPlaneta);
 				glUseProgram(shader_programID);
 				glUniformMatrix4fv(glGetUniformLocation(shader_programID, "viewMatrix"), 1, GL_FALSE, &ViewMatrix[0][0]);
 			}
@@ -731,14 +728,15 @@ void draw_Menu_ImGui()
 		escenariActual != nullptr &&
 		!escenariActual->m_objectList.empty())
 	{
+		//Ids dels objectes que tindran etiqueta
 		static const CelestialBodyId IDEtiquetes[9] = { CB_SUN, CB_MERCURY, CB_VENUS, CB_EARTH, CB_MARS, CB_JUPITER, CB_SATURN, CB_URANUS, CB_NEPTUNE};
 		glm::vec4 viewport(0.0f, 0.0f, (float)w, (float)h);
 		for (int i = 0; i < 9; i++)
 		{
 			// Situa l'etiqueta lleugerament per sobre de cada cos (z = rCos * 1.15)
-			glm::vec3 centreCos = glm::vec3(escenariActual->m_objectList[IDEtiquetes[i]]->m_mMatrix[3]);
-			float radiCos = glm::length(glm::vec3(escenariActual->m_objectList[IDEtiquetes[i]]->m_mMatrix[2]));
-			glm::vec3 posMon = centreCos + glm::vec3(0.0f, 0.0f, radiCos * 1.15f);
+			glm::vec3 centreCos = glm::vec3(escenariActual->m_objectList[IDEtiquetes[i]]->m_trMatrix[3]);
+			double scale = escenariActual->m_objectList[IDEtiquetes[i]]->m_scale;
+			glm::vec3 posMon = centreCos + glm::vec3(0.0f, 0.0f, scale * 1.15f);
 
 			InterficieUI::DibuixarEtiquetaPlaneta(escenariActual->m_objectList[IDEtiquetes[i]]->m_nom, posMon, ViewMatrix, ProjectionMatrix, viewport);
 		}
@@ -952,13 +950,13 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 			const double pasAngle = 5.0;
 			// Adapta el zoom minim i pas de distancia segons el radi del cos enfocant (cosEnfocatId)
 			CelestialBodyId cosId = g_EstatSimulador.cosEnfocatId;
-			double radiCos = 35.0;
-			if (escenariActual != nullptr && cosId >= 0 && cosId < 9) {
-				radiCos = escenariActual->m_objectList[cosId]->m_radiCos;
+			double scale = 35.0;
+			if (escenariActual != nullptr && cosId != CB_NONE) {
+				scale = escenariActual->m_objectList[cosId]->m_scale;
 			}
-			double minR = (cosId == 0) ? 42.0 : std::max(2.5, radiCos * 2.2);
+			double minR = (cosId == 0) ? 42.0 : std::max(2.5, scale * 2.2);
 			double maxR = 800.0;
-			const double pasDistancia = (cosId == 0) ? 5.0 : std::max(1.0, radiCos * 0.5);
+			const double pasDistancia = (cosId == 0) ? 5.0 : std::max(1.0, scale * 0.5);
 
 			// Gir horitzontal al voltant del cos enfocat
 			if (key == GLFW_KEY_LEFT)
@@ -1403,13 +1401,13 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 			if (camera == CAM_ESFERICA)
 			{	// Càmera Esfèrica: limits i velocitat de zoom adaptats al cos enfocant (cosEnfocatId)
 				CelestialBodyId cosId = g_EstatSimulador.cosEnfocatId;
-				double radiCos = 35.0;
-				if (escenariActual != nullptr && cosId >= 0 && cosId < 9) {
-					radiCos = escenariActual->m_objectList[cosId]->m_radiCos;
+				double scale = 35.0;
+				if (escenariActual != nullptr && cosId != CB_NONE) {
+					scale = escenariActual->m_objectList[cosId]->m_scale;
 				}
-				double minR = (cosId == 0) ? 42.0 : std::max(2.5, radiCos * 2.2);
+				double minR = (cosId == 0) ? 42.0 : std::max(2.5, scale * 2.2);
 				double maxR = 800.0;
-				double pasZoom = (cosId == 0) ? 5.0 : std::max(1.0, radiCos * 0.5);
+				double pasZoom = (cosId == 0) ? 5.0 : std::max(1.0, scale * 0.5);
 
 				OPV.R = OPV.R - yoffset * pasZoom;
 				if (OPV.R < minR)
@@ -1567,6 +1565,26 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severi
 	fprintf(stderr, "\n");
 }
 
+#include <ctime>
+double toJ2000Seconds(int year, int month, int day, int hour = 0, int minute = 0, double second = 0.0) {
+	if (month <= 2) {
+		year -= 1;
+		month += 12;
+	}
+
+	int a = year / 100;
+	int b = 2 - a + (a / 4);
+
+	// Days since J2000.0 (2000-01-01 12:00:00)
+	// -1524.5 (JD offset) - 2451545.0 (J2000 epoch) = -2453069.5
+	double daysSinceJ2000 = std::floor(365.25 * (year + 4716))
+		+ std::floor(30.6001 * (month + 1))
+		+ day
+		+ b
+		- 2453069.5;
+
+	return (daysSinceJ2000 * 86400.0) + (hour * 3600.0) + (minute * 60.0) + second;
+}
 //COMMMMMMMMM static Escenari* escenariActual = new Escenari();
 // main(): Funció principal del programa. Inicialitza la finestra, els callbacks i el bucle principal d'operació
 int main()
@@ -1737,13 +1755,22 @@ int main()
 			bool escalaReal = (g_EstatSimulador.modeActual == ModeSimulacio::ESCALA_REAL);
 			if (!g_EstatSimulador.tempsSimulacio.enPausa) {
 				// En mode didàctic el rellotge avança a ritme moderat; en escala real segons el timelapse (factorVelocitatSegonsPerSegon)
-				double deltaRellotge = escalaReal ? (double)delta : ((double)delta * 0.25);
+				//double deltaRellotge = escalaReal ? (double)delta : ((double)delta * 0.25);
+				double deltaRellotge = delta;
 				g_EstatSimulador.tempsSimulacio.AvancarSegons(deltaRellotge);
 			}
 
 			// Propaga pausa, direccio, mode i velocitat del timelapse cap a l'Escenari actiu
 			if (escenariActual != nullptr && objecte == SISTEMA_SOLAR) {
 				escenariActual->updateVariables(
+					toJ2000Seconds(g_EstatSimulador.tempsSimulacio.dataHora.any, 
+						g_EstatSimulador.tempsSimulacio.dataHora.mes,
+						g_EstatSimulador.tempsSimulacio.dataHora.dia,
+						g_EstatSimulador.tempsSimulacio.dataHora.hora,
+						g_EstatSimulador.tempsSimulacio.dataHora.minut,
+						g_EstatSimulador.tempsSimulacio.dataHora.segon
+					),
+					//Lo es de abajo no deberian estar, pero bueno
 					(double)delta,
 					g_EstatSimulador.tempsSimulacio.enPausa,
 					g_EstatSimulador.tempsSimulacio.direccioTemps,

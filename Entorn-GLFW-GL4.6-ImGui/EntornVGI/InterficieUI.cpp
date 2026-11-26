@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <cmath>
 #include <algorithm>
+#include "CelestialBodyData.h"
 
 // Fonts sans-serif carregades per als panells i etiquetes (la font 0 queda com a base d'ImGui)
 static ImFont* s_fontPanellRegular = nullptr; // Text estandard de controls i files (16 px)
@@ -47,23 +48,23 @@ static void PopFontSegur(ImFont* f)
 // CATALEG DE DADES FISIQUES DELS 9 COSSOS DEL SISTEMA SOLAR (0: Sol .. 8: Neptu)
 // Ordre indexat igual que EstatSimulacio::cosEnfocatId i Escenari::m_objectList[0..8].
 // =========================================================================
-static const CosAstronomicDades kCatalegCossos[9] = {
-    { "Sol",     696340.0,  0.000, 274.00,  609.12,   0.00 },
-    { "Mercuri",   2439.7,  0.387,   3.70, 1407.60,   0.24 },
-    { "Venus",     6051.8,  0.723,   8.87, 5832.50,   0.62 },
-    { "Terra",     6371.0,  1.000,   9.81,   23.93,   1.00 },
-    { "Mart",      3389.5,  1.524,   3.72,   24.62,   1.88 },
-    { "Júpiter",  69911.0,  5.204,  24.79,    9.93,  11.86 },
-    { "Saturn",   58232.0,  9.582,  10.44,   10.70,  29.45 },
-    { "Urà",      25362.0, 19.218,   8.69,   17.24,  84.02 },
-    { "Neptú",    24622.0, 30.110,  11.15,   16.11, 164.79 }
+static std::unordered_map<CelestialBodyId, CosAstronomicDades> kCatalegCossos = {
+    { CB_SUN,     { "Sol",     696340.0,  0.000, 274.00,  609.12,   0.00 } },
+    { CB_MERCURY, { "Mercuri",   2439.7,  0.387,   3.70, 1407.60,   0.24 } },
+    { CB_VENUS,   { "Venus",     6051.8,  0.723,   8.87, 5832.50,   0.62 } },
+    { CB_EARTH,   { "Terra",     6371.0,  1.000,   9.81,   23.93,   1.00 } },
+    { CB_MARS,    { "Mart",      3389.5,  1.524,   3.72,   24.62,   1.88 } },
+    { CB_JUPITER, { "Júpiter",  69911.0,  5.204,  24.79,    9.93,  11.86 } },
+    { CB_SATURN,  { "Saturn",   58232.0,  9.582,  10.44,   10.70,  29.45 } },
+    { CB_URANUS,  { "Urà",      25362.0, 19.218,   8.69,   17.24,  84.02 } },
+    { CB_NEPTUNE, { "Neptú",    24622.0, 30.110,  11.15,   16.11, 164.79 } }
 };
 
 // Copia les dades del cataleg de l'astre enfocant cap a estat.dadesCosActiu per al HUD
 void InterficieUI::ActualitzarDadesCosActiu(EstatSimulacio& estat)
 {
-    int id = estat.cosEnfocatId;
-    if (id < 0 || id >= 9) id = 0; // Proteccio de rang (per defecte Sol)
+    CelestialBodyId id = estat.cosEnfocatId;
+    if (id == CB_NONE) id = CB_SUN; // Proteccio de rang (per defecte Sol)
     estat.dadesCosActiu = kCatalegCossos[id];
 }
 
@@ -698,9 +699,12 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
     ImGui::SetWindowFontScale(factorFontMenu);
 
     // Noms mostrables dels 9 astres indexats segons Escenari::m_objectList[0..8]
-    static const char* nomsPlanetesMenu[9] = {
-        "Sol (Centre)", "Mercuri", "Venus", "Terra",
-        "Mart", "Júpiter", "Saturn", "Urà", "Neptú"
+    const int numBodies = 9;
+    static const char* nomsPlanetesMenu[numBodies] = {
+        "Sol (Centre)", "Mercuri", "Venus", "Terra", "Mart", "Júpiter", "Saturn", "Urà", "Neptú"
+    };
+    CelestialBodyId mainBodies[numBodies] = {
+        CB_SUN, CB_MERCURY, CB_VENUS, CB_EARTH, CB_MARS, CB_JUPITER, CB_SATURN, CB_URANUS, CB_NEPTUNE
     };
 
     if (estat.modeActual == ModeSimulacio::INTUITIU)
@@ -743,13 +747,11 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
         }
 
         // 2) Seleccio de l'astre sobre el qual orbita la camera (0=Sol .. 8=Neptu)
-        CelestialBodyId mainBodies[9] = { CB_SUN, CB_MERCURY, CB_VENUS, CB_EARTH, CB_MARS, CB_JUPITER, CB_SATURN, CB_URANUS, CB_NEPTUNE };
-
         if (ImGui::BeginMenu("Planetes & Focus"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
-            for (int i = 0; i < 9; ++i) {
-                bool seleccionat = (estat.cosEnfocatId == i);
+            for (int i = 0; i < numBodies; ++i) {
+                bool seleccionat = (estat.cosEnfocatId == mainBodies[i]);
                 if (ImGui::MenuItem(nomsPlanetesMenu[i], nullptr, seleccionat)) {
                     estat.cosEnfocatId = mainBodies[i];
                     estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
@@ -911,13 +913,12 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
         }
 
         // 3) Seleccio d'origen/astre centrat i modalitat de camera (incloent Pilota coet)
-        CelestialBodyId mainBodies[9] = { CB_SUN, CB_MERCURY, CB_VENUS, CB_EARTH, CB_MARS, CB_JUPITER, CB_SATURN, CB_URANUS, CB_NEPTUNE };
 
         if (ImGui::BeginMenu("Origen & Càmeres"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
             ImGui::TextDisabled("Centrar Vista en:");
-            if (ImGui::MenuItem("El Sol", nullptr, estat.origenReferenciaSol && estat.cosEnfocatId == 0)) {
+            if (ImGui::MenuItem("El Sol", nullptr, estat.origenReferenciaSol && estat.cosEnfocatId == CB_NONE)) {
                 estat.origenReferenciaSol = true;
                 estat.cosEnfocatId = CB_SUN;
                 estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
@@ -926,8 +927,8 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             }
             if (ImGui::BeginMenu("El Planeta Seleccionat")) {
                 ImGui::SetWindowFontScale(factorFontMenu);
-                for (int i = 1; i < 9; ++i) {
-                    bool seleccionat = (!estat.origenReferenciaSol && estat.cosEnfocatId == i);
+                for (int i = 1; i < numBodies; ++i) {
+                    bool seleccionat = (!estat.origenReferenciaSol && estat.cosEnfocatId == mainBodies[i]);
                     if (ImGui::MenuItem(nomsPlanetesMenu[i], nullptr, seleccionat)) {
                         estat.cosEnfocatId = mainBodies[i];
                         estat.origenReferenciaSol = false;
