@@ -91,6 +91,72 @@ void EsferaInt::update(double T)
 		if (son) son->update(T);
 }
 
+
+
+void AnellInt::drawObject(GLuint& shaderActual, glm::mat4& matriuTG)
+{
+	// 1. Hereta la posició del planeta pare
+	m_trMatrix = matriuTG;
+
+	// 2. Matriu de model: inclinació axial (els radis ja estan integrats al CVAO)
+	glm::mat4 ModelMatrix = glm::rotate(m_trMatrix, (float)glm::radians(m_inclinacioEix), vec3(1.0f, 0.0f, 0.0f));
+	glUniformMatrix4fv(glGetUniformLocation(shaderActual, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
+
+	// 3. Configuració de textura i il·luminació directa (sense oscuriment per angle ras del Sol)
+	if (m_textureID != 0)
+	{
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, m_textureID);
+		glUniform1i(glGetUniformLocation(shaderActual, "textur"), GL_TRUE);
+		glUniform1i(glGetUniformLocation(shaderActual, "texImage"), 0);
+	}
+	else
+	{
+		glUniform1i(glGetUniformLocation(shaderActual, "textur"), GL_FALSE);
+	}
+
+	glUniform1i(glGetUniformLocation(shaderActual, "sw_material"), GL_FALSE);
+	glUniform4i(glGetUniformLocation(shaderActual, "sw_intensity"), GL_TRUE, GL_FALSE, GL_FALSE, GL_FALSE);
+
+	// 4. Il·luminació bilateral i blending per a les zones semitransparents
+	GLint locTwoSided = glGetUniformLocation(shaderActual, "sw_twoSided");
+	if (locTwoSided != -1) glUniform1i(locTwoSided, GL_TRUE);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDepthMask(GL_FALSE);
+
+	// 5. Dibuixar el CVAO propi (idèntic a draw_TriEBO_Object)
+	if (m_vao.vaoId != 0)
+	{
+		glBindVertexArray(m_vao.vaoId);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_vao.eboId);
+		glDrawElements(GL_TRIANGLES, m_vao.nIndices, GL_UNSIGNED_INT, nullptr);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+		glBindVertexArray(0);
+	}
+
+	// 6. Restaurar estats d'OpenGL i uniforms
+	glDepthMask(GL_TRUE);
+	glDisable(GL_BLEND);
+	if (locTwoSided != -1) glUniform1i(locTwoSided, GL_FALSE);
+
+	if (m_textureID != 0)
+	{
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glUniform1i(glGetUniformLocation(shaderActual, "textur"), GL_FALSE);
+	}
+
+	// 7. Propagar als fills
+	for (Object* o : m_sons)
+		if (o)
+			o->drawObject(shaderActual, m_trMatrix);
+}
+
+
+
+
+
 // Copia matrius i llums del shader Phong al shader de normal mapping (perque tots dos il.luminin igual)
 static void copiaUniformsShader(GLuint src, GLuint dst)
 {
@@ -212,7 +278,7 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	deleteVAOList(GLUT_TORUS);
 	SetColor4d(colObj.r, colObj.g, colObj.b, colObj.a);
 	Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(1.0, 40, 40));				// Esfera de radi 1 (cossos)
-	Set_VAOList(GLU_DISK, loadgluDisk_EBO(8.0f, 12.0f, 80, 5)); //anell saturn
+	Set_VAOList(GLU_DISK, loadgluDisk_EBO(8.0f, 12.0f, 80, 5)); //anell
 	Set_VAOList(GLUT_TORUS, creaOrbita());	// Anell fi de radi 1 (orbites). 
 
 	// Orbites: un unic cercle de linies de radi 1, compartit per les 8 orbites planetaries i la lunar
@@ -231,7 +297,7 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	m_objectList[CB_URANUS] = new EsferaInt("Ur\xE0", 5.5, 175.0, 313.23, x / 30688.5, 0.0, 501.393 * factorRotacio, 97.77, 0.77);
 	m_objectList[CB_NEPTUNE] = new EsferaInt("Nept\xFA", 5.3, 210.0, 304.88, x / 60195.0, 0.0, 545.455 * factorRotacio, 28.32, 1.77);
 	m_objectList[CB_MOON] = new EsferaInt("Lluna", 1.0, 7.0, 218.32, x / 27.322, 128.32, x / 27.322, 6.68, 5.14);
-	// m_objectList[CB_SATURN_RINGS] = new AnellsInt("Anells de Saturn", 1.0, 0.0, 0.0, 0.0, 0.0, 0.0); // radiOrbita i angleOrbita a 0.0 perquè hereten la posició de Saturn
+	Object* anellSat = new AnellInt("Anells de Saturn", 9.0, 17.5, 26.73);
 
 	// Build scene graph hierarchy
 	m_objectList[CB_SUN]->addSon(m_objectList[CB_MERCURY]);
@@ -244,7 +310,7 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	m_objectList[CB_SUN]->addSon(m_objectList[CB_NEPTUNE]);
 
 	m_objectList[CB_EARTH]->addSon(m_objectList[CB_MOON]);
-	// m_objectList[CB_SATURN]->addSon(m_objectList[CB_SATURN_RINGS]);
+	m_objectList[CB_SATURN]->addSon(anellSat);
 
 	// Càrrega de textures difuses
 	m_objectList[CB_SUN]->loadTexture(".\\textures\\sun\\2k_sun.jpg");
@@ -257,7 +323,7 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	m_objectList[CB_URANUS]->loadTexture(".\\textures\\planet\\Uranus\\2k_uranus.jpg");
 	m_objectList[CB_NEPTUNE]->loadTexture(".\\textures\\planet\\Neptune\\2k_neptune.jpg");
 	m_objectList[CB_MOON]->loadTexture(".\\textures\\planet\\Moon\\2k_moon.jpg");
-	// m_objectList[CB_SATURN_RINGS]->loadTexture(".\\textures\\planet\\Saturn\\2k_saturn_ring_alpha.png");
+	anellSat->loadTexture(".\\textures\\planet\\Saturn\\2k_saturn_ring_alpha.png");
 
 	// Càrrega de mapes normals
 	m_objectList[CB_SUN]->m_normalMapID = createDefaultNormalMap();
@@ -270,7 +336,7 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	m_objectList[CB_URANUS]->m_normalMapID = createDefaultNormalMap();
 	m_objectList[CB_NEPTUNE]->loadNormMap(".\\textures\\planet\\NormalTextures\\NormalMapNeptune.png");
 	m_objectList[CB_MOON]->m_normalMapID = createDefaultNormalMap();
-	// m_objectList[CB_SATURN_RINGS]->m_normalMapID = baseNorm;
+	anellSat->m_normalMapID = createDefaultNormalMap();
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 }

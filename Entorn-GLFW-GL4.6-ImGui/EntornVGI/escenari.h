@@ -100,7 +100,7 @@ public:
 	double m_inclinacioEix = 0.0;
 	double m_inclinacioOrbita = 0.0;
 
-	EsferaInt() {}
+	//EsferaInt() {}
 	EsferaInt(const std::string& nom, double radiCos, double radiOrbita, double angleOrbita, double velAngular, double angleRotacio, double velRotacio, double inclinacioEix = 0.0, double inclinacioOrbita = 0.0) :
 		Object(nom, radiCos),
 		m_radiOrbita(radiOrbita),
@@ -118,6 +118,51 @@ public:
 	void drawObject(GLuint& shaderActual, glm::mat4& matriuTG) override;
 	void update(double T) override;
 
+};
+
+class AnellInt : public Object
+{
+public:
+	double& m_radiExtern = m_scale;
+	double m_radiIntern = 0.0;
+	double m_inclinacioEix = 0.0;
+
+	CVAO m_vao;
+
+	AnellInt(const std::string& nom, double radiIntern, double radiExtern, double inclinacioEix = 0.0) :
+		Object(nom, radiExtern),
+		m_radiIntern(radiIntern),
+		m_inclinacioEix(inclinacioEix)
+	{
+		m_vao = loadgluDisk_EBO(m_radiIntern, m_radiExtern, 80, 5);
+	}
+
+	~AnellInt()
+	{
+		if (m_vao.vaoId != 0)
+		{
+			glBindVertexArray(m_vao.vaoId);
+			glDisableVertexAttribArray(0);
+			glDisableVertexAttribArray(1);
+			glDisableVertexAttribArray(2);
+			glDisableVertexAttribArray(3);
+
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
+			glDeleteBuffers(1, &m_vao.vboId);
+			glDeleteBuffers(1, &m_vao.eboId);
+
+			glBindVertexArray(0);
+			glDeleteVertexArrays(1, &m_vao.vaoId);
+
+			m_vao.vaoId = 0;
+			m_vao.vboId = 0;
+			m_vao.eboId = 0;
+			m_vao.nVertexs = 0;
+			m_vao.nIndices = 0;
+		}
+	}
+
+	void drawObject(GLuint& shaderActual, glm::mat4& matriuTG) override;
 };
 
 // Gestió de l'escenari complet del Sistema Solar (cossos, òrbites, textures i actualització orbital)
