@@ -5,6 +5,37 @@
 #include "visualitzacio.h"
 #include <vector>
 #include "CelestialBodyData.h"
+#include "GestorRecursos.h"
+
+// Categoria astronomica/tecnica per agrupar l'objecte als menus i gestionar l'enfocament
+enum class CategoriaObjecte {
+	ESTRELLA,           // Sol
+	PLANETA,            // Mercuri .. Neptu
+	PLANETA_NAN,        // Pluto, Ceres (quan s'incorporin)
+	SATELLIT_NATURAL,   // Lluna, Caront, llunes dels gegants...
+	ASTRE_ARTIFICIAL,   // Coet Milano, Voyager 1/2, ISS, sondes...
+	ORNAMENTAL          // Anells planetaris, cinturons visuals (no enfocables individualment)
+};
+
+// Context compartit durant el recorregut recursiu del graf d'escena
+struct ContextRenderEscenari {
+	GLuint shaderPhongID = 0;       // Shader estandard (orbites, anells, objectes sense normal map)
+	GLuint shaderNormalMapID = 0;   // Shader amb normal mapping per a superficies planetaries
+	GLuint shaderActualID = 0;      // Shader actiu en aquest moment per evitar glUseProgram redundants
+	bool mostrarOrbites = true;     // Controlat pel menu Visualitzacio
+	bool iluminacioSolar = true;    // sw_mat[0]: emissio del Sol i llum puntual #0
+	bool vistaClara = false;        // sw_mat[1]: llum ambient global
+	bool sw_mat[5] = { false, false, true, false, true };
+	glm::mat4 matriuVista = glm::mat4(1.0f);
+	CacheUniformsShader* cachePhong = nullptr;
+	CacheUniformsShader* cacheNormalMap = nullptr;
+
+	CacheUniformsShader* cacheActual() const {
+		return (shaderActualID == shaderNormalMapID && shaderNormalMapID != 0)
+			? cacheNormalMap
+			: cachePhong;
+	}
+};
 
 // Dades individuals de cada cos qualsevol dins de l'escenari
 class Object
@@ -22,12 +53,13 @@ public:
 		m_sons.clear();
 	}
 
-	//REALMENTE lo correcto seria que las texturas se guardasen en las herencias determinadas, ya que hay objetos que no tienen. pero como es codigo exactamente igual lo dejamos aqui de momento
-	void unloadTexture() { if (m_textureID != 0) { glDeleteTextures(1, &m_textureID); m_textureID = 0; } }
-	void unloadNormMap() { if (m_normalMapID != 0) { glDeleteTextures(1, &m_normalMapID); m_normalMapID = 0; } }
+	// Nomes allibera textures si l'objecte n'es propietari directe (les compartides les allibera GestorRecursos)
+	void unloadTexture() { if (m_propietariTextures && m_textureID != 0) { glDeleteTextures(1, &m_textureID); } m_textureID = 0; }
+	void unloadNormMap() { if (m_propietariTextures && m_normalMapID != 0) { glDeleteTextures(1, &m_normalMapID); } m_normalMapID = 0; }
 	GLuint loadTexture(const char* filepath) {
 		unloadTexture();
 		if (filepath == nullptr) return 0;
+		m_propietariTextures = true;
 		m_textureID = loadIMA_SOIL(filepath);
 		if (m_textureID == 0)
 			fprintf(stderr, "No s'ha pogut carregar: %s\n", filepath);
@@ -44,6 +76,7 @@ public:
 	GLuint loadNormMap(const char* filepath) {
 		unloadNormMap();
 		if (filepath == nullptr) return 0;
+		m_propietariTextures = true;
 		m_normalMapID = loadIMA_SOIL(filepath);
 		if (m_normalMapID == 0)
 			fprintf(stderr, "No s'ha pogut carregar: %s\n", filepath);
@@ -66,16 +99,31 @@ public:
 		return false;
 	}
 
-	virtual void drawObject(GLuint& shaderActual, glm::mat4& matriuTG) = 0;
-	virtual void update(double T) { for (Object* son : m_sons) if (son) son->update(T); }
+	virtual void drawObject(ContextRenderEscenari& ctx, const glm::mat4& matriuPare) = 0;
+
+	// Actualitza l'estat orbital/rotacional i calcula la matriu de posicio global (m_trMatrix)
+	// a partir de la matriu del pare, abans de construir la camera del frame actual.
+	virtual void update(double tempsJ2000, const glm::mat4& matriuPare) {
+		m_trMatrix = matriuPare;
+		for (Object* son : m_sons)
+			if (son) son->update(tempsJ2000, m_trMatrix);
+	}
 
 	GLuint m_textureID = 0;
 	GLuint m_normalMapID = 0;
+	bool m_propietariTextures = false; // false quan provenen de GestorRecursos (compartides entre escenaris)
 
 	glm::mat4 m_trMatrix = glm::mat4(1.0f);
 	double m_scale = 1.0f; //Scale / radi del objecte, s'utilitza per la camara, hauria de canviar el nom pero bue. Més tard ja veig
 
 	std::string m_nom = "";
+
+	// Metadades unificades d'observacio i organitzacio als menus
+	CelestialBodyId m_id = CB_NONE;
+	CategoriaObjecte m_categoria = CategoriaObjecte::PLANETA;
+	bool m_enfocable = true;        // true: apareix als menus de focus i pot ser centre de camera
+	bool m_mostrarEtiqueta = true;  // true: mostra etiqueta 2D al viewport quan les etiquetes son actives
+	int m_ordreMenu = 0;            // Ordre deterministic de presentacio als menus (evita ordre aleatori d'unordered_map)
 
 	std::vector<Object*> m_sons;
 	Object* m_parent = nullptr;
@@ -115,8 +163,8 @@ public:
 
 	~EsferaInt() {}
 
-	void drawObject(GLuint& shaderActual, glm::mat4& matriuTG) override;
-	void update(double T) override;
+	void drawObject(ContextRenderEscenari& ctx, const glm::mat4& matriuPare) override;
+	void update(double tempsJ2000, const glm::mat4& matriuPare) override;
 
 };
 
@@ -134,6 +182,9 @@ public:
 		m_radiIntern(radiIntern),
 		m_inclinacioEix(inclinacioEix)
 	{
+		m_categoria = CategoriaObjecte::ORNAMENTAL;
+		m_enfocable = false;
+		m_mostrarEtiqueta = false;
 		m_vao = loadgluDisk_EBO(m_radiIntern, m_radiExtern, 80, 5);
 	}
 
@@ -162,7 +213,8 @@ public:
 		}
 	}
 
-	void drawObject(GLuint& shaderActual, glm::mat4& matriuTG) override;
+	void drawObject(ContextRenderEscenari& ctx, const glm::mat4& matriuPare) override;
+	void update(double tempsJ2000, const glm::mat4& matriuPare) override;
 };
 
 // Gestió de l'escenari complet del Sistema Solar (cossos, òrbites, textures i actualització orbital)
@@ -180,20 +232,34 @@ public:
 	void creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID);
 
 	// Renderitza els cossos celestes, l'anell de Saturn i les orbites (controlades pel flag mostrarOrbites de la UI)
-	void dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5], bool mostrarOrbites = true);
+	void dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5], bool mostrarOrbites = true, const ParametresIluminacioEscenari* ilum = nullptr);
 
 	// Actualitza els angles orbitals i de rotacio segons els parametres temporals d'EstatSimulacio
-	// (enPausa, direccioTemps [+1/-1], escalaReal i factorVelocitat del timelapse)
-	void updateVariables(double et = 0, double dt = 0.016, bool enPausa = false, int direccioTemps = 1, bool escalaReal = false, double factorVelocitat = 60.0);
-	// Allibera els objectes (i els seus VAO). Cal cridar-la ABANS de destruir el context OpenGL.
+	// (enPausa, direccioTemps [+1/-1], escalaReal i factorVelocitat del timelapse).
+	// Si forcarActualitzacio es true, recalcula posicions encara que la simulacio estigui en pausa.
+	void updateVariables(double et = 0, double dt = 0.016, bool enPausa = false, int direccioTemps = 1, bool escalaReal = false, double factorVelocitat = 60.0, bool forcarActualitzacio = false);
+
+	bool esInicialitzat() const { return m_inicialitzat; }
+
+	// Cerca segura sense inserir claus nul-les al mapa (evita crashes per nullptr)
+	Object* obtenirObjecte(CelestialBodyId id) const {
+		auto it = m_objectList.find(id);
+		return (it != m_objectList.end()) ? it->second : nullptr;
+	}
+
+	// Retorna tots els objectes enfocables de l'escenari ordenats per m_ordreMenu
+	std::vector<const Object*> obtenirObjectesEnfocables() const;
+
+	// Retorna el radi maxim de referencia del sistema (p. ex. orbita de Neptu) per escalar vistes globals entre modes
+	virtual double obtenirRadiReferenciaSistema() const { return 210.0; }
+
+	// Allibera els objectes de l'escenari (els VAOs i textures compartides s'alliberen un sol cop a GestorRecursos::AlliberarTot).
 	void alliberaEscenari() {
-		deleteVAOList(GLU_SPHERE);
-		deleteVAOList(GLU_DISK);
-		deleteVAOList(GLUT_TORUS);
+		if (!m_inicialitzat && m_objectList.empty()) return;
 
 		std::vector<Object*> roots;
 		for (auto& p : m_objectList)
-			if (p.second->m_parent == nullptr)
+			if (p.second && p.second->m_parent == nullptr)
 				roots.push_back(p.second);
 
 		m_objectList.clear();
@@ -201,7 +267,10 @@ public:
 		for (Object* r : roots)
 			delete r;
 		roots.clear();
+
+		m_inicialitzat = false;
 	}
 
+	bool m_inicialitzat = false; // Evita recrear i filtrar textures/objectes si l'escenari ja esta carregat
 	std::unordered_map<CelestialBodyId, Object*> m_objectList;
 };

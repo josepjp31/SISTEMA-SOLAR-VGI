@@ -1,12 +1,12 @@
-//******** PRACTICA VISUALITZACIÓ GRÀFICA INTERACTIVA (Escola Enginyeria - UAB)
-//******** Entorn bàsic VS2026 MONOFINESTRA amb OpenGL 4.6, interfície GLFW, ImGui i llibreries GLM
-//******** Ferran Poveda, Marc Vivet, Carme Julià, Débora Gil, Enric Martí (Setembre 2026)
-// main.h : Interfície i declaracions globals de main.cpp (bucle GLFW, càmera, il·luminació i callbacks)
+//******** PRACTICA VISUALITZACIÃ“ GRÃ€FICA INTERACTIVA (Escola Enginyeria - UAB)
+//******** Entorn bÃ sic VS2026 MONOFINESTRA amb OpenGL 4.6, interfÃ­cie GLFW, ImGui i llibreries GLM
+//******** Ferran Poveda, Marc Vivet, Carme JuliÃ , DÃ©bora Gil, Enric MartÃ­ (Setembre 2026)
+// main.h : InterfÃ­cie i declaracions globals de main.cpp (bucle GLFW, cÃ mera, ilÂ·luminaciÃ³ i callbacks)
 //
 /////////////////////////////////////////////////////////////////////////////
 
 
-// Entorn VGI: Llibreries i constants Constants de l'aplicació EntornVGI
+// Entorn VGI: Llibreries i constants Constants de l'aplicaciÃ³ EntornVGI
 #include "framework.h"
 #include "objLoader.h"	// COBJModel (nau Milano)
 
@@ -21,48 +21,48 @@ const GLFWvidmode* mode;
 // Entorn VGI: Finestra principal 
 GLFWwindow* window;
 
-// EntornVGI.ImGui: Gestió de finestres de menú ImGui
+// EntornVGI.ImGui: GestiÃ³ de finestres de menÃº ImGui
 bool show_demo_window = false;
 bool show_another_window = false;
 
-// Entorn VGI: Variables de control per Menú CAMERA: Esfèrica, Navega, Mòbil, Zoom, Satelit, Polars... 
-char camera;	// Variable que controla el tipus de càmera segons valors definits en constants.h
-bool mobil;		// Opció canvi de Punt de Vista interactiu (mobil) [0:NO,1:SI]
-bool zzoom;		// Opció Zoom interactiu (zoom) [0:NO,1:SI]
-bool zzoomO;	// Opció Zoom en Projecció Ortogràfica adaptant Volum Visualització [0:NO,1:SI]
-bool satelit;	// Opció de navegació animada al volt de l'objecte centrat definint increment per mouse (SATÈLIT)
+// Entorn VGI: Variables de control per MenÃº CAMERA: EsfÃ¨rica, Navega, MÃ²bil, Zoom, Satelit, Polars... 
+char camera;	// Variable que controla el tipus de cÃ mera segons valors definits en constants.h
+bool mobil;		// OpciÃ³ canvi de Punt de Vista interactiu (mobil) [0:NO,1:SI]
+bool zzoom;		// OpciÃ³ Zoom interactiu (zoom) [0:NO,1:SI]
+bool zzoomO;	// OpciÃ³ Zoom en ProjecciÃ³ OrtogrÃ fica adaptant Volum VisualitzaciÃ³ [0:NO,1:SI]
+bool satelit;	// OpciÃ³ de navegaciÃ³ animada al volt de l'objecte centrat definint increment per mouse (SATÃˆLIT)
 
-// Entorn VGI: Variables de control de l'opció CAMERA->ESFÈRICA?
-float cam_Esferica[3];		// ImGui: Coordenades Esfèriques Càmera
-CEsfe3D OPV;				// Paràmetres camera en coord. esfèriques (R,alfa,beta)
-char Vis_Polar;				// Variable que controla orientació dels eixos en Visualització Interactiva (POLARZ,POLARY,POLARX)
-glm::mat4 ViewMatrix(1.0);	// Matriu de Càmera a passar al shader
+// Entorn VGI: Variables de control de l'opciÃ³ CAMERA->ESFÃˆRICA?
+float cam_Esferica[3];		// ImGui: Coordenades EsfÃ¨riques CÃ mera
+CEsfe3D OPV;				// ParÃ metres camera en coord. esfÃ¨riques (R,alfa,beta)
+char Vis_Polar;				// Variable que controla orientaciÃ³ dels eixos en VisualitzaciÃ³ Interactiva (POLARZ,POLARY,POLARX)
+glm::mat4 ViewMatrix(1.0);	// Matriu de CÃ mera a passar al shader
 
-// Entorn VGI: Variables de control de l'opció CÀMERA->NAVEGA?
+// Entorn VGI: Variables de control de l'opciÃ³ CÃ€MERA->NAVEGA?
 GLdouble n[3];				// Punt cap on mira.
-CPunt3D opvN;				// Definició Orígen Punt de Vista (en coordenades món)
-double angleZ;				// angle de rotació de la trajectòria.
+CPunt3D opvN;				// DefiniciÃ³ OrÃ­gen Punt de Vista (en coordenades mÃ³n)
+double angleZ;				// angle de rotaciÃ³ de la trajectÃ²ria.
 
-// Entorn VGI: Variables de control per Menú VISTA: fullsecreen, pan, dibuixar eixos i grid. 
-bool fullscreen;	// Opció booleana per Pantalla Completal [0:NO,1:SI]
-bool pan;			// Opcio Pan. Desplaçament del centre de l'esfera de Vista [0:NO,1:SI]
-bool eixos;			// Opció per dibuixar els eixos X,Y,Z (Eixos?) [0:NO,1:SI]
+// Entorn VGI: Variables de control per MenÃº VISTA: fullsecreen, pan, dibuixar eixos i grid. 
+bool fullscreen;	// OpciÃ³ booleana per Pantalla Completal [0:NO,1:SI]
+bool pan;			// Opcio Pan. DesplaÃ§ament del centre de l'esfera de Vista [0:NO,1:SI]
+bool eixos;			// OpciÃ³ per dibuixar els eixos X,Y,Z (Eixos?) [0:NO,1:SI]
 Shader shaderEixos;	// Ientificador pel shader d'eixos.
 GLuint eixos_programID;
 GLuint eixos_Id;	// Identificador del VBO per a dibuixar els eixos.
-CMask3D grid;		// Opció per a dibuixar grids (.x: grid XY, .y:grid XZ, .z: grid YZ, .w:grid XYZ)
-CPunt3D hgrid;		// Alçada de cada grid (.x: grid XY, .y:grid XZ, .z: grid YZ, .w:grid XYZ)
+CMask3D grid;		// OpciÃ³ per a dibuixar grids (.x: grid XY, .y:grid XZ, .z: grid YZ, .w:grid XYZ)
+CPunt3D hgrid;		// AlÃ§ada de cada grid (.x: grid XY, .y:grid XZ, .z: grid YZ, .w:grid XYZ)
 
-// Entorn VGI: Variables de l'opció VISTA->PAN?
-double fact_pan;	// Factor de desplaçament de la càmara (opció pan).
-CPunt3D tr_cpv;		// Vector de Traslació del Centre del Punt de Vista actiu dins opció pan.
-CPunt3D tr_cpvF;	// Vector de Traslació del Centre del Punt de Vista (fixat amb INSERT dins opció pan) 
-//       i actiu fora l'opció pan.
+// Entorn VGI: Variables de l'opciÃ³ VISTA->PAN?
+double fact_pan;	// Factor de desplaÃ§ament de la cÃ mara (opciÃ³ pan).
+CPunt3D tr_cpv;		// Vector de TraslaciÃ³ del Centre del Punt de Vista actiu dins opciÃ³ pan.
+CPunt3D tr_cpvF;	// Vector de TraslaciÃ³ del Centre del Punt de Vista (fixat amb INSERT dins opciÃ³ pan) 
+//       i actiu fora l'opciÃ³ pan.
 
-// Entorn VGI: Variables de control per les opcions de menú PROJECCIÓ, OBJECTE
-char projeccio;					// Menú Projecció: Tipus de projeccio
-glm::mat4 ProjectionMatrix(1.0);// Matriu de Projecció a passar al shader
-char objecte;					// Menú Objecte: Tipus d'Objecte
+// Entorn VGI: Variables de control per les opcions de menÃº PROJECCIÃ“, OBJECTE
+char projeccio;					// MenÃº ProjecciÃ³: Tipus de projeccio
+glm::mat4 ProjectionMatrix(1.0);// Matriu de ProjecciÃ³ a passar al shader
+char objecte;					// MenÃº Objecte: Tipus d'Objecte
 
 // Entorn VGI: Variables de control Skybox Cube
 bool SkyBoxCube;			// Booleana que controla si es visualitza Skybox [TRUE] o no [FALSE].
@@ -72,50 +72,50 @@ CVAO skC_VAOID;				// Identificador VAO List (vaoId, vboId, nVertexs) per a Skyb
 GLuint cubemapTexture;		// Identificador textura cubemap.
 Shader shaderSkyBox;		// Shader SkyBox
 
-// Entorn VGI: Variables de control del menú TRANSFORMA
+// Entorn VGI: Variables de control del menÃº TRANSFORMA
 bool transf;	// Booleana per activar Transformacions (true) o no (false).
-bool trasl;		// Booleana d'activació de la Traslació (true) o no (false).
-bool rota;		// Booleana d'activació de la Rotació (true) o no (false).
-bool escal;		// Booleana d'activació de l'Escalatge (true) o no (false).
-double fact_Tras, fact_Rota;	// Increments de Traslació i Rotació.
-INSTANCIA TG;	// Estructura que conté TG del menú Transforma actiu dins qualsevol opció de Transforma 
-//      (Traslació Rotació i Escalatge).
-INSTANCIA TGF;	// Estructura que conté TG del menú Transforma fixat amb INSERT dins les opcions de Transforma
-//     i actiu fora l'opció Transforma.
-bool transX;	// Opció Mobil Eix X?: TG interactives per l'eix X via mouse [F:NO,T:SI].
-bool transY;	// Opció Mobil Eix Y?: TG interactives per l'eix Y via mouse [F:NO,T:SI].
-bool transZ;	// Opció Mobil Eix Z?: TG interactives per l'eix Z via mouse [F:NO,T:SI].
-glm::mat4 GTMatrix; // Matriu de Transformacions Geomètriques a passar al shader
+bool trasl;		// Booleana d'activaciÃ³ de la TraslaciÃ³ (true) o no (false).
+bool rota;		// Booleana d'activaciÃ³ de la RotaciÃ³ (true) o no (false).
+bool escal;		// Booleana d'activaciÃ³ de l'Escalatge (true) o no (false).
+double fact_Tras, fact_Rota;	// Increments de TraslaciÃ³ i RotaciÃ³.
+INSTANCIA TG;	// Estructura que contÃ© TG del menÃº Transforma actiu dins qualsevol opciÃ³ de Transforma 
+//      (TraslaciÃ³ RotaciÃ³ i Escalatge).
+INSTANCIA TGF;	// Estructura que contÃ© TG del menÃº Transforma fixat amb INSERT dins les opcions de Transforma
+//     i actiu fora l'opciÃ³ Transforma.
+bool transX;	// OpciÃ³ Mobil Eix X?: TG interactives per l'eix X via mouse [F:NO,T:SI].
+bool transY;	// OpciÃ³ Mobil Eix Y?: TG interactives per l'eix Y via mouse [F:NO,T:SI].
+bool transZ;	// OpciÃ³ Mobil Eix Z?: TG interactives per l'eix Z via mouse [F:NO,T:SI].
+glm::mat4 GTMatrix; // Matriu de Transformacions GeomÃ¨triques a passar al shader
 
-// Entorn VGI: Variables de control per les opcions de menú OCULTACIONS
-bool front_faces;// Menú ocultacions: Determina si les cares visibles són les frontals [true-defecte] o les back [false] pel Test de Visibilitat.
-bool test_vis;  // Menú ocultacions: Activa [true] o desactiva [false] Test Visibilitat.
-bool oculta;    // Menú ocultacions: Activa [true] o desactiva [false] Ocultacions (Z-buffer).
-bool back_line; // Menú ocultacions: Activa [true] o desactiva [false] dibuix cares back com a línies.
+// Entorn VGI: Variables de control per les opcions de menÃº OCULTACIONS
+bool front_faces;// MenÃº ocultacions: Determina si les cares visibles sÃ³n les frontals [true-defecte] o les back [false] pel Test de Visibilitat.
+bool test_vis;  // MenÃº ocultacions: Activa [true] o desactiva [false] Test Visibilitat.
+bool oculta;    // MenÃº ocultacions: Activa [true] o desactiva [false] Ocultacions (Z-buffer).
+bool back_line; // MenÃº ocultacions: Activa [true] o desactiva [false] dibuix cares back com a lÃ­nies.
 
-// Entorn VGI: Variables de control del menú ILUMINACIÓ
-bool ifixe;         // Iluminació fixe independent del PV (ifixe=1) 
+// Entorn VGI: Variables de control del menÃº ILUMINACIÃ“
+bool ifixe;         // IluminaciÃ³ fixe independent del PV (ifixe=1) 
 // o depenent (mobil) respecte el PV (casc miner) (ifixe=0)
-bool ilum2sides;	// Iluminació de les cares FRONT i BACK [TRUE] o només les FRONT [FALSE]
-char ilumina;		// Tipus d'il.luminació [FILFERROS 'f',PLANA 'c',SUAU 'c']
+bool ilum2sides;	// IluminaciÃ³ de les cares FRONT i BACK [TRUE] o nomÃ©s les FRONT [FALSE]
+char ilumina;		// Tipus d'il.luminaciÃ³ [FILFERROS 'f',PLANA 'c',SUAU 'c']
 bool sw_material[5];// Variable que controla els coeficients de reflectivitat del material [TRUE] o no [FALSE]:
 // [0]: emission, [1]: ambient, [2]: difusa, [3] especular.
 bool sw_material_old[5]; // Variable que guarda els valors de sw_material mentre no hi ha reflectivitat de material (refl_material=false).
 bool textura;       // Control de textures desactivades [0:NO] o activades [1:SI]
 char t_textura;		// Tipus de textures (predefinides o per fitxer)
-bool tFlag_invert_Y; // Booleana que activa la inversió coordenada textura t (o Y) a 1.0-cty segons llibreria SOIL (TRUE) o no (FALSE).
+bool tFlag_invert_Y; // Booleana que activa la inversiÃ³ coordenada textura t (o Y) a 1.0-cty segons llibreria SOIL (TRUE) o no (FALSE).
 
-// Entorn VGI: Variables de control del menú LLUMS
+// Entorn VGI: Variables de control del menÃº LLUMS
 bool llum_ambient;		// Booleana que controla la llum ambient (SI/NO).
 LLUM llumGL[NUM_MAX_LLUMS];		// Vector de llums d'OpenGL
 
-// Entorn VGI: Variables de control del menú SHADER
+// Entorn VGI: Variables de control del menÃº SHADER
 char shader;				// Tipus de shader [FLAT, GOURAUD, PHONG, FILE, PROG_BINARY_SHADER]
-GLuint shader_programID;	// Shader Program que conté el Vertex i Fragment program.
+GLuint shader_programID;	// Shader Program que contÃ© el Vertex i Fragment program.
 GLuint instancing_programID;
-GLuint shader_programIDNormalMap;	// Shader Program que conté el Vertex i Fragment program per a normal mapping.
-Shader shaderLightingNormalMap;		// Shader que implementa els codis GLSL d'il.luminació.
-Shader shaderLighting;		// Shader que implementa els codis GLSL d'il.luminació.
+GLuint shader_programIDNormalMap;	// Shader Program que contÃ© el Vertex i Fragment program per a normal mapping.
+Shader shaderLightingNormalMap;		// Shader que implementa els codis GLSL d'il.luminaciÃ³.
+Shader shaderLighting;		// Shader que implementa els codis GLSL d'il.luminaciÃ³.
 
 // COET: Model OBJ de la nau Milano (es carrega en activar la camera Navega)
 COBJModel* ObOBJ = NULL;
@@ -124,13 +124,13 @@ COBJModel* ObOBJ = NULL;
 CPoint m_PosEAvall, m_PosDAvall;	// Coordenades del cursor quan el boto esquerre(E) o dret(D) del 
 //    mouse ha estat clicat.
 bool m_ButoEAvall, m_ButoDAvall;	// TRUE si el boto esquerre(E) o dret(D) del mouse esta clicat.
-CEsfe3D m_EsfeEAvall;				// Coordenades Esfèriques del PV (OPV) quan el boto esquerre(E) o dret(D) del 
+CEsfe3D m_EsfeEAvall;				// Coordenades EsfÃ¨riques del PV (OPV) quan el boto esquerre(E) o dret(D) del 
 //		mouse ha estat clicat.
-CEsfe3D m_EsfeIncEAvall;			// Increment de desplaçament en coordenades Esfèriques del PV (OPV).
+CEsfe3D m_EsfeIncEAvall;			// Increment de desplaÃ§ament en coordenades EsfÃ¨riques del PV (OPV).
 
-// Entorn VGI: Variables que controlen paràmetres visualització: Mides finestra Windows i PV (càmera)
-int w, h;				// Mides de la finestra Windows (w-amplada,h-alçada)
-int width_old, height_old;	// Mides de la resolució actual de la pantalla (finestra Windows)
+// Entorn VGI: Variables que controlen parÃ metres visualitzaciÃ³: Mides finestra Windows i PV (cÃ mera)
+int w, h;				// Mides de la finestra Windows (w-amplada,h-alÃ§ada)
+int width_old, height_old;	// Mides de la resoluciÃ³ actual de la pantalla (finestra Windows)
 
 // Entorn VGI: Color de fons i de l'objecte
 CColor c_fons;				// Intensitat de color de fons.
@@ -138,14 +138,14 @@ ImVec4 clear_colorB;		// ImGui: Color de fons
 ImVec4 clear_colorO;		// ImGui: Color de l'objecte.
 CColor col_obj;				// Color de l'objecte simple.
 
-// Entorn VGI: Variables de visualització i altres
-int pas;			// Resolució passada a les funcions de càmera.
-GLdouble mida;		// Factor d'escala per calcular Volum de Visualització de l'objecte que encaixi.
+// Entorn VGI: Variables de visualitzaciÃ³ i altres
+int pas;			// ResoluciÃ³ passada a les funcions de cÃ mera.
+GLdouble mida;		// Factor d'escala per calcular Volum de VisualitzaciÃ³ de l'objecte que encaixi.
 //-------------- Entorn VGI: Fi De Variables globals de main
 
-//-------------- Entorn VGI: Declaració funcions main
+//-------------- Entorn VGI: DeclaraciÃ³ funcions main
 
-// Inicialització variables de control
+// InicialitzaciÃ³ variables de control
 void InitGL();
 
 void GetGLVersion(int* major, int* minor);

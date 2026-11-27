@@ -1,4 +1,4 @@
-﻿
+
 //******** PRACTICA VISUALITZACIÓ GRÀFICA INTERACTIVA (Escola Enginyeria - UAB)
 //******** Entorn bàsic VS2026 MONOFINESTRA amb OpenGL 4.6, interfície GLFW 3.4, ImGui i llibreries GLM
 //******** Ferran Poveda, Marc Vivet, Carme Julià, Débora Gil, Enric Martí (Setembre 2026)
@@ -19,6 +19,8 @@
 #include "main.h"
 #include "escenari.h"
 #include "InterficieUI.h"
+#include <thread>
+#include <atomic>
 
 // Escenari actiu i llista d'escenaris reservats a main():
 // - escenaris[0]: Mode Didactic / Intuitiu
@@ -290,23 +292,9 @@ void InitGL()
 	fprintf(stderr, "SkyBox: \n");
 	if (!skC_programID) skC_programID = shader_SkyBoxC.loadFileShaders(".\\shaders\\skybox.VERT", ".\\shaders\\skybox.FRAG");
 
-	// Entorn VGI: Càrrega VAO Skybox Cube
+	// Entorn VGI: Càrrega VAO Skybox Cube (el cubemap es carrega en segon pla via GestorRecursos)
 	if (skC_VAOID.vaoId == 0) skC_VAOID = loadCubeSkybox_VAO();
 	Set_VAOList(CUBE_SKYBOX, skC_VAOID);
-
-	if (!cubemapTexture)
-	{	// load Skybox textures
-		// -------------
-		std::vector<std::string> faces =
-		{ ".\\textures\\skybox\\right.png",
-			".\\textures\\skybox\\left.png",
-			".\\textures\\skybox\\top.png",
-			".\\textures\\skybox\\bottom.png",
-			".\\textures\\skybox\\front.png",
-			".\\textures\\skybox\\back.png"
-		};
-		cubemapTexture = loadCubemap(faces);
-	}
 
 	// Càrrega Shader de Phong
 	shader_programID = 0;
@@ -387,9 +375,136 @@ void OnShaderNormalMap()
 	else fprintf(stderr, "GLSL_Error. Fitxers normal_mapping amb errors\n");
 }
 
+double toJ2000Seconds(int year, int month, int day, int hour = 0, int minute = 0, double second = 0.0);
+
+// Estat de precarrega asincrona en segon pla del model 3D de la nau Milano
+static std::thread g_coetPreloadThread;
+static OBJPreloadData g_coetPreloadData;
+static std::atomic<bool> g_coetPreloadStarted(false);
+static std::atomic<bool> g_coetPreloadDone(false);
+static std::atomic<bool> g_coetPreloadSuccess(false);
+static const char* kMilanoObjPath = "textures/coet/milano_gotg.obj";
+
+// Inicia la lectura i decodificacio a RAM (.mbin o .obj + textura) en un fil secundari
+static void IniciarPrecarregaCoet()
+{
+	if (!g_coetPreloadStarted.exchange(true))
+	{
+		g_coetPreloadThread = std::thread([]() {
+			bool ok = COBJModel::LoadToCPU(kMilanoObjPath, g_coetPreloadData);
+			g_coetPreloadSuccess.store(ok);
+			g_coetPreloadDone.store(true);
+		});
+	}
+}
+
+// Puja la geometria i textura precarregades a la GPU al fil principal OpenGL.
+// Si esperarSiCal és true (en entrar a "Pilota coet"), fa join() si cal.
+static void FinalitzarCarregaCoetGPU(bool esperarSiCal)
+{
+	if (ObOBJ != NULL) return;
+
+	if (!g_coetPreloadStarted.load())
+	{
+		if (!esperarSiCal) return;
+		ObOBJ = new COBJModel;
+		char nomFitxer[260];
+		strcpy_s(nomFitxer, kMilanoObjPath);
+		int error = ObOBJ->LoadModel(nomFitxer);
+		if (error == 0) printf("Milano carregada correctament!\n");
+		else printf("Error carregant la Milano: %d\n", error);
+		return;
+	}
+
+	if (!g_coetPreloadDone.load() && !esperarSiCal) return;
+
+	if (g_coetPreloadThread.joinable())
+		g_coetPreloadThread.join();
+
+	if (g_coetPreloadSuccess.load())
+	{
+		ObOBJ = new COBJModel;
+		int error = ObOBJ->UploadFromCPU(g_coetPreloadData);
+		if (error == 0)
+			printf("Milano carregada correctament!\n");
+		else
+			printf("Error carregant la Milano: %d\n", error);
+	}
+	else if (esperarSiCal)
+	{
+		ObOBJ = new COBJModel;
+		char nomFitxer[260];
+		strcpy_s(nomFitxer, kMilanoObjPath);
+		int error = ObOBJ->LoadModel(nomFitxer);
+		if (error == 0)
+			printf("Milano carregada correctament!\n");
+		else
+			printf("Error carregant la Milano: %d\n", error);
+	}
+}
+
+// Carrega el model 3D de la nau Milano si encara no és a GPU (usat únicament al mode "Pilota coet")
+static void AssegurarCoetCarregat()
+{
+	FinalitzarCarregaCoetGPU(true);
+}
+
+// Resol la posició en coordenades del món, el radi visual d'enquadrament i el nom
+// de qualsevol astre observable dins escenariActual.
+static bool ObtenirDadesEnfocament(const Escenari* escenari, CelestialBodyId id,
+                                   glm::vec3& outPosicio, double& outRadi, std::string* outNom = nullptr)
+{
+	if (escenari != nullptr) {
+		const Object* obj = escenari->obtenirObjecte(id);
+		if (obj != nullptr && obj->m_enfocable) {
+			outPosicio = glm::vec3(obj->m_trMatrix[3]);
+			outRadi = obj->m_scale;
+			if (outNom) *outNom = obj->m_nom;
+			return true;
+		}
+	}
+	return false;
+}
+
+// Calcula la distancia per defecte, el zoom minim, el zoom maxim i el pas de zoom
+// de forma proporcional al radi de l'objecte enfocat (valid tant per INTUITIU com ESCALA_REAL).
+struct LimitsCameraCos {
+	double distDefecte;
+	double minR;
+	double maxR;
+	double pasZoom;
+};
+
+static LimitsCameraCos CalcularLimitsCameraPerCos(CelestialBodyId id, double radiCos)
+{
+	// Proteccio davant radis molt petits o nuls (ex. sondes o escala real en UA)
+	const double radiSegur = std::max(radiCos, 0.0005);
+
+	LimitsCameraCos lim;
+	if (id == CB_SUN) {
+		lim.distDefecte = std::max(radiSegur * 8.5, 140.0);
+		lim.minR        = std::max(radiSegur * 2.2, 2.0);
+		lim.maxR        = std::max(radiSegur * 60.0, 1200.0);
+		lim.pasZoom     = std::max(radiSegur * 0.35, 0.5);
+	} else {
+		lim.distDefecte = radiSegur * 4.5;
+		lim.minR        = std::max(radiSegur * 1.8, p_near * 10.0);
+		lim.maxR        = std::max(radiSegur * 250.0, 800.0);
+		lim.pasZoom     = std::max(radiSegur * 0.35, 0.02);
+	}
+	return lim;
+}
+
+static double LimitarRang(double valor, double minim, double maxim)
+{
+	return std::min(maxim, std::max(minim, valor));
+}
+
 // SincronitzarEstatSimuladorAmbOpenGL: Pont entre la interficie ImGui (g_EstatSimulador)
 // i les variables globals d'OpenGL/EntornVGI. S'executa a cada frame abans de renderitzar:
 // - Bloc 1 (configuracioInicialPendent): configura projeccio, shaders, llum solar #0, escenari i skybox.
+// - Bloc 1b (canviModeDirectePendent): commuta d'escenari en directe conservant vista, angle i zoom relatiu.
+// - Bloc 1c (recalculEfemeridesNecessari): recalcula posicions encara que estigui en pausa.
 // - Bloc 2 (continu): aplica en temps real les opcions del menu "Visualitzacio".
 // - Bloc 3 (canviCameraPendent): canvia entre CAM_ESFERICA (orbital/25°/global) i CAM_NAVEGA (Pilota coet).
 void SincronitzarEstatSimuladorAmbOpenGL()
@@ -449,10 +564,14 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		glUniform1i(glGetUniformLocation(shader_programIDNormalMap, "flag_invert_y"), tFlag_invert_Y);
 		glUseProgram(shader_programID);
 
-		// Assegurar que l'escenari te els VAOs i textures vinculats al shader Phong actual
+		// Assegurar que l'escenari te els VAOs i textures vinculats als shaders actius
 		if (escenariActual != nullptr)
 		{
-			escenariActual->creaEscenari(shader_programID, shader_programIDNormalMap);
+			if (!escenariActual->esInicialitzat()) {
+				GestorRecursos::FinalitzarPrecarregaGPU();
+				escenariActual->creaEscenari(shader_programID, shader_programIDNormalMap);
+			}
+			g_EstatSimulador.recalculEfemeridesNecessari = true;
 		}
 
 		// Assegurar que el Skybox i els Eixos estan carregats
@@ -463,11 +582,177 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		g_EstatSimulador.configuracioInicialPendent = false;
 	}
 
+	// 1b. Canvi de mode en directe ("Canviar" o drecera Tab): commuta d'escenari conservant vista i camera
+	if (g_EstatSimulador.canviModeDirectePendent)
+	{
+		// Pas 1: Capturar la vista de l'escenari sortint abans de canviar el punter escenariActual
+		const Escenari* escenariAnterior = escenariActual;
+		EstatSimulacio::EstatVistaTransicio transicio;
+		transicio.valid = true;
+		transicio.cosAnterior = g_EstatSimulador.cosEnfocatId;
+		transicio.modeCameraAnterior = g_EstatSimulador.cameraConfig.mode;
+		transicio.alfa = OPV.alfa;
+		transicio.beta = OPV.beta;
+		transicio.distAbsoluta = OPV.R;
+		transicio.radiSistemaAnterior = (escenariAnterior != nullptr)
+			? std::max(escenariAnterior->obtenirRadiReferenciaSistema(), 1e-6)
+			: 210.0;
+
+		glm::vec3 posOrigen(0.0f);
+		double radiOrigen = 16.0;
+		if (!ObtenirDadesEnfocament(escenariAnterior, transicio.cosAnterior, posOrigen, radiOrigen)) {
+			radiOrigen = 16.0;
+		}
+		transicio.radiCosAnterior = radiOrigen;
+		transicio.ratioZoomRelatiu = (radiOrigen > 1e-6) ? (OPV.R / radiOrigen) : 4.5;
+
+		// Pas 2: Commutar el punter d'escenari actiu i inicialitzar-lo si es el primer cop
+		if (escenaris != nullptr) {
+			int idxNou = (g_EstatSimulador.modeActual == ModeSimulacio::INTUITIU) ? 0 : 1;
+			escenariActual = &escenaris[idxNou];
+			if (!escenariActual->esInicialitzat()) {
+				GestorRecursos::FinalitzarPrecarregaGPU();
+				escenariActual->creaEscenari(shader_programID, shader_programIDNormalMap);
+			}
+		}
+
+		// Forcar actualitzacio immediata a l'instant temporal actual fins i tot si la simulacio es en pausa
+		if (escenariActual != nullptr && objecte == SISTEMA_SOLAR) {
+			bool escalaReal = (g_EstatSimulador.modeActual == ModeSimulacio::ESCALA_REAL);
+			double tJ2000 = toJ2000Seconds(
+				g_EstatSimulador.tempsSimulacio.dataHora.any,
+				g_EstatSimulador.tempsSimulacio.dataHora.mes,
+				g_EstatSimulador.tempsSimulacio.dataHora.dia,
+				g_EstatSimulador.tempsSimulacio.dataHora.hora,
+				g_EstatSimulador.tempsSimulacio.dataHora.minut,
+				g_EstatSimulador.tempsSimulacio.dataHora.segon
+			);
+			escenariActual->updateVariables(
+				tJ2000,
+				0.0,
+				g_EstatSimulador.tempsSimulacio.enPausa,
+				g_EstatSimulador.tempsSimulacio.direccioTemps,
+				escalaReal,
+				g_EstatSimulador.tempsSimulacio.factorVelocitatSegonsPerSegon,
+				true // forcarActualitzacio: m_trMatrix sincronitzada abans de posicionar la camera
+			);
+			g_EstatSimulador.recalculEfemeridesNecessari = false;
+		}
+
+		// Pas 3: Restaurar/adaptar la camera i l'objecte enfocat al nou escenari
+		double radiSistemaDesti = (escenariActual != nullptr)
+			? std::max(escenariActual->obtenirRadiReferenciaSistema(), 1e-6)
+			: 210.0;
+		double factorSistema = radiSistemaDesti / transicio.radiSistemaAnterior;
+
+		CelestialBodyId cidDesti = transicio.cosAnterior;
+		glm::vec3 posDesti(0.0f);
+		double radiDesti = 16.0;
+		if (!ObtenirDadesEnfocament(escenariActual, cidDesti, posDesti, radiDesti)) {
+			// Si no existeix al nou escenari, provar el seu pare o fer fallback a CB_SUN
+			CelestialBodyId fallbackId = CB_SUN;
+			if (escenariAnterior != nullptr) {
+				const Object* objOrig = escenariAnterior->obtenirObjecte(cidDesti);
+				if (objOrig != nullptr && objOrig->m_parent != nullptr &&
+					ObtenirDadesEnfocament(escenariActual, objOrig->m_parent->m_id, posDesti, radiDesti))
+				{
+					fallbackId = objOrig->m_parent->m_id;
+				}
+			}
+			cidDesti = fallbackId;
+			ObtenirDadesEnfocament(escenariActual, cidDesti, posDesti, radiDesti);
+			g_EstatSimulador.cosEnfocatId = cidDesti;
+			g_EstatSimulador.origenReferenciaSol = (cidDesti == CB_SUN);
+		}
+		InterficieUI::ActualitzarDadesCosActiu(g_EstatSimulador, escenariActual);
+
+		if (transicio.modeCameraAnterior == ModeCamera::ORBITAL_CENTRADOR ||
+			transicio.modeCameraAnterior == ModeCamera::FIXA_INCLINADA_25)
+		{
+			camera = CAM_ESFERICA;
+			mobil = true;   zzoom = true;   satelit = false;   pan = false;
+			Vis_Polar = POLARZ;
+			OPV.alfa = (transicio.modeCameraAnterior == ModeCamera::FIXA_INCLINADA_25) ? 25.0 : transicio.alfa;
+			OPV.beta = transicio.beta;
+
+			LimitsCameraCos limDesti = CalcularLimitsCameraPerCos(cidDesti, radiDesti);
+			OPV.R = LimitarRang(transicio.ratioZoomRelatiu * radiDesti, limDesti.minR, limDesti.maxR);
+
+			cam_Esferica[0] = (float)OPV.R;
+			cam_Esferica[1] = (float)OPV.alfa;
+			cam_Esferica[2] = (float)OPV.beta;
+		}
+		else if (transicio.modeCameraAnterior == ModeCamera::GLOBAL_SISTEMA)
+		{
+			camera = CAM_ESFERICA;
+			mobil = true;   zzoom = true;   satelit = false;   pan = false;
+			Vis_Polar = POLARZ;
+			OPV.alfa = transicio.alfa;
+			OPV.beta = transicio.beta;
+
+			LimitsCameraCos limDesti = CalcularLimitsCameraPerCos(cidDesti, radiDesti);
+			OPV.R = LimitarRang(transicio.distAbsoluta * factorSistema, limDesti.minR, limDesti.maxR);
+
+			cam_Esferica[0] = (float)OPV.R;
+			cam_Esferica[1] = (float)OPV.alfa;
+			cam_Esferica[2] = (float)OPV.beta;
+		}
+		else if (transicio.modeCameraAnterior == ModeCamera::COET_PRIMERA_PERSONA)
+		{
+			AssegurarCoetCarregat();
+			camera = CAM_NAVEGA;
+			mobil = false;  zzoom = false;  satelit = false;
+			Vis_Polar = POLARZ;
+
+			posMilano *= (float)factorSistema;
+			glm::vec3 posSol(0.0f);
+			double radiSol = 16.0;
+			if (ObtenirDadesEnfocament(escenariActual, CB_SUN, posSol, radiSol)) {
+				glm::vec3 deltaSol = posMilano - posSol;
+				float distSol = glm::length(deltaSol);
+				float minDistSol = (float)(radiSol * 1.5);
+				if (distSol < 1e-4f) {
+					posMilano = posSol + glm::vec3(minDistSol, 0.0f, 0.0f);
+				} else if (distSol < minDistSol) {
+					posMilano = posSol + glm::normalize(deltaSol) * minDistSol;
+				}
+			}
+		}
+
+		g_EstatSimulador.transicioVista = transicio;
+		g_EstatSimulador.canviModeDirectePendent = false;
+	}
+
+	// 1b. Recalcular immediatament les posicions orbitals si s'ha canviat data/hora o creat l'escenari
+	// (funciona tambe amb la simulacio en pausa i abans de construir ViewMatrix)
+	if (g_EstatSimulador.recalculEfemeridesNecessari && escenariActual != nullptr && objecte == SISTEMA_SOLAR)
+	{
+		bool escalaReal = (g_EstatSimulador.modeActual == ModeSimulacio::ESCALA_REAL);
+		double tJ2000 = toJ2000Seconds(
+			g_EstatSimulador.tempsSimulacio.dataHora.any,
+			g_EstatSimulador.tempsSimulacio.dataHora.mes,
+			g_EstatSimulador.tempsSimulacio.dataHora.dia,
+			g_EstatSimulador.tempsSimulacio.dataHora.hora,
+			g_EstatSimulador.tempsSimulacio.dataHora.minut,
+			g_EstatSimulador.tempsSimulacio.dataHora.segon
+		);
+		escenariActual->updateVariables(
+			tJ2000,
+			0.0,
+			g_EstatSimulador.tempsSimulacio.enPausa,
+			g_EstatSimulador.tempsSimulacio.direccioTemps,
+			escalaReal,
+			g_EstatSimulador.tempsSimulacio.factorVelocitatSegonsPerSegon,
+			true // forcarActualitzacio: reflecteix el canvi de data encara que estigui en pausa
+		);
+		g_EstatSimulador.recalculEfemeridesNecessari = false;
+	}
+
 	// 2. Sincronitzacio continua a cada frame de les opcions commutables del menu "Visualitzacio"
 	if (objecte == SISTEMA_SOLAR)
 	{
 		SkyBoxCube = g_EstatSimulador.opcionsVisualitzacio.mostrarSkybox;
-		if (SkyBoxCube && skC_VAOID.vaoId == 0) OnVistaSkyBox();
+		if (SkyBoxCube && (skC_VAOID.vaoId == 0 || cubemapTexture == 0)) OnVistaSkyBox();
 
 		eixos = g_EstatSimulador.opcionsVisualitzacio.mostrarEixos;
 
@@ -485,13 +770,15 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		CelestialBodyId cid = g_EstatSimulador.cosEnfocatId;
 		if (cid == CB_NONE) cid = CB_SUN;
 
-		// Distancia de camera proporcional al radi del planeta seleccionat per garantir bon enquadrament
-		double distPerDefecte = 140.0f;
-		if (cid != CB_NONE && escenariActual != nullptr)
-		{
-			distPerDefecte = escenariActual->m_objectList[cid]->m_scale * 4.5f;
-			if (distPerDefecte < 14.0f) distPerDefecte = 14.0f;
+		// Distància de càmera proporcional al radi de l'objecte enfocat
+		glm::vec3 posObjecte(0.0f);
+		double radiObjecte = 16.0;
+		if (!ObtenirDadesEnfocament(escenariActual, cid, posObjecte, radiObjecte)) {
+			cid = CB_SUN;
+			ObtenirDadesEnfocament(escenariActual, cid, posObjecte, radiObjecte);
 		}
+		LimitsCameraCos lim = CalcularLimitsCameraPerCos(cid, radiObjecte);
+		double distPerDefecte = lim.distDefecte;
 
 		if (g_EstatSimulador.cameraConfig.mode == ModeCamera::FIXA_INCLINADA_25)
 		{
@@ -590,16 +877,18 @@ void OnPaint(GLFWwindow* window)
 				ilumina, llum_ambient, llumGL, ifixe, ilum2sides,
 				eixos, grid, hgrid);
 
-			// Quan hi ha un planeta enfocant des del menu (cosEnfocatId > 0), traslladem la vista
-			// cap a la seva posicio orbital (px, py, 0) perque la camera orbiti al seu voltant
-			if (objecte == SISTEMA_SOLAR && escenariActual != nullptr && g_EstatSimulador.cosEnfocatId != CB_NONE)
+			// Quan hi ha un cos enfocat des del menu (natural o artificial), traslladem la vista
+			// cap a la seva posicio orbital perque la camera orbiti al seu voltant
+			if (objecte == SISTEMA_SOLAR && g_EstatSimulador.cosEnfocatId != CB_NONE)
 			{
-				CelestialBodyId cid = g_EstatSimulador.cosEnfocatId;
-				glm::vec3 posPlaneta = glm::vec3(escenariActual->m_objectList[cid]->m_trMatrix[3]);
-
-				ViewMatrix = glm::translate(ViewMatrix, -posPlaneta);
-				glUseProgram(shader_programID);
-				glUniformMatrix4fv(glGetUniformLocation(shader_programID, "viewMatrix"), 1, GL_FALSE, &ViewMatrix[0][0]);
+				glm::vec3 posObjecte(0.0f);
+				double radiObjecte = 1.0;
+				if (ObtenirDadesEnfocament(escenariActual, g_EstatSimulador.cosEnfocatId, posObjecte, radiObjecte))
+				{
+					ViewMatrix = glm::translate(ViewMatrix, -posObjecte);
+					glUseProgram(shader_programID);
+					glUniformMatrix4fv(glGetUniformLocation(shader_programID, "viewMatrix"), 1, GL_FALSE, &ViewMatrix[0][0]);
+				}
 			}
 		}
 		else if (camera == CAM_NAVEGA) {
@@ -696,12 +985,22 @@ void dibuixa_Escena() {
 	// Escalat d'objectes, per adequar-los a les vistes ortogràfiques (Pràctica 2)
 	//	GTMatrix = glm::scale();
 
-	//	Dibuix geometria de l'escena amb comandes GL.
+	//	Dibuix geometria de l'escena amb comandes GL (passant matrius i llums directament des de CPU).
+	ParametresIluminacioEscenari ilumEscena;
+	ilumEscena.matriuProjeccio = ProjectionMatrix;
+	ilumEscena.llums = llumGL;
+	ilumEscena.numLlums = NUM_MAX_LLUMS;
+	ilumEscena.llumAmbient = llum_ambient;
+	ilumEscena.llumFixa = ifixe;
+
+	// La nau Milano només es mostra quan la càmera activa és el mode "Pilota coet" (CAM_NAVEGA)
+	bool mostrarMilano = (camera == CAM_NAVEGA);
 	dibuixa_EscenaGL(shader_programID, shader_programIDNormalMap, ViewMatrix, GTMatrix, sw_material,
 		escenariActual,
 		ObOBJ,				// COET: model OBJ de la nau Milano
 		g_EstatSimulador.opcionsVisualitzacio.mostrarOrbites,
-		camera == CAM_NAVEGA);
+		mostrarMilano,
+		&ilumEscena);
 }
 
 
@@ -720,7 +1019,7 @@ void draw_Menu_ImGui()
 	// Renderitza la interficie principal del simulador (selector modal, barra de menu, panell de temps i HUD)
 	InterficieUI::Renderitzar(g_EstatSimulador, escenariActual, escenaris, shader_programID, shader_programIDNormalMap);
 
-	// Projeccio de les etiquetes 2D dels 9 astres sobre la pantalla:
+	// Projeccio dinamica de les etiquetes 2D de tots els objectes observables sobre la pantalla:
 	// nomes s'executa amb la simulacio activa (selector tancat) i l'opcio del menu activada.
 	if (!g_EstatSimulador.mostrarSelectorModes &&
 		g_EstatSimulador.opcionsVisualitzacio.mostrarEtiquetes &&
@@ -728,17 +1027,40 @@ void draw_Menu_ImGui()
 		escenariActual != nullptr &&
 		!escenariActual->m_objectList.empty())
 	{
-		//Ids dels objectes que tindran etiqueta
-		static const CelestialBodyId IDEtiquetes[9] = { CB_SUN, CB_MERCURY, CB_VENUS, CB_EARTH, CB_MARS, CB_JUPITER, CB_SATURN, CB_URANUS, CB_NEPTUNE};
 		glm::vec4 viewport(0.0f, 0.0f, (float)w, (float)h);
-		for (int i = 0; i < 9; i++)
+		std::vector<const Object*> enfocables = escenariActual->obtenirObjectesEnfocables();
+		for (const Object* obj : enfocables)
 		{
-			// Situa l'etiqueta lleugerament per sobre de cada cos (z = rCos * 1.15)
-			glm::vec3 centreCos = glm::vec3(escenariActual->m_objectList[IDEtiquetes[i]]->m_trMatrix[3]);
-			double scale = escenariActual->m_objectList[IDEtiquetes[i]]->m_scale;
-			glm::vec3 posMon = centreCos + glm::vec3(0.0f, 0.0f, scale * 1.15f);
+			if (obj == nullptr || !obj->m_mostrarEtiqueta) continue;
 
-			InterficieUI::DibuixarEtiquetaPlaneta(escenariActual->m_objectList[IDEtiquetes[i]]->m_nom, posMon, ViewMatrix, ProjectionMatrix, viewport);
+			// Amagar etiquetes de satel-lits naturals en vista molt allunyada excepte si estan enfocats
+			if (obj->m_categoria == CategoriaObjecte::SATELLIT_NATURAL &&
+				obj->m_id != g_EstatSimulador.cosEnfocatId &&
+				obj->m_parent != nullptr)
+			{
+				glm::vec3 posSat = glm::vec3(obj->m_trMatrix[3]);
+				glm::vec3 posPare = glm::vec3(obj->m_parent->m_trMatrix[3]);
+				glm::vec3 scrSat = glm::project(posSat, ViewMatrix, ProjectionMatrix, viewport);
+				glm::vec3 scrPare = glm::project(posPare, ViewMatrix, ProjectionMatrix, viewport);
+				if (scrSat.z > 0.0f && scrSat.z < 1.0f && scrPare.z > 0.0f && scrPare.z < 1.0f) {
+					float dx = scrSat.x - scrPare.x;
+					float dy = scrSat.y - scrPare.y;
+					if ((dx * dx + dy * dy) < (24.0f * 24.0f)) continue;
+				}
+			}
+
+			// Situa l'etiqueta lleugerament per sobre de cada cos (z = rCos * 1.15)
+			glm::vec3 centreCos = glm::vec3(obj->m_trMatrix[3]);
+			glm::vec3 posMon = centreCos + glm::vec3(0.0f, 0.0f, (float)(obj->m_scale * 1.15));
+
+			InterficieUI::DibuixarEtiquetaPlaneta(obj->m_nom, posMon, ViewMatrix, ProjectionMatrix, viewport);
+		}
+
+		// Etiqueta 2D de la Nau Milano només quan s'està pilotant (CAM_NAVEGA)
+		if (camera == CAM_NAVEGA)
+		{
+			glm::vec3 posMonMilano = posMilano + glm::vec3(0.0f, 0.0f, 6.0f * 1.15f);
+			InterficieUI::DibuixarEtiquetaPlaneta("Nau Milano", posMonMilano, ViewMatrix, ProjectionMatrix, viewport);
 		}
 	}
 
@@ -768,24 +1090,7 @@ void OnCameraNavega()
 	{
 		camera = CAM_NAVEGA;
 		// Carregar la Milano automàticament si encara no està carregada
-		if (ObOBJ == NULL) //COET
-		{
-			ObOBJ = new COBJModel;
-
-			char nomFitxer[] = "textures/coet/milano_gotg.obj";
-
-			int error = ObOBJ->LoadModel(nomFitxer);
-
-			if (error == 0)
-			{
-				
-				printf("Milano carregada correctament!\n");
-			}
-			else
-			{
-				printf("Error carregant la Milano: %d\n", error);
-			}
-		}
+		AssegurarCoetCarregat();
 		// Desactivació de zoom, mobil, Transformacions Geomètriques via mouse i pan 
 		//		si navega activat
 		mobil = false;	zzoom = false;	satelit = false;
@@ -834,17 +1139,8 @@ void OnVistaSkyBox()
 	Set_VAOList(CUBE_SKYBOX, skC_VAOID);
 
 	if (!cubemapTexture)
-	{	// load Skybox textures
-		// -------------
-		std::vector<std::string> faces =
-		{ ".\\textures\\skybox\\right.png",
-			".\\textures\\skybox\\left.png",
-			".\\textures\\skybox\\top.png",
-			".\\textures\\skybox\\bottom.png",
-			".\\textures\\skybox\\front.png",
-			".\\textures\\skybox\\back.png"
-		};
-		cubemapTexture = loadCubemap(faces);
+	{
+		cubemapTexture = GestorRecursos::ObtenirTexturaSkybox();
 	}
 }
 
@@ -916,7 +1212,7 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 		if (g_EstatSimulador.mostrarSelectorModes) return;
 
 		// Dreceres globals del simulador sincronitzades amb els menus de la interficie:
-		// Espai -> Pausa/Reprendre, Backspace -> Invertir temps, R -> Reenquadrar vista, Home -> Vista Global
+		// Espai -> Pausa/Reprendre, Backspace -> Invertir temps, R -> Reenquadrar vista, Home -> Vista Global, Tab -> Canviar mode
 		if (mods == 0 && action == GLFW_PRESS) {
 			if (key == GLFW_KEY_SPACE) {
 				g_EstatSimulador.tempsSimulacio.enPausa = !g_EstatSimulador.tempsSimulacio.enPausa;
@@ -933,8 +1229,16 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 			else if (key == GLFW_KEY_HOME) {
 				g_EstatSimulador.cameraConfig.mode = ModeCamera::GLOBAL_SISTEMA;
 				g_EstatSimulador.cosEnfocatId = CB_SUN;
-				InterficieUI::ActualitzarDadesCosActiu(g_EstatSimulador);
+				g_EstatSimulador.origenReferenciaSol = true;
+				InterficieUI::ActualitzarDadesCosActiu(g_EstatSimulador, escenariActual);
 				g_EstatSimulador.canviCameraPendent = true;
+				return;
+			}
+			else if (key == GLFW_KEY_TAB) {
+				ModeSimulacio nouMode = (g_EstatSimulador.modeActual == ModeSimulacio::INTUITIU)
+					? ModeSimulacio::ESCALA_REAL
+					: ModeSimulacio::INTUITIU;
+				InterficieUI::SolicitarCanviModeDirecte(g_EstatSimulador, nouMode);
 				return;
 			}
 		}
@@ -948,15 +1252,13 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 				key == GLFW_KEY_DOWN))
 		{
 			const double pasAngle = 5.0;
-			// Adapta el zoom minim i pas de distancia segons el radi del cos enfocant (cosEnfocatId)
+			// Adapta el zoom minim i pas de distancia segons el radi del cos enfocat (natural o artificial)
 			CelestialBodyId cosId = g_EstatSimulador.cosEnfocatId;
-			double scale = 35.0;
-			if (escenariActual != nullptr && cosId != CB_NONE) {
-				scale = escenariActual->m_objectList[cosId]->m_scale;
-			}
-			double minR = (cosId == 0) ? 42.0 : std::max(2.5, scale * 2.2);
-			double maxR = 800.0;
-			const double pasDistancia = (cosId == 0) ? 5.0 : std::max(1.0, scale * 0.5);
+			glm::vec3 posObj(0.0f);
+			double scale = 16.0;
+			ObtenirDadesEnfocament(escenariActual, cosId, posObj, scale);
+			LimitsCameraCos lim = CalcularLimitsCameraPerCos(cosId, scale);
+			const double pasDistancia = std::max(lim.pasZoom, OPV.R * 0.08);
 
 			// Gir horitzontal al voltant del cos enfocat
 			if (key == GLFW_KEY_LEFT)
@@ -973,10 +1275,10 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 				OPV.R += pasDistancia;
 
 			// Evitem que la càmera travessi el cos
-			if (OPV.R < minR)
-				OPV.R = minR;
-			if (OPV.R > maxR)
-				OPV.R = maxR;
+			if (OPV.R < lim.minR)
+				OPV.R = lim.minR;
+			if (OPV.R > lim.maxR)
+				OPV.R = lim.maxR;
 
 			// Mantenim l'angle horitzontal entre 0 i 360 graus
 			while (OPV.beta >= 360.0)
@@ -1399,21 +1701,19 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 		if ((zzoom || zzoomO) || (transX) || (transY) || (transZ))
 		{
 			if (camera == CAM_ESFERICA)
-			{	// Càmera Esfèrica: limits i velocitat de zoom adaptats al cos enfocant (cosEnfocatId)
+			{	// Càmera Esfèrica: limits i velocitat de zoom adaptats al cos enfocat (natural o artificial)
 				CelestialBodyId cosId = g_EstatSimulador.cosEnfocatId;
-				double scale = 35.0;
-				if (escenariActual != nullptr && cosId != CB_NONE) {
-					scale = escenariActual->m_objectList[cosId]->m_scale;
-				}
-				double minR = (cosId == 0) ? 42.0 : std::max(2.5, scale * 2.2);
-				double maxR = 800.0;
-				double pasZoom = (cosId == 0) ? 5.0 : std::max(1.0, scale * 0.5);
+				glm::vec3 posObj(0.0f);
+				double scale = 16.0;
+				ObtenirDadesEnfocament(escenariActual, cosId, posObj, scale);
+				LimitsCameraCos lim = CalcularLimitsCameraPerCos(cosId, scale);
+				double pasZoom = std::max(lim.pasZoom, OPV.R * 0.08);
 
 				OPV.R = OPV.R - yoffset * pasZoom;
-				if (OPV.R < minR)
-					OPV.R = minR;
-				if (OPV.R > maxR)
-					OPV.R = maxR;
+				if (OPV.R < lim.minR)
+					OPV.R = lim.minR;
+				if (OPV.R > lim.maxR)
+					OPV.R = lim.maxR;
 
 				cam_Esferica[0] = (float)OPV.R;
 				cam_Esferica[1] = (float)OPV.alfa;
@@ -1566,7 +1866,7 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severi
 }
 
 #include <ctime>
-double toJ2000Seconds(int year, int month, int day, int hour = 0, int minute = 0, double second = 0.0) {
+double toJ2000Seconds(int year, int month, int day, int hour, int minute, double second) {
 	if (month <= 2) {
 		year -= 1;
 		month += 12;
@@ -1589,6 +1889,11 @@ double toJ2000Seconds(int year, int month, int day, int hour = 0, int minute = 0
 // main(): Funció principal del programa. Inicialitza la finestra, els callbacks i el bucle principal d'operació
 int main()
 {
+#ifdef _WIN32
+	// Configurar la consola de Windows en UTF-8 per mostrar accents i caràcters especials catalans
+	SetConsoleOutputCP(CP_UTF8);
+	SetConsoleCP(CP_UTF8);
+#endif
 	//	std::cout << "Hello World!\n";
 
 	//    GLFWwindow* window;
@@ -1724,7 +2029,8 @@ int main()
 
 	// Reserva de l'array d'escenaris (0: Mode Didactic, 1: Mode a Escala Real).
 	// L'escena del sistema solar NO es carrega ni es dibuixa mentre el selector inicial de modes estigui obert.
-	escenaris = new Escenari[5];
+	static constexpr int NUM_ESCENARIS = 2;
+	escenaris = new Escenari[NUM_ESCENARIS];
 	escenariActual = &escenaris[0];
 	objecte = CAP;
 
@@ -1737,6 +2043,9 @@ int main()
 	OPV.R = 550.0;	OPV.alfa = 65.0;	OPV.beta = 0.0;
 	cam_Esferica[0] = (float)OPV.R;	cam_Esferica[1] = (float)OPV.alfa;	cam_Esferica[2] = (float)OPV.beta;
 
+	// Precarrega asincrona del coet Milano i de les textures/Skybox en segon pla
+	IniciarPrecarregaCoet();
+	GestorRecursos::IniciarPrecarregaEscena();
 
 // Loop until the user closes the window
 	while (!glfwWindowShouldClose(window))
@@ -1780,6 +2089,11 @@ int main()
 			}
 		}
 
+		// Pujada progressiva a GPU de textures precarregades (2-3 per frame) i coet Milano
+		GestorRecursos::ProcessarCuaPujadaGPU(3);
+		if (ObOBJ == NULL && g_coetPreloadDone.load())
+			FinalitzarCarregaCoetGPU(false);
+
 		// Poll for and process events
 		glfwPollEvents();
 
@@ -1811,6 +2125,17 @@ int main()
 	delete[] escenaris;
 	escenaris = nullptr;
 	escenariActual = nullptr;
+
+	// Neteja segura dels fils de precarrega, textures compartides, VAOs i coet Milano abans de tancar OpenGL
+	if (g_coetPreloadThread.joinable()) g_coetPreloadThread.join();
+	COBJModel::FreePreloadData(g_coetPreloadData);
+	if (ObOBJ != NULL)
+	{
+		delete ObOBJ;
+		ObOBJ = NULL;
+	}
+	GestorRecursos::AlliberarTot();
+	cubemapTexture = 0;
 
 	glfwDestroyWindow(window);
 

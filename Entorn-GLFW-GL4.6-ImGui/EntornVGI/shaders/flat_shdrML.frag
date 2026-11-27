@@ -1,24 +1,24 @@
-//******** PRACTICA VISUALITZACIÓ GRÀFICA INTERACTIVA (EE-UAB)
-//******** Entorn bàsic VS2026 amb interfície MFC/GLFW i Status Bar
+//******** PRACTICA VISUALITZACIÃ“ GRÃ€FICA INTERACTIVA (EE-UAB)
+//******** Entorn bÃ sic VS2026 amb interfÃ­cie MFC/GLFW i Status Bar
 //******** Enric Marti (Setembre 2026)
-// flat_shdrML.frag: Fragment Program en GLSL per en versió OpenGL 3.3 o 4.60 per a implementar:
-//     a) Iluminació plana
+// flat_shdrML.frag: Fragment Program en GLSL per en versiÃ³ OpenGL 3.3 o 4.60 per a implementar:
+//     a) IluminaciÃ³ plana
 //     b) Fonts de llum puntuals o direccionals
 //     c) Fonts de llum restringides
-//     d) Atenuació de fonts de llum
-//     e) Modus d'assignació de textura MODULATE o DECAL
+//     d) AtenuaciÃ³ de fonts de llum
+//     e) Modus d'assignaciÃ³ de textura MODULATE o DECAL
 
 //#version 330 core
 #version 460 core
 
 // ---- L14- in Variables
-flat in vec4 VertexColor;     // Color del vèrtex
-in vec2 VertexTexCoord;	 // Coordenades textura del vèrtex
+flat in vec4 VertexColor;     // Color del vÃ¨rtex
+in vec2 VertexTexCoord;	 // Coordenades textura del vÃ¨rtex
 
 // ---- L18- uniform Variables
 uniform sampler2D texture0;	// Imatge textura
-uniform bool textur;		// Booleana d’activació (TRUE) de textures o no (FALSE).
-uniform bool modulate;		// Booleana d'activació de barreja color textura- color intensitat llum (TRUE) o només color textura (FALSE)
+uniform bool textur;		// Booleana dâ€™activaciÃ³ (TRUE) de textures o no (FALSE).
+uniform bool modulate;		// Booleana d'activaciÃ³ de barreja color textura- color intensitat llum (TRUE) o nomÃ©s color textura (FALSE)
 
 // ---- L23- out Variables
 out vec4 FragColor;		// Color fragment (r,g,b,a)

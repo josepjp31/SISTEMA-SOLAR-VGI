@@ -1,7 +1,7 @@
-//******** PRACTICA VISUALITZACI” GR¿FICA INTERACTIVA (Escola Enginyeria - UAB)
-//******** Entorn b‡sic VS2026 MONOFINESTRA amb OpenGL 4.6, interfÌcie GLFW 3.4, ImGui i llibreries GLM
-//******** Ferran Poveda, Marc Vivet, Carme Juli‡, DÈbora Gil, Enric MartÌ (Setembre 2026)
-// material.cpp : Funcions de definiciÛ de les propietats de reflectivitat dels objectes.
+//******** PRACTICA VISUALITZACI√ì GR√ÄFICA INTERACTIVA (Escola Enginyeria - UAB)
+//******** Entorn b√†sic VS2026 MONOFINESTRA amb OpenGL 4.6, interf√≠cie GLFW 3.4, ImGui i llibreries GLM
+//******** Ferran Poveda, Marc Vivet, Carme Juli√†, D√©bora Gil, Enric Mart√≠ (Setembre 2026)
+// material.cpp : Funcions de definici√≥ de les propietats de reflectivitat dels objectes.
 
 #include "framework.h"
 #include "material.h"
@@ -23,7 +23,7 @@ void SeleccionaColorMaterial(GLuint sh_programID, CColor c_obj, bool sw_mater[5]
 	glUniform4i(glGetUniformLocation(sh_programID, "sw_intensity"), sw_mater[0], sw_mater[1], sw_mater[2], sw_mater[3]);
 	glUniform1i(glGetUniformLocation(sh_programID, "sw_material"), sw_mater[4]);
 
-// Component de reflectivitat d'emissiÛ de llum del material
+// Component de reflectivitat d'emissi√≥ de llum del material
 //	glColorMaterial(GL_FRONT, GL_EMISSION);	// Codi OpenGL 1.1
 	if (sw_mater[0]) {	//glColor4fv(color);	// Codi OpenGL 1.1
 						//glMaterialfv(GL_FRONT, GL_EMISSION, color);	// Codi OpenGL 1.1

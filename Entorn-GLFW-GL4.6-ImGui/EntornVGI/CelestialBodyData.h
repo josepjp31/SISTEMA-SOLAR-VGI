@@ -35,10 +35,10 @@ enum CelestialBodyId {
     //CB_HYDRA = 903,
     //CB_KERBEROS = 904,
     //CB_STYX = 905,
-    //OTHER
-    //CB_HALLEY = 1000036,
+    // --- ASTRES ARTIFICIALS / NAUS ---
     CB_VOYAGER1 = -31,
-    //CB_VOYAGER2 = -32
+    CB_VOYAGER2 = -32,
+    CB_MILANO = -1000,      // Nau espacial Milano pilotable i observable com a centre
     CB_NONE = -99999
 };
 

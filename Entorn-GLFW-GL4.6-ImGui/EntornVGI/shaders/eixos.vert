@@ -1,7 +1,7 @@
-//******** PRACTICA VISUALITZACI” GR¿FICA INTERACTIVA (EE-UAB)
-//******** Entorn b‡sic VS2026 amb interfÌcie MFC/GLFW i Status Bar
+//******** PRACTICA VISUALITZACI√ì GR√ÄFICA INTERACTIVA (EE-UAB)
+//******** Entorn b√†sic VS2026 amb interf√≠cie MFC/GLFW i Status Bar
 //******** Enric Marti (Setembre 2026)
-// eixos.vert: Vertex Program en GLSL en versiÛ OpenGL 3.3 o 4.30 per a dibuixar eixos Coordenades MÛn
+// eixos.vert: Vertex Program en GLSL en versi√≥ OpenGL 3.3 o 4.30 per a dibuixar eixos Coordenades M√≥n
 
 //#version 330 core
 #version 460 core
@@ -19,7 +19,7 @@ out vec4 VertexColor;
 
 void main ()	// --- L20
 {
-// --- L22- Transformacio de Visualitzacio amb Matriu Projeccio (projectionMatrix), Matriu C‡mera (viewMatrix) i Matriu TG (modelMatrix)
+// --- L22- Transformacio de Visualitzacio amb Matriu Projeccio (projectionMatrix), Matriu C√†mera (viewMatrix) i Matriu TG (modelMatrix)
     gl_Position = vec4(projectionMatrix * viewMatrix * vec4(in_Vertex,1.0));
 
 // ---L25- Calcul intensitat final del vertex
