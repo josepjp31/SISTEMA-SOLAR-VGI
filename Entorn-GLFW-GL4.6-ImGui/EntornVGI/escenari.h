@@ -6,6 +6,17 @@
 #include <vector>
 #include "CelestialBodyData.h"
 
+// Context compartit durant el recorregut recursiu del graf d'escena
+struct ContextRenderEscenari {
+	GLuint shaderPhongID = 0;       // Shader estandard (orbites, anells, objectes sense normal map)
+	GLuint shaderNormalMapID = 0;   // Shader amb normal mapping per a superficies planetaries
+	GLuint shaderActualID = 0;      // Shader actiu en aquest moment per evitar glUseProgram redundants
+	bool mostrarOrbites = true;     // Controlat pel menu Visualitzacio
+	bool iluminacioSolar = true;    // sw_mat[0]: emissio del Sol i llum puntual #0
+	bool vistaClara = false;        // sw_mat[1]: llum ambient global
+	bool sw_mat[5] = { false, false, true, false, true };
+};
+
 // Dades individuals de cada cos qualsevol dins de l'escenari
 class Object
 {
@@ -66,8 +77,15 @@ public:
 		return false;
 	}
 
-	virtual void drawObject(GLuint& shaderActual, glm::mat4& matriuTG) = 0;
-	virtual void update(double T) { for (Object* son : m_sons) if (son) son->update(T); }
+	virtual void drawObject(ContextRenderEscenari& ctx, const glm::mat4& matriuPare) = 0;
+
+	// Actualitza l'estat orbital/rotacional i calcula la matriu de posicio global (m_trMatrix)
+	// a partir de la matriu del pare, abans de construir la camera del frame actual.
+	virtual void update(double tempsJ2000, const glm::mat4& matriuPare) {
+		m_trMatrix = matriuPare;
+		for (Object* son : m_sons)
+			if (son) son->update(tempsJ2000, m_trMatrix);
+	}
 
 	GLuint m_textureID = 0;
 	GLuint m_normalMapID = 0;
@@ -115,8 +133,8 @@ public:
 
 	~EsferaInt() {}
 
-	void drawObject(GLuint& shaderActual, glm::mat4& matriuTG) override;
-	void update(double T) override;
+	void drawObject(ContextRenderEscenari& ctx, const glm::mat4& matriuPare) override;
+	void update(double tempsJ2000, const glm::mat4& matriuPare) override;
 
 };
 
@@ -162,7 +180,8 @@ public:
 		}
 	}
 
-	void drawObject(GLuint& shaderActual, glm::mat4& matriuTG) override;
+	void drawObject(ContextRenderEscenari& ctx, const glm::mat4& matriuPare) override;
+	void update(double tempsJ2000, const glm::mat4& matriuPare) override;
 };
 
 // Gestió de l'escenari complet del Sistema Solar (cossos, òrbites, textures i actualització orbital)
@@ -183,17 +202,29 @@ public:
 	void dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5], bool mostrarOrbites = true);
 
 	// Actualitza els angles orbitals i de rotacio segons els parametres temporals d'EstatSimulacio
-	// (enPausa, direccioTemps [+1/-1], escalaReal i factorVelocitat del timelapse)
-	void updateVariables(double et = 0, double dt = 0.016, bool enPausa = false, int direccioTemps = 1, bool escalaReal = false, double factorVelocitat = 60.0);
+	// (enPausa, direccioTemps [+1/-1], escalaReal i factorVelocitat del timelapse).
+	// Si forcarActualitzacio es true, recalcula posicions encara que la simulacio estigui en pausa.
+	void updateVariables(double et = 0, double dt = 0.016, bool enPausa = false, int direccioTemps = 1, bool escalaReal = false, double factorVelocitat = 60.0, bool forcarActualitzacio = false);
+
+	bool esInicialitzat() const { return m_inicialitzat; }
+
+	// Cerca segura sense inserir claus nul-les al mapa (evita crashes per nullptr)
+	Object* obtenirObjecte(CelestialBodyId id) const {
+		auto it = m_objectList.find(id);
+		return (it != m_objectList.end()) ? it->second : nullptr;
+	}
+
 	// Allibera els objectes (i els seus VAO). Cal cridar-la ABANS de destruir el context OpenGL.
 	void alliberaEscenari() {
+		if (!m_inicialitzat && m_objectList.empty()) return;
+
 		deleteVAOList(GLU_SPHERE);
 		deleteVAOList(GLU_DISK);
 		deleteVAOList(GLUT_TORUS);
 
 		std::vector<Object*> roots;
 		for (auto& p : m_objectList)
-			if (p.second->m_parent == nullptr)
+			if (p.second && p.second->m_parent == nullptr)
 				roots.push_back(p.second);
 
 		m_objectList.clear();
@@ -201,7 +232,10 @@ public:
 		for (Object* r : roots)
 			delete r;
 		roots.clear();
+
+		m_inicialitzat = false;
 	}
 
+	bool m_inicialitzat = false; // Evita recrear i filtrar textures/objectes si l'escenari ja esta carregat
 	std::unordered_map<CelestialBodyId, Object*> m_objectList;
 };

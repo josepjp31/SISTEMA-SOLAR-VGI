@@ -64,8 +64,13 @@ static std::unordered_map<CelestialBodyId, CosAstronomicDades> kCatalegCossos = 
 void InterficieUI::ActualitzarDadesCosActiu(EstatSimulacio& estat)
 {
     CelestialBodyId id = estat.cosEnfocatId;
-    if (id == CB_NONE) id = CB_SUN; // Proteccio de rang (per defecte Sol)
-    estat.dadesCosActiu = kCatalegCossos[id];
+    auto it = kCatalegCossos.find(id);
+    if (it == kCatalegCossos.end()) {
+        it = kCatalegCossos.find(CB_SUN); // Proteccio de rang (per defecte Sol)
+    }
+    if (it != kCatalegCossos.end()) {
+        estat.dadesCosActiu = it->second;
+    }
 }
 
 // =========================================================================
@@ -399,6 +404,8 @@ static void DibuixarPuntLlista(const char* text)
 // =========================================================================
 void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID, GLuint& shader_programIDNormalMap)
 {
+    (void)shader_programID;
+    (void)shader_programIDNormalMap;
     if (!estat.mostrarSelectorModes) return;
 
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -571,11 +578,10 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
                 estat.canviCameraPendent = true;
                 ActualitzarDadesCosActiu(estat);
 
-                // Creacio i vinculacio de l'escenari didactic (index 0) amb els shaders actius
+                // Assignacio de l'escenari didactic (index 0); la inicialitzacio OpenGL es centralitza a main.cpp
                 if (escenaris != nullptr)
                 {
                     currentEscenari = &escenaris[0];
-                    currentEscenari->creaEscenari(shader_programID, shader_programIDNormalMap);
                 }
             }
             ImGui::PopStyleColor(4);
@@ -647,11 +653,10 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
                 estat.canviCameraPendent = true;
                 ActualitzarDadesCosActiu(estat);
 
-                // Creacio i vinculacio de l'escenari a escala real (index 1)
+                // Assignacio de l'escenari a escala real (index 1); la inicialitzacio OpenGL es centralitza a main.cpp
                 if (escenaris != nullptr)
                 {
                     currentEscenari = &escenaris[1];
-                    currentEscenari->creaEscenari(shader_programID, shader_programIDNormalMap);
                 }
             }
             ImGui::PopStyleColor(4);
@@ -673,6 +678,8 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
 // del bloc corresponent (INTUITIU o ESCALA_REAL) i propagueu SetWindowFontScale.
 void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID, GLuint& shader_programIDNormalMap)
 {
+    (void)shader_programID;
+    (void)shader_programIDNormalMap;
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     float viewW = vp->WorkSize.x;
 
@@ -724,7 +731,6 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 estat.canviCameraPendent = true;
                 if (escenaris != nullptr) {
                     currentEscenari = &escenaris[1];
-                    currentEscenari->creaEscenari(shader_programID, shader_programIDNormalMap);
                 }
             }
             ImGui::Separator();
@@ -852,7 +858,6 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 estat.canviCameraPendent = true;
                 if (escenaris != nullptr) {
                     currentEscenari = &escenaris[0];
-                    currentEscenari->creaEscenari(shader_programID, shader_programIDNormalMap);
                 }
             }
             ImGui::Separator();
@@ -918,7 +923,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
         {
             ImGui::SetWindowFontScale(factorFontMenu);
             ImGui::TextDisabled("Centrar Vista en:");
-            if (ImGui::MenuItem("El Sol", nullptr, estat.origenReferenciaSol && estat.cosEnfocatId == CB_NONE)) {
+            if (ImGui::MenuItem("El Sol", nullptr, estat.cosEnfocatId == CB_SUN)) {
                 estat.origenReferenciaSol = true;
                 estat.cosEnfocatId = CB_SUN;
                 estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;

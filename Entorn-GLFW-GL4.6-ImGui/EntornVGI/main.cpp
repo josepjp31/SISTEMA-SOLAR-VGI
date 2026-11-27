@@ -387,6 +387,8 @@ void OnShaderNormalMap()
 	else fprintf(stderr, "GLSL_Error. Fitxers normal_mapping amb errors\n");
 }
 
+double toJ2000Seconds(int year, int month, int day, int hour = 0, int minute = 0, double second = 0.0);
+
 // SincronitzarEstatSimuladorAmbOpenGL: Pont entre la interficie ImGui (g_EstatSimulador)
 // i les variables globals d'OpenGL/EntornVGI. S'executa a cada frame abans de renderitzar:
 // - Bloc 1 (configuracioInicialPendent): configura projeccio, shaders, llum solar #0, escenari i skybox.
@@ -449,10 +451,12 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		glUniform1i(glGetUniformLocation(shader_programIDNormalMap, "flag_invert_y"), tFlag_invert_Y);
 		glUseProgram(shader_programID);
 
-		// Assegurar que l'escenari te els VAOs i textures vinculats al shader Phong actual
+		// Assegurar que l'escenari te els VAOs i textures vinculats als shaders actius
 		if (escenariActual != nullptr)
 		{
-			escenariActual->creaEscenari(shader_programID, shader_programIDNormalMap);
+			if (!escenariActual->esInicialitzat())
+				escenariActual->creaEscenari(shader_programID, shader_programIDNormalMap);
+			g_EstatSimulador.recalculEfemeridesNecessari = true;
 		}
 
 		// Assegurar que el Skybox i els Eixos estan carregats
@@ -461,6 +465,31 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		if (SkyBoxCube) OnVistaSkyBox();
 
 		g_EstatSimulador.configuracioInicialPendent = false;
+	}
+
+	// 1b. Recalcular immediatament les posicions orbitals si s'ha canviat data/hora o creat l'escenari
+	// (funciona tambe amb la simulacio en pausa i abans de construir ViewMatrix)
+	if (g_EstatSimulador.recalculEfemeridesNecessari && escenariActual != nullptr && objecte == SISTEMA_SOLAR)
+	{
+		bool escalaReal = (g_EstatSimulador.modeActual == ModeSimulacio::ESCALA_REAL);
+		double tJ2000 = toJ2000Seconds(
+			g_EstatSimulador.tempsSimulacio.dataHora.any,
+			g_EstatSimulador.tempsSimulacio.dataHora.mes,
+			g_EstatSimulador.tempsSimulacio.dataHora.dia,
+			g_EstatSimulador.tempsSimulacio.dataHora.hora,
+			g_EstatSimulador.tempsSimulacio.dataHora.minut,
+			g_EstatSimulador.tempsSimulacio.dataHora.segon
+		);
+		escenariActual->updateVariables(
+			tJ2000,
+			0.0,
+			g_EstatSimulador.tempsSimulacio.enPausa,
+			g_EstatSimulador.tempsSimulacio.direccioTemps,
+			escalaReal,
+			g_EstatSimulador.tempsSimulacio.factorVelocitatSegonsPerSegon,
+			true // forcarActualitzacio: reflecteix el canvi de data encara que estigui en pausa
+		);
+		g_EstatSimulador.recalculEfemeridesNecessari = false;
 	}
 
 	// 2. Sincronitzacio continua a cada frame de les opcions commutables del menu "Visualitzacio"
@@ -486,11 +515,15 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		if (cid == CB_NONE) cid = CB_SUN;
 
 		// Distancia de camera proporcional al radi del planeta seleccionat per garantir bon enquadrament
-		double distPerDefecte = 140.0f;
+		double distPerDefecte = 140.0;
 		if (cid != CB_NONE && escenariActual != nullptr)
 		{
-			distPerDefecte = escenariActual->m_objectList[cid]->m_scale * 4.5f;
-			if (distPerDefecte < 14.0f) distPerDefecte = 14.0f;
+			Object* obj = escenariActual->obtenirObjecte(cid);
+			if (obj != nullptr)
+			{
+				distPerDefecte = obj->m_scale * 4.5;
+				if (distPerDefecte < 14.0) distPerDefecte = 14.0;
+			}
 		}
 
 		if (g_EstatSimulador.cameraConfig.mode == ModeCamera::FIXA_INCLINADA_25)
@@ -590,16 +623,19 @@ void OnPaint(GLFWwindow* window)
 				ilumina, llum_ambient, llumGL, ifixe, ilum2sides,
 				eixos, grid, hgrid);
 
-			// Quan hi ha un planeta enfocant des del menu (cosEnfocatId > 0), traslladem la vista
-			// cap a la seva posicio orbital (px, py, 0) perque la camera orbiti al seu voltant
+			// Quan hi ha un cos enfocat des del menu, traslladem la vista cap a la seva posicio orbital
+			// perque la camera orbiti al seu voltant
 			if (objecte == SISTEMA_SOLAR && escenariActual != nullptr && g_EstatSimulador.cosEnfocatId != CB_NONE)
 			{
-				CelestialBodyId cid = g_EstatSimulador.cosEnfocatId;
-				glm::vec3 posPlaneta = glm::vec3(escenariActual->m_objectList[cid]->m_trMatrix[3]);
+				Object* objEnfocat = escenariActual->obtenirObjecte(g_EstatSimulador.cosEnfocatId);
+				if (objEnfocat != nullptr)
+				{
+					glm::vec3 posPlaneta = glm::vec3(objEnfocat->m_trMatrix[3]);
 
-				ViewMatrix = glm::translate(ViewMatrix, -posPlaneta);
-				glUseProgram(shader_programID);
-				glUniformMatrix4fv(glGetUniformLocation(shader_programID, "viewMatrix"), 1, GL_FALSE, &ViewMatrix[0][0]);
+					ViewMatrix = glm::translate(ViewMatrix, -posPlaneta);
+					glUseProgram(shader_programID);
+					glUniformMatrix4fv(glGetUniformLocation(shader_programID, "viewMatrix"), 1, GL_FALSE, &ViewMatrix[0][0]);
+				}
 			}
 		}
 		else if (camera == CAM_NAVEGA) {
@@ -733,12 +769,15 @@ void draw_Menu_ImGui()
 		glm::vec4 viewport(0.0f, 0.0f, (float)w, (float)h);
 		for (int i = 0; i < 9; i++)
 		{
-			// Situa l'etiqueta lleugerament per sobre de cada cos (z = rCos * 1.15)
-			glm::vec3 centreCos = glm::vec3(escenariActual->m_objectList[IDEtiquetes[i]]->m_trMatrix[3]);
-			double scale = escenariActual->m_objectList[IDEtiquetes[i]]->m_scale;
-			glm::vec3 posMon = centreCos + glm::vec3(0.0f, 0.0f, scale * 1.15f);
+			Object* obj = escenariActual->obtenirObjecte(IDEtiquetes[i]);
+			if (obj == nullptr) continue;
 
-			InterficieUI::DibuixarEtiquetaPlaneta(escenariActual->m_objectList[IDEtiquetes[i]]->m_nom, posMon, ViewMatrix, ProjectionMatrix, viewport);
+			// Situa l'etiqueta lleugerament per sobre de cada cos (z = rCos * 1.15)
+			glm::vec3 centreCos = glm::vec3(obj->m_trMatrix[3]);
+			double scale = obj->m_scale;
+			glm::vec3 posMon = centreCos + glm::vec3(0.0f, 0.0f, (float)(scale * 1.15));
+
+			InterficieUI::DibuixarEtiquetaPlaneta(obj->m_nom, posMon, ViewMatrix, ProjectionMatrix, viewport);
 		}
 	}
 
@@ -952,11 +991,12 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 			CelestialBodyId cosId = g_EstatSimulador.cosEnfocatId;
 			double scale = 35.0;
 			if (escenariActual != nullptr && cosId != CB_NONE) {
-				scale = escenariActual->m_objectList[cosId]->m_scale;
+				Object* obj = escenariActual->obtenirObjecte(cosId);
+				if (obj != nullptr) scale = obj->m_scale;
 			}
-			double minR = (cosId == 0) ? 42.0 : std::max(2.5, scale * 2.2);
+			double minR = (cosId == CB_SUN) ? 42.0 : std::max(2.5, scale * 2.2);
 			double maxR = 800.0;
-			const double pasDistancia = (cosId == 0) ? 5.0 : std::max(1.0, scale * 0.5);
+			const double pasDistancia = (cosId == CB_SUN) ? 5.0 : std::max(1.0, scale * 0.5);
 
 			// Gir horitzontal al voltant del cos enfocat
 			if (key == GLFW_KEY_LEFT)
@@ -1403,11 +1443,12 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 				CelestialBodyId cosId = g_EstatSimulador.cosEnfocatId;
 				double scale = 35.0;
 				if (escenariActual != nullptr && cosId != CB_NONE) {
-					scale = escenariActual->m_objectList[cosId]->m_scale;
+					Object* obj = escenariActual->obtenirObjecte(cosId);
+					if (obj != nullptr) scale = obj->m_scale;
 				}
-				double minR = (cosId == 0) ? 42.0 : std::max(2.5, scale * 2.2);
+				double minR = (cosId == CB_SUN) ? 42.0 : std::max(2.5, scale * 2.2);
 				double maxR = 800.0;
-				double pasZoom = (cosId == 0) ? 5.0 : std::max(1.0, scale * 0.5);
+				double pasZoom = (cosId == CB_SUN) ? 5.0 : std::max(1.0, scale * 0.5);
 
 				OPV.R = OPV.R - yoffset * pasZoom;
 				if (OPV.R < minR)
@@ -1566,7 +1607,7 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severi
 }
 
 #include <ctime>
-double toJ2000Seconds(int year, int month, int day, int hour = 0, int minute = 0, double second = 0.0) {
+double toJ2000Seconds(int year, int month, int day, int hour, int minute, double second) {
 	if (month <= 2) {
 		year -= 1;
 		month += 12;
@@ -1724,7 +1765,8 @@ int main()
 
 	// Reserva de l'array d'escenaris (0: Mode Didactic, 1: Mode a Escala Real).
 	// L'escena del sistema solar NO es carrega ni es dibuixa mentre el selector inicial de modes estigui obert.
-	escenaris = new Escenari[5];
+	static constexpr int NUM_ESCENARIS = 2;
+	escenaris = new Escenari[NUM_ESCENARIS];
 	escenariActual = &escenaris[0];
 	objecte = CAP;
 

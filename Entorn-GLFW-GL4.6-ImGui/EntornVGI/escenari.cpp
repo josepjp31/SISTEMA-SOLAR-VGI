@@ -3,20 +3,31 @@
 #include <vector>
 
 
-void EsferaInt::drawObject(GLuint& shaderActual, glm::mat4& matriuTG)
+// Activa el shader objectiu nomes si es diferent del shader actual per evitar glUseProgram redundants
+static void activarShaderSiCal(ContextRenderEscenari& ctx, GLuint shaderObjectiu)
 {
-	// Plano orbital inclinado respecto al sistema de referencia del padre
-	glm::mat4 matriuPlaOrbita = glm::rotate(matriuTG, (float)glm::radians(m_inclinacioOrbita), vec3(1.0f, 0.0f, 0.0f));
-
-	// 1. DIBUIXAR L'ÒRBITA
-	if (m_radiOrbita > 0.0)
+	if (shaderObjectiu != 0 && ctx.shaderActualID != shaderObjectiu)
 	{
-		glUniform1i(glGetUniformLocation(shaderActual, "textur"), GL_FALSE);
-		glUniform1i(glGetUniformLocation(shaderActual, "sw_material"), GL_FALSE);
-		glUniform4i(glGetUniformLocation(shaderActual, "sw_intensity"), GL_TRUE, GL_FALSE, GL_FALSE, GL_FALSE);
+		glUseProgram(shaderObjectiu);
+		ctx.shaderActualID = shaderObjectiu;
+	}
+}
 
+void EsferaInt::drawObject(ContextRenderEscenari& ctx, const glm::mat4& matriuPare)
+{
+	// 1. DIBUIXAR L'ÒRBITA (nomes si mostrarOrbites esta actiu a la UI i el cos te orbita)
+	if (ctx.mostrarOrbites && m_radiOrbita > 0.0)
+	{
+		activarShaderSiCal(ctx, ctx.shaderPhongID);
+
+		// Pla orbital inclinat respecte al sistema de referencia del pare
+		glm::mat4 matriuPlaOrbita = glm::rotate(matriuPare, (float)glm::radians(m_inclinacioOrbita), vec3(1.0f, 0.0f, 0.0f));
 		glm::mat4 matriuOrb = glm::scale(matriuPlaOrbita, vec3((float)m_radiOrbita));
-		glUniformMatrix4fv(glGetUniformLocation(shaderActual, "modelMatrix"), 1, GL_FALSE, &matriuOrb[0][0]);
+
+		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "textur"), GL_FALSE);
+		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "sw_material"), GL_FALSE);
+		glUniform4i(glGetUniformLocation(ctx.shaderActualID, "sw_intensity"), GL_TRUE, GL_FALSE, GL_FALSE, GL_FALSE);
+		glUniformMatrix4fv(glGetUniformLocation(ctx.shaderActualID, "modelMatrix"), 1, GL_FALSE, &matriuOrb[0][0]);
 
 		CVAO orbitVAO = Get_VAOList(GLUT_TORUS);
 		if (orbitVAO.vaoId != 0)
@@ -27,99 +38,135 @@ void EsferaInt::drawObject(GLuint& shaderActual, glm::mat4& matriuTG)
 		}
 	}
 
-	// 2. POSICIÓ ORBITAL DEL COS (m_trMatrix pasa SOLO la posición a los hijos, sin torcer sus ejes)
-	float xOrb = (float)(m_radiOrbita * cos(glm::radians(m_angleOrbita)));
-	float yOrb = (float)(m_radiOrbita * sin(glm::radians(m_angleOrbita)));
-
-	glm::mat4 matriuPosicio = glm::translate(matriuPlaOrbita, vec3(xOrb, yOrb, 0.0f));
-
-	m_trMatrix = matriuTG;
-	m_trMatrix[3] = matriuPosicio[3];
-
-	// 3. MATRIU DE MODEL DEL PROPI COS (inclinació de l'eix + rotació + escala)
+	// 2. MATRIU DE MODEL DEL PROPI COS (usa m_trMatrix ja calculada a update() abans de la camera)
 	glm::mat4 ModelMatrix = glm::rotate(m_trMatrix, (float)glm::radians(m_inclinacioEix), vec3(1.0f, 0.0f, 0.0f));
 	ModelMatrix = glm::rotate(ModelMatrix, (float)glm::radians(m_angleRotacio), vec3(0.0f, 0.0f, 1.0f));
 	ModelMatrix = glm::scale(ModelMatrix, vec3((float)m_radiCos));
 
-	// 4. CONFIGURACIÓ DE SHADER, TEXTURA I MATERIAL PER A L'ESFERA
-	glUniformMatrix4fv(glGetUniformLocation(shaderActual, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
+	// 3. SELECCIÓ DE SHADER (normal mapping si disposa de mapa normal valid)
+	const bool usaNormalMap = (m_normalMapID != 0 && ctx.shaderNormalMapID != 0);
+	activarShaderSiCal(ctx, usaNormalMap ? ctx.shaderNormalMapID : ctx.shaderPhongID);
+
+	// 4. CONFIGURACIÓ DE MATRIU, TEXTURA DIFUSA (GL_TEXTURE0) I MAPA NORMAL (GL_TEXTURE1)
+	glUniformMatrix4fv(glGetUniformLocation(ctx.shaderActualID, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
 
 	if (m_textureID != 0)
 	{
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, m_textureID);
-		glUniform1i(glGetUniformLocation(shaderActual, "textur"), GL_TRUE);
-		glUniform1i(glGetUniformLocation(shaderActual, "texImage"), 0);
+		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "textur"), GL_TRUE);
+		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "texture0"), 0);
 	}
 	else
 	{
-		glUniform1i(glGetUniformLocation(shaderActual, "textur"), GL_FALSE);
+		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "textur"), GL_FALSE);
 	}
 
-	glUniform1i(glGetUniformLocation(shaderActual, "sw_material"), GL_TRUE);
-	glUniform4i(glGetUniformLocation(shaderActual, "sw_intensity"), m_sw_mat[0], m_sw_mat[1], m_sw_mat[2], m_sw_mat[3]);
-	SeleccionaColorMaterial(shaderActual, { 1.0,1.0,1.0,1.0 }, m_sw_mat);
+	if (usaNormalMap)
+	{
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, m_normalMapID);
+		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "normalMap"), 1);
+	}
+
+	// Combinar m_sw_mat de l'objecte amb les opcions globals del menu Visualitzacio
+	bool swMatCombinat[5] = {
+		m_sw_mat[0] && ctx.iluminacioSolar,
+		ctx.vistaClara,
+		ctx.sw_mat[2],
+		ctx.sw_mat[3],
+		m_sw_mat[4]
+	};
+	SeleccionaColorMaterial(ctx.shaderActualID, { 1.0, 1.0, 1.0, 1.0 }, swMatCombinat);
 
 	// 5. DIBUIXAR L'ESFERA
 	draw_TriEBO_Object(GLU_SPHERE);
 
-	// Restaurar estat de textura per seguretat
+	// Restaurar estat de textures per seguretat
+	if (usaNormalMap)
+	{
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
 	if (m_textureID != 0)
 	{
+		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, 0);
-		glUniform1i(glGetUniformLocation(shaderActual, "textur"), GL_FALSE);
+		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "textur"), GL_FALSE);
 	}
 
 	// 6. DIBUIXAR ELS FILLS (satèl·lits, anells, etc.) AMB LA POSICIÓ DEL PARE
 	for (Object* o : m_sons)
 		if (o)
-			o->drawObject(shaderActual, m_trMatrix);
+			o->drawObject(ctx, m_trMatrix);
 }
 
-void EsferaInt::update(double T)
+void EsferaInt::update(double tempsJ2000, const glm::mat4& matriuPare)
 {
 	if (m_radiOrbita > 0.0)
 	{
-		m_angleOrbita = std::fmod(m_angleOrbitaInicial + m_velAngular * T, 360.0);
+		m_angleOrbita = std::fmod(m_angleOrbitaInicial + m_velAngular * tempsJ2000, 360.0);
 		if (m_angleOrbita < 0.0) m_angleOrbita += 360.0;
 	}
 
-	m_angleRotacio = std::fmod(m_angleRotacioInicial + m_velRotacio * T, 360.0);
+	m_angleRotacio = std::fmod(m_angleRotacioInicial + m_velRotacio * tempsJ2000, 360.0);
 	if (m_angleRotacio < 0.0) m_angleRotacio += 360.0;
 
+	// Calcular la posicio orbital global respecte a matriuPare abans de dibuixar (0 frames de lag)
+	glm::mat4 matriuPlaOrbita = glm::rotate(matriuPare, (float)glm::radians(m_inclinacioOrbita), vec3(1.0f, 0.0f, 0.0f));
+	float xOrb = (float)(m_radiOrbita * cos(glm::radians(m_angleOrbita)));
+	float yOrb = (float)(m_radiOrbita * sin(glm::radians(m_angleOrbita)));
+	glm::mat4 matriuPosicio = glm::translate(matriuPlaOrbita, vec3(xOrb, yOrb, 0.0f));
+
+	// m_trMatrix passa nomes la posicio als fills sense inclinar els seus eixos
+	m_trMatrix = matriuPare;
+	m_trMatrix[3] = matriuPosicio[3];
+
 	for (Object* son : m_sons)
-		if (son) son->update(T);
+		if (son) son->update(tempsJ2000, m_trMatrix);
 }
 
-
-
-void AnellInt::drawObject(GLuint& shaderActual, glm::mat4& matriuTG)
+void AnellInt::update(double tempsJ2000, const glm::mat4& matriuPare)
 {
-	// 1. Hereta la posició del planeta pare
-	m_trMatrix = matriuTG;
+	m_trMatrix = matriuPare;
+	for (Object* son : m_sons)
+		if (son) son->update(tempsJ2000, m_trMatrix);
+}
 
-	// 2. Matriu de model: inclinació axial (els radis ja estan integrats al CVAO)
+void AnellInt::drawObject(ContextRenderEscenari& ctx, const glm::mat4& matriuPare)
+{
+	// 1. Dibuixar amb el shader Phong estandard (suporta sw_twoSided per a superficies primes)
+	activarShaderSiCal(ctx, ctx.shaderPhongID);
+
+	// 2. Hereta la posició del planeta pare i aplica inclinació axial (els radis ja estan al CVAO)
+	m_trMatrix = matriuPare;
 	glm::mat4 ModelMatrix = glm::rotate(m_trMatrix, (float)glm::radians(m_inclinacioEix), vec3(1.0f, 0.0f, 0.0f));
-	glUniformMatrix4fv(glGetUniformLocation(shaderActual, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
+	glUniformMatrix4fv(glGetUniformLocation(ctx.shaderActualID, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
 
-	// 3. Configuració de textura i il·luminació directa (sense oscuriment per angle ras del Sol)
+	// 3. Configuració de textura difusa
 	if (m_textureID != 0)
 	{
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, m_textureID);
-		glUniform1i(glGetUniformLocation(shaderActual, "textur"), GL_TRUE);
-		glUniform1i(glGetUniformLocation(shaderActual, "texImage"), 0);
+		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "textur"), GL_TRUE);
+		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "texture0"), 0);
 	}
 	else
 	{
-		glUniform1i(glGetUniformLocation(shaderActual, "textur"), GL_FALSE);
+		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "textur"), GL_FALSE);
 	}
 
-	glUniform1i(glGetUniformLocation(shaderActual, "sw_material"), GL_FALSE);
-	glUniform4i(glGetUniformLocation(shaderActual, "sw_intensity"), GL_TRUE, GL_FALSE, GL_FALSE, GL_FALSE);
+	// 4. Combinar material amb opcions de la UI i activar il·luminació bilateral + transparència
+	bool swMatAnell[5] = {
+		m_sw_mat[0] && ctx.iluminacioSolar,
+		ctx.vistaClara,
+		ctx.sw_mat[2],
+		false,
+		true
+	};
+	SeleccionaColorMaterial(ctx.shaderActualID, { 1.0, 1.0, 1.0, 1.0 }, swMatAnell);
 
-	// 4. Il·luminació bilateral i blending per a les zones semitransparents
-	GLint locTwoSided = glGetUniformLocation(shaderActual, "sw_twoSided");
+	GLint locTwoSided = glGetUniformLocation(ctx.shaderActualID, "sw_twoSided");
 	if (locTwoSided != -1) glUniform1i(locTwoSided, GL_TRUE);
 
 	glEnable(GL_BLEND);
@@ -143,14 +190,15 @@ void AnellInt::drawObject(GLuint& shaderActual, glm::mat4& matriuTG)
 
 	if (m_textureID != 0)
 	{
+		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, 0);
-		glUniform1i(glGetUniformLocation(shaderActual, "textur"), GL_FALSE);
+		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "textur"), GL_FALSE);
 	}
 
 	// 7. Propagar als fills
 	for (Object* o : m_sons)
 		if (o)
-			o->drawObject(shaderActual, m_trMatrix);
+			o->drawObject(ctx, m_trMatrix);
 }
 
 
@@ -258,31 +306,30 @@ CVAO creaOrbita()
 }
 
 
-CelestialBodyId mainBodies[10] = { CB_SUN, CB_MERCURY, CB_VENUS, CB_EARTH, CB_MARS, CB_JUPITER, CB_SATURN, CB_URANUS, CB_NEPTUNE, CB_MOON };
-
 void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
-{	glUseProgram(shaderNormalMapID);
-	glUniform1i(glGetUniformLocation(shaderNormalMapID, "texture0"), 0);
-	glUniform1i(glGetUniformLocation(shaderNormalMapID, "normalMap"), 1);
-	glUniform1i(glGetUniformLocation(shaderNormalMapID, "flag_invert_y"), GL_TRUE);
+{
+	if (m_inicialitzat) return;
+
+	if (shaderNormalMapID != 0) {
+		glUseProgram(shaderNormalMapID);
+		glUniform1i(glGetUniformLocation(shaderNormalMapID, "texture0"), 0);
+		glUniform1i(glGetUniformLocation(shaderNormalMapID, "normalMap"), 1);
+		glUniform1i(glGetUniformLocation(shaderNormalMapID, "flag_invert_y"), GL_TRUE);
+	}
 
 	glUseProgram(shader_programID);
 	glUniform1i(glGetUniformLocation(shader_programID, "texture0"), GLint(0));
 	glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), GL_TRUE);
 
-
 	CColor colObj;
 	colObj.r = 1.0; colObj.g = 1.0; colObj.b = 1.0; colObj.a = 1.0;
-	deleteVAOList(GLU_SPHERE);
-	deleteVAOList(GLU_DISK);
-	deleteVAOList(GLUT_TORUS);
 	SetColor4d(colObj.r, colObj.g, colObj.b, colObj.a);
-	Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(1.0, 40, 40));				// Esfera de radi 1 (cossos)
-	Set_VAOList(GLU_DISK, loadgluDisk_EBO(8.0f, 12.0f, 80, 5)); //anell
-	Set_VAOList(GLUT_TORUS, creaOrbita());	// Anell fi de radi 1 (orbites). 
-
-	// Orbites: un unic cercle de linies de radi 1, compartit per les 8 orbites planetaries i la lunar
-	//creaOrbita();
+	if (Get_VAOList(GLU_SPHERE).vaoId == 0) {
+		Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(1.0, 40, 40)); // Esfera de radi 1 (cossos)
+	}
+	if (Get_VAOList(GLUT_TORUS).vaoId == 0) {
+		Set_VAOList(GLUT_TORUS, creaOrbita()); // Cercle de linies de radi 1 (orbites)
+	}
 
 	const double x = 360.0 / 86400; // 360 graus / dies_orbita -> velocitat en graus/dia (1s simulat = 1 dia)
 	const double factorRotacio = 1.0 / 86400;
@@ -339,16 +386,7 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	anellSat->m_normalMapID = createDefaultNormalMap();
 
 	glBindTexture(GL_TEXTURE_2D, 0);
-}
-
-// Inclinacio del pla orbital de la Lluna respecte l'ecliptica (graus). Font: docs/planetes/planetes.json
-static const float INCLINACIO_ORBITA_LLUNA = 5.145f;
-
-// Matriu del sistema de referencia de l'orbita lunar: centrat a la Terra i inclinat respecte l'ecliptica.
-// La fan servir tant l'orbita lunar com la Lluna, perque quedin sempre alineades.
-static glm::mat4 matriuOrbitaLluna(const Object* terra)
-{
-	return glm::rotate(terra->m_trMatrix, glm::radians((float)INCLINACIO_ORBITA_LLUNA), glm::vec3(1.0f, 0.0f, 0.0f));
+	m_inicialitzat = true;
 }
 
 // dibuixaEscenari: renderitza orbites (si mostrarOrbites es true des del menu Visualitzacio),
@@ -356,42 +394,10 @@ static glm::mat4 matriuOrbitaLluna(const Object* terra)
 void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5], bool mostrarOrbites)
 {
 	(void)MatriuVista;
-	CColor col_blanc, col_orbita;
+	CColor col_blanc;
 	col_blanc.r = 1.0;	col_blanc.g = 1.0;	col_blanc.b = 1.0;	col_blanc.a = 1.0;
-	col_orbita.r = 0.7;	col_orbita.g = 0.7;	col_orbita.b = 0.7;	col_orbita.a = 1.0;
 
-	glm::mat4 ModelMatrix(1.0);
-	int i;
-	// Desactivar emissio per a orbites i anell de Saturn (nomes el Sol emet llum propia)
-	bool sw_mat_no_emisio[5] = { false, sw_mat[1], sw_mat[2], sw_mat[3], sw_mat[4] };
-
-	// 1. Orbites: anell fi sense textura, escalat al radi de cada orbita (condicionat a mostrarOrbites)
-	if (false && mostrarOrbites) {
-		glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_FALSE);
-		SeleccionaColorMaterial(sh_programID, col_orbita, sw_mat_no_emisio);
-		GLint locModelMatOrb = glGetUniformLocation(sh_programID, "modelMatrix");
-		GLint locTwoSidedOrb = glGetUniformLocation(sh_programID, "sw_twoSided");
-		//if (m_orbitVAO.vaoId != 0) glBindVertexArray(m_orbitVAO.vaoId);
-		for (i = 0; i < m_objectList.size(); i++)
-		{
-			// Les orbites planetaries es centren al Sol; la de la Lluna (i == 9) a la Terra
-			glm::mat4 MatriuCentre = (i == 9) ? matriuOrbitaLluna(m_objectList[CB_EARTH]) : MatriuTG;
-			//ModelMatrix = glm::scale(MatriuCentre, vec3(m_objectList[mainBodies[i]]->m_radiOrbita, m_objectList[mainBodies[i]]->m_radiOrbita, m_objectList[mainBodies[i]]->m_radiOrbita));
-			glUniformMatrix4fv(locModelMatOrb, 1, GL_FALSE, &ModelMatrix[0][0]);
-
-			// L'orbita lunar no esta centrada al Sol: la seva normal no sempre mira cap a la llum.
-			// Amb il.luminacio bilateral (mateix uniform que l'anell de Saturn) mai queda totalment fosca.
-			if (locTwoSidedOrb != -1) glUniform1i(locTwoSidedOrb, (i == 9));
-
-			//if (m_orbitVAO.vaoId != 0)
-				//glDrawArrays(GL_LINE_LOOP, 0, m_orbitVAO.nVertexs);
-		}
-		if (locTwoSidedOrb != -1) glUniform1i(locTwoSidedOrb, GL_FALSE);
-		glBindVertexArray(0);
-	}
-
-	// 3. Cossos: esfera amb la seva textura, situada sobre la seva òrbita
-	// Preparamos el shader estándar (Phong)
+	// Preparamos el shader estandard (Phong)
 	glUseProgram(sh_programID);
 	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_TRUE);
 	glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_TRUE);
@@ -399,135 +405,66 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 	SeleccionaColorMaterial(sh_programID, col_blanc, sw_mat);
 
 	// Preparamos el shader de normal mapping una sola vez antes del bucle
-	glUseProgram(shaderNormalMapID);
-	copiaUniformsShader(sh_programID, shaderNormalMapID);
-	glUniform1i(glGetUniformLocation(shaderNormalMapID, "textur"), GL_TRUE);
-	glUniform1i(glGetUniformLocation(shaderNormalMapID, "modulate"), GL_TRUE);
-	glUniform1i(glGetUniformLocation(shaderNormalMapID, "flag_invert_y"), GL_TRUE);
-	SeleccionaColorMaterial(shaderNormalMapID, col_blanc, sw_mat);
+	GLuint shaderInicialActiu = sh_programID;
+	if (shaderNormalMapID != 0)
+	{
+		glUseProgram(shaderNormalMapID);
+		copiaUniformsShader(sh_programID, shaderNormalMapID);
+		glUniform1i(glGetUniformLocation(shaderNormalMapID, "textur"), GL_TRUE);
+		glUniform1i(glGetUniformLocation(shaderNormalMapID, "modulate"), GL_TRUE);
+		glUniform1i(glGetUniformLocation(shaderNormalMapID, "flag_invert_y"), GL_TRUE);
+		SeleccionaColorMaterial(shaderNormalMapID, col_blanc, sw_mat);
+		shaderInicialActiu = shaderNormalMapID;
+	}
 
-	GLuint shaderActual = shaderNormalMapID;
+	ContextRenderEscenari ctx;
+	ctx.shaderPhongID = sh_programID;
+	ctx.shaderNormalMapID = shaderNormalMapID;
+	ctx.shaderActualID = shaderInicialActiu;
+	ctx.mostrarOrbites = mostrarOrbites;
+	ctx.iluminacioSolar = sw_mat[0];
+	ctx.vistaClara = sw_mat[1];
+	for (int k = 0; k < 5; ++k) ctx.sw_mat[k] = sw_mat[k];
 
-	GLint locTwoSided = glGetUniformLocation(shaderActual, "sw_twoSided");
-	//glUniform4i(glGetUniformLocation(shaderActual, "sw_intensity"), (true && sw_mat[0]), sw_mat[1], sw_mat[2], sw_mat[3]);
-
+	// Recorregut recursiu des dels nodes arrel del graf d'escena
 	for (auto& p : m_objectList)
 	{
-		CelestialBodyId id = p.first;
 		Object* obj = p.second;
-
-		if (!p.second) continue;
-		if (p.second->m_parent == nullptr)
-			obj->drawObject(shaderActual, MatriuTG);
+		if (!obj) continue;
+		if (obj->m_parent == nullptr)
+			obj->drawObject(ctx, MatriuTG);
 	}
 
-	for (i = 0; i < m_objectList.size(); i++)
-	{
-		break;
-		bool esAnell = (i == 10);
-		bool usaNormalMap = (m_objectList[mainBodies[i]]->m_normalMapID != 0 && shaderNormalMapID != 0);
-		GLuint shaderObjetivo = usaNormalMap ? shaderNormalMapID : sh_programID;
-
-		// Cambiar de shader solo cuando sea necesario
-		if (shaderActual != shaderObjetivo) {
-			glUseProgram(shaderObjetivo);
-			shaderActual = shaderObjetivo;
-		}
-
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, m_objectList[mainBodies[i]]->m_textureID);
-		// Mapa normal (unidad 1)
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, usaNormalMap ? m_objectList[mainBodies[i]]->m_normalMapID : 0);
-
-		int idxOrbita = esAnell ? 6 : i;
-		//float x = m_objectList[mainBodies[idxOrbita]]->m_radiOrbita * (float)cos(m_objectList[mainBodies[idxOrbita]]->m_angleOrbita * PI / 180.0);
-		//float y = m_objectList[mainBodies[idxOrbita]]->m_radiOrbita * (float)sin(m_objectList[mainBodies[idxOrbita]]->m_angleOrbita * PI / 180.0);
-
-		//// Cálculo de posición y matriz de modelo (ahora sirve para todos, incluida la Luna)
-		//glm::mat4 MatriuCentre = (i == 9) ? matriuOrbitaLluna(m_objectList[CB_EARTH]) : MatriuTG;
-		//ModelMatrix = glm::translate(MatriuCentre, vec3(x, y, 0.0f));
-		//if (esAnell)
-		//	ModelMatrix = glm::rotate(ModelMatrix, glm::radians(20.0f), vec3(1.0f, 0.0f, 0.0f));
-		//else
-		//	ModelMatrix = glm::rotate(ModelMatrix, glm::radians(m_objectList[mainBodies[i]]->m_angleRotacio), vec3(0.0f, 0.0f, 1.0f));
-		//ModelMatrix = glm::scale(ModelMatrix, vec3(m_objectList[mainBodies[i]]->m_radiCos, m_objectList[mainBodies[i]]->m_radiCos, m_objectList[mainBodies[i]]->m_radiCos));
-		//m_objectList[mainBodies[i]]->m_mMatrix = ModelMatrix;
-		glUniformMatrix4fv(glGetUniformLocation(shaderActual, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
-		glUniform4i(glGetUniformLocation(shaderActual, "sw_intensity"), (i == 0 && sw_mat[0]), sw_mat[1], sw_mat[2], sw_mat[3]);
-
-		if (esAnell) {
-			if (locTwoSided != -1) glUniform1i(locTwoSided, GL_TRUE);
-			glEnable(GL_BLEND);
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-			draw_TriEBO_Object(GLU_DISK);
-
-			glDisable(GL_BLEND);
-			if (locTwoSided != -1) glUniform1i(locTwoSided, GL_FALSE);
-		}
-		else {
-			draw_TriEBO_Object(GLU_SPHERE);
-		}
-	}
-
-	// Restaurar estado de texturas y volver al shader principal
+	// Restaurar estat de textures i tornar al shader Phong principal
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
-	if (shaderActual != sh_programID) {
-		glUseProgram(sh_programID);
-	}
-
+	activarShaderSiCal(ctx, sh_programID);
 	glUniform4i(glGetUniformLocation(sh_programID, "sw_intensity"), sw_mat[0], sw_mat[1], sw_mat[2], sw_mat[3]);
+	glUniform1i(glGetUniformLocation(sh_programID, "sw_material"), sw_mat[4]);
 	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_FALSE);
 }
 
-// updateVariables: avanca les orbites i rotacions dels 10 cossos segons els controls de la UI:
-// - enPausa: atura completament el moviment quan l'usuari prem Pausa o Espai.
+// updateVariables: avanca les orbites i rotacions dels cossos segons els controls de la UI:
+// - enPausa: atura completament el moviment quan l'usuari prem Pausa o Espai (tret de forcarActualitzacio).
 // - direccioTemps: +1 (endavant) o -1 (rebobinar) des del panell temporal / Backspace.
 // - escalaReal + factorVelocitat: ajusta el pas orbital segons el timelapse actiu en mode ESCALA_REAL.
-void Escenari::updateVariables(double t, double dt, bool enPausa, int direccioTemps, bool escalaReal, double factorVelocitat)
+void Escenari::updateVariables(double t, double dt, bool enPausa, int direccioTemps, bool escalaReal, double factorVelocitat, bool forcarActualitzacio)
 {
-	if (m_objectList.empty() || enPausa) return;
+	(void)dt;
+	(void)direccioTemps;
+	(void)escalaReal;
+	(void)factorVelocitat;
 
-	// Limit de seguretat per a dt
-	if (dt < 0.0) dt = 0.0;
-	if (dt > 0.1) dt = 0.1;
-
-	dt = dt * direccioTemps;
-	// Factor de temps per al moviment orbital
-	float factorTemps = 1.0f;
-	//if (escalaReal) factorTemps = std::sqrt(factorVelocitat / 300.0);
+	if (m_objectList.empty() || (enPausa && !forcarActualitzacio)) return;
 
 	for (auto& p : m_objectList)
 	{
 		if (p.second && p.second->m_parent == nullptr)
-			p.second->update(t);
+			p.second->update(t, glm::mat4(1.0f));
 	}
-
-	//for (int i = 0; i < m_objectList.size(); i++)
-	//{
-	//	// Gir orbital al voltant del Sol (la Lluna, i == 9, al voltant de la Terra)
-	//	if (i > 0)
-	//	{
-	//		double incrementOrbita = m_objectList[mainBodies[i]]->m_velAngular * dt * factorTemps;
-	//		m_objectList[mainBodies[i]]->m_angleOrbita += incrementOrbita;
-	//		while (m_objectList[mainBodies[i]]->m_angleOrbita >= 360.0f) m_objectList[mainBodies[i]]->m_angleOrbita -= 360.0f;
-	//		while (m_objectList[mainBodies[i]]->m_angleOrbita < 0.0f) m_objectList[mainBodies[i]]->m_angleOrbita += 360.0f;
-	//	}
-
-	//	m_objectList[mainBodies[i]]->m_angleRotacio += m_objectList[mainBodies[i]]->m_velRotacio * dt;
-	//	while (m_objectList[mainBodies[i]]->m_angleRotacio >= 360.0f) m_objectList[mainBodies[i]]->m_angleRotacio -= 360.0f;
-	//	while (m_objectList[mainBodies[i]]->m_angleRotacio < 0.0f) m_objectList[mainBodies[i]]->m_angleRotacio += 360.0f;
-	//}
-
-	//// Lluna: rotacio sincrona (sempre mostra la mateixa cara a la Terra).
-	//// El centre de la textura (cara visible, u = 0.5) queda a la direccio (0,-1,0) de l'esfera de
-	//// glut_geometry. Girar-la (angleOrbita - 90) graus la fa apuntar sempre cap a la Terra.
-	//m_objectList[CB_MOON]->m_angleRotacio = m_objectList[CB_MOON]->m_angleOrbita - 90.0f;
 }
 
 

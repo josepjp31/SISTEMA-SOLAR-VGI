@@ -61,6 +61,7 @@ uniform bvec4 sw_intensity;	// Filtre per a cada tipus de reflexió: Emissiva (sw
 uniform vec4 LightModelAmbient;	// Intensitat de llum ambient (r,g,b,a)-
 uniform Light LightSource[MaxLights];	// Vector de fonts de llum.
 uniform Material material;	// Vector de coeficients reflectivitat de materials.
+uniform bool sw_twoSided = false;	// Il-luminacio bilateral per a superficies primes (paritat amb phong_shdrML.frag).
 
 // ---- L63- Variables out
 out vec4 FragColor; 		// Color fragment (r,g,b,a)
@@ -141,7 +142,7 @@ vec3 phongModel(vec3 N, inout int numMat, inout float aValue)
 
 		// ---- L140- Compute the diffuse term
     		Idiffuse = vec3 (0.0,0.0,0.0);	// Intensitat difusa de la font de llum i-èssima reflexada del fragment (pixel).
-     		if (sw_intensity[2]) {	diffuseLight = max(dot(L, N), 0.0);
+     		if (sw_intensity[2]) {	diffuseLight = sw_twoSided ? (0.35 + 0.65 * abs(dot(L, N))) : max(dot(L, N), 0.0);
     					if (sw_material) { Idiffuse = material.diffuse.rgb * LightSource[i].diffuse.rgb * diffuseLight * fatt;
                                                            // Càlcul component a de transparència per llum difusa i per material.
 					                   numMat = numMat +1;
