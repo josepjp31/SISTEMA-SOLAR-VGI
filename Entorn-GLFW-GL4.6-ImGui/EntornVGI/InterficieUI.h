@@ -206,8 +206,26 @@ struct EstatSimulacio {
     CelestialBodyId cosEnfocatId = CB_SUN;              // Index de l'astre enfocat (0=Sol, 1=Mercuri .. 8=Neptu)
 
     // Flags de sincronitzacio amb el motor OpenGL (llegits i netejats a SincronitzarEstatSimuladorAmbOpenGL de main.cpp)
-    bool configuracioInicialPendent = false; // S'activa en iniciar o commutar de mode per reconfigurar shaders, llum i escenari
-    bool canviCameraPendent = false;         // S'activa en triar una camera o enfocar un nou planeta per actualitzar OPV / CAM_NAVEGA
+    bool configuracioInicialPendent = false; // Nomes al sortir del selector inicial (configura shaders, llums, skybox)
+    bool canviModeDirectePendent = false;    // Activat pel boto "Canviar" o menu rapid: commuta escenari conservant vista
+    bool canviCameraPendent = false;         // Activat quan l'usuari canvia manualment d'astre o mode de camera
+
+    // Preferencia del panell de temps en mode ESCALA_REAL (per recordar si estava obert en tornar-hi)
+    bool panellTempsPreferitReal = true;
+
+    // Snapshot de la vista abans d'un canvi directe de mode per conservar exactament l'enquadrament
+    struct EstatVistaTransicio {
+        bool valid = false;
+        CelestialBodyId cosAnterior = CB_SUN;
+        ModeCamera modeCameraAnterior = ModeCamera::FIXA_INCLINADA_25;
+        double radiCosAnterior = 1.0;       // Escala del cos enfocat a l'escenari d'origen
+        double distAbsoluta = 100.0;        // OPV.R abans del canvi
+        double ratioZoomRelatiu = 4.5;      // OPV.R / radiCosAnterior (clau per comparar escales diferents)
+        double alfa = 25.0;                 // Angle vertical de camera esferica
+        double beta = 0.0;                  // Angle horitzontal de camera esferica
+        double radiSistemaAnterior = 210.0; // Per escalar proporcionalment en GLOBAL_SISTEMA o COET
+    };
+    EstatVistaTransicio transicioVista;
 
     EstatTempsSimulacio tempsSimulacio;
     OpcionsVisualitzacio opcionsVisualitzacio;
@@ -224,6 +242,9 @@ public:
 
     // Actualitza estat.dadesCosActiu a partir del cataleg intern (amb fallback segur des d'Escenari)
     static void ActualitzarDadesCosActiu(EstatSimulacio& estat, const Escenari* escenari = nullptr);
+
+    // Commuta directament entre INTUITIU i ESCALA_REAL conservant vista, camera, focus i temps
+    static void SolicitarCanviModeDirecte(EstatSimulacio& estat, ModeSimulacio modeDesti);
 
     // Coordina i dibuixa tots els components actius de la UI a cada frame (cridada des de draw_Menu_ImGui a main.cpp)
     static void Renderitzar(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID, GLuint& shader_programIDNormalMap);

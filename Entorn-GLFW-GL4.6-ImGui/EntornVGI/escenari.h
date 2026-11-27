@@ -237,6 +237,9 @@ public:
 	// Retorna tots els objectes enfocables de l'escenari ordenats per m_ordreMenu
 	std::vector<const Object*> obtenirObjectesEnfocables() const;
 
+	// Retorna el radi maxim de referencia del sistema (p. ex. orbita de Neptu) per escalar vistes globals entre modes
+	virtual double obtenirRadiReferenciaSistema() const { return 210.0; }
+
 	// Allibera els objectes (i els seus VAO). Cal cridar-la ABANS de destruir el context OpenGL.
 	void alliberaEscenari() {
 		if (!m_inicialitzat && m_objectList.empty()) return;

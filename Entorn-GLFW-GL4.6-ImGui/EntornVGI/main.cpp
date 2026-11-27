@@ -457,9 +457,16 @@ static LimitsCameraCos CalcularLimitsCameraPerCos(CelestialBodyId id, double rad
 	return lim;
 }
 
+static double LimitarRang(double valor, double minim, double maxim)
+{
+	return std::min(maxim, std::max(minim, valor));
+}
+
 // SincronitzarEstatSimuladorAmbOpenGL: Pont entre la interficie ImGui (g_EstatSimulador)
 // i les variables globals d'OpenGL/EntornVGI. S'executa a cada frame abans de renderitzar:
 // - Bloc 1 (configuracioInicialPendent): configura projeccio, shaders, llum solar #0, escenari i skybox.
+// - Bloc 1b (canviModeDirectePendent): commuta d'escenari en directe conservant vista, angle i zoom relatiu.
+// - Bloc 1c (recalculEfemeridesNecessari): recalcula posicions encara que estigui en pausa.
 // - Bloc 2 (continu): aplica en temps real les opcions del menu "Visualitzacio".
 // - Bloc 3 (canviCameraPendent): canvia entre CAM_ESFERICA (orbital/25°/global) i CAM_NAVEGA (Pilota coet).
 void SincronitzarEstatSimuladorAmbOpenGL()
@@ -533,6 +540,150 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		if (SkyBoxCube) OnVistaSkyBox();
 
 		g_EstatSimulador.configuracioInicialPendent = false;
+	}
+
+	// 1b. Canvi de mode en directe ("Canviar" o drecera Tab): commuta d'escenari conservant vista i camera
+	if (g_EstatSimulador.canviModeDirectePendent)
+	{
+		// Pas 1: Capturar la vista de l'escenari sortint abans de canviar el punter escenariActual
+		const Escenari* escenariAnterior = escenariActual;
+		EstatSimulacio::EstatVistaTransicio transicio;
+		transicio.valid = true;
+		transicio.cosAnterior = g_EstatSimulador.cosEnfocatId;
+		transicio.modeCameraAnterior = g_EstatSimulador.cameraConfig.mode;
+		transicio.alfa = OPV.alfa;
+		transicio.beta = OPV.beta;
+		transicio.distAbsoluta = OPV.R;
+		transicio.radiSistemaAnterior = (escenariAnterior != nullptr)
+			? std::max(escenariAnterior->obtenirRadiReferenciaSistema(), 1e-6)
+			: 210.0;
+
+		glm::vec3 posOrigen(0.0f);
+		double radiOrigen = 16.0;
+		if (!ObtenirDadesEnfocament(escenariAnterior, transicio.cosAnterior, posOrigen, radiOrigen)) {
+			radiOrigen = 16.0;
+		}
+		transicio.radiCosAnterior = radiOrigen;
+		transicio.ratioZoomRelatiu = (radiOrigen > 1e-6) ? (OPV.R / radiOrigen) : 4.5;
+
+		// Pas 2: Commutar el punter d'escenari actiu i inicialitzar-lo si es el primer cop
+		if (escenaris != nullptr) {
+			int idxNou = (g_EstatSimulador.modeActual == ModeSimulacio::INTUITIU) ? 0 : 1;
+			escenariActual = &escenaris[idxNou];
+			if (!escenariActual->esInicialitzat()) {
+				escenariActual->creaEscenari(shader_programID, shader_programIDNormalMap);
+			}
+		}
+
+		// Forcar actualitzacio immediata a l'instant temporal actual fins i tot si la simulacio es en pausa
+		if (escenariActual != nullptr && objecte == SISTEMA_SOLAR) {
+			bool escalaReal = (g_EstatSimulador.modeActual == ModeSimulacio::ESCALA_REAL);
+			double tJ2000 = toJ2000Seconds(
+				g_EstatSimulador.tempsSimulacio.dataHora.any,
+				g_EstatSimulador.tempsSimulacio.dataHora.mes,
+				g_EstatSimulador.tempsSimulacio.dataHora.dia,
+				g_EstatSimulador.tempsSimulacio.dataHora.hora,
+				g_EstatSimulador.tempsSimulacio.dataHora.minut,
+				g_EstatSimulador.tempsSimulacio.dataHora.segon
+			);
+			escenariActual->updateVariables(
+				tJ2000,
+				0.0,
+				g_EstatSimulador.tempsSimulacio.enPausa,
+				g_EstatSimulador.tempsSimulacio.direccioTemps,
+				escalaReal,
+				g_EstatSimulador.tempsSimulacio.factorVelocitatSegonsPerSegon,
+				true // forcarActualitzacio: m_trMatrix sincronitzada abans de posicionar la camera
+			);
+			g_EstatSimulador.recalculEfemeridesNecessari = false;
+		}
+
+		// Pas 3: Restaurar/adaptar la camera i l'objecte enfocat al nou escenari
+		double radiSistemaDesti = (escenariActual != nullptr)
+			? std::max(escenariActual->obtenirRadiReferenciaSistema(), 1e-6)
+			: 210.0;
+		double factorSistema = radiSistemaDesti / transicio.radiSistemaAnterior;
+
+		CelestialBodyId cidDesti = transicio.cosAnterior;
+		glm::vec3 posDesti(0.0f);
+		double radiDesti = 16.0;
+		if (!ObtenirDadesEnfocament(escenariActual, cidDesti, posDesti, radiDesti)) {
+			// Si no existeix al nou escenari, provar el seu pare o fer fallback a CB_SUN
+			CelestialBodyId fallbackId = CB_SUN;
+			if (escenariAnterior != nullptr) {
+				const Object* objOrig = escenariAnterior->obtenirObjecte(cidDesti);
+				if (objOrig != nullptr && objOrig->m_parent != nullptr &&
+					ObtenirDadesEnfocament(escenariActual, objOrig->m_parent->m_id, posDesti, radiDesti))
+				{
+					fallbackId = objOrig->m_parent->m_id;
+				}
+			}
+			cidDesti = fallbackId;
+			ObtenirDadesEnfocament(escenariActual, cidDesti, posDesti, radiDesti);
+			g_EstatSimulador.cosEnfocatId = cidDesti;
+			g_EstatSimulador.origenReferenciaSol = (cidDesti == CB_SUN);
+		}
+		InterficieUI::ActualitzarDadesCosActiu(g_EstatSimulador, escenariActual);
+
+		if (cidDesti == CB_MILANO) {
+			AssegurarCoetCarregat();
+		}
+
+		if (transicio.modeCameraAnterior == ModeCamera::ORBITAL_CENTRADOR ||
+			transicio.modeCameraAnterior == ModeCamera::FIXA_INCLINADA_25)
+		{
+			camera = CAM_ESFERICA;
+			mobil = true;   zzoom = true;   satelit = false;   pan = false;
+			Vis_Polar = POLARZ;
+			OPV.alfa = (transicio.modeCameraAnterior == ModeCamera::FIXA_INCLINADA_25) ? 25.0 : transicio.alfa;
+			OPV.beta = transicio.beta;
+
+			LimitsCameraCos limDesti = CalcularLimitsCameraPerCos(cidDesti, radiDesti);
+			OPV.R = LimitarRang(transicio.ratioZoomRelatiu * radiDesti, limDesti.minR, limDesti.maxR);
+
+			cam_Esferica[0] = (float)OPV.R;
+			cam_Esferica[1] = (float)OPV.alfa;
+			cam_Esferica[2] = (float)OPV.beta;
+		}
+		else if (transicio.modeCameraAnterior == ModeCamera::GLOBAL_SISTEMA)
+		{
+			camera = CAM_ESFERICA;
+			mobil = true;   zzoom = true;   satelit = false;   pan = false;
+			Vis_Polar = POLARZ;
+			OPV.alfa = transicio.alfa;
+			OPV.beta = transicio.beta;
+
+			LimitsCameraCos limDesti = CalcularLimitsCameraPerCos(cidDesti, radiDesti);
+			OPV.R = LimitarRang(transicio.distAbsoluta * factorSistema, limDesti.minR, limDesti.maxR);
+
+			cam_Esferica[0] = (float)OPV.R;
+			cam_Esferica[1] = (float)OPV.alfa;
+			cam_Esferica[2] = (float)OPV.beta;
+		}
+		else if (transicio.modeCameraAnterior == ModeCamera::COET_PRIMERA_PERSONA)
+		{
+			AssegurarCoetCarregat();
+			camera = CAM_NAVEGA;
+			mobil = false;  zzoom = false;  satelit = false;
+			Vis_Polar = POLARZ;
+
+			posMilano *= (float)factorSistema;
+			glm::vec3 posSol(0.0f);
+			double radiSol = 16.0;
+			if (ObtenirDadesEnfocament(escenariActual, CB_SUN, posSol, radiSol)) {
+				glm::vec3 deltaSol = posMilano - posSol;
+				float distSol = glm::length(deltaSol);
+				float minDistSol = (float)(radiSol * 1.5);
+				if (distSol < 1e-4f) {
+					posMilano = posSol + glm::vec3(minDistSol, 0.0f, 0.0f);
+				} else if (distSol < minDistSol) {
+					posMilano = posSol + glm::normalize(deltaSol) * minDistSol;
+				}
+			}
+		}
+
+		g_EstatSimulador.transicioVista = transicio;
+		g_EstatSimulador.canviModeDirectePendent = false;
 	}
 
 	// 1b. Recalcular immediatament les posicions orbitals si s'ha canviat data/hora o creat l'escenari
@@ -1028,7 +1179,7 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 		if (g_EstatSimulador.mostrarSelectorModes) return;
 
 		// Dreceres globals del simulador sincronitzades amb els menus de la interficie:
-		// Espai -> Pausa/Reprendre, Backspace -> Invertir temps, R -> Reenquadrar vista, Home -> Vista Global
+		// Espai -> Pausa/Reprendre, Backspace -> Invertir temps, R -> Reenquadrar vista, Home -> Vista Global, Tab -> Canviar mode
 		if (mods == 0 && action == GLFW_PRESS) {
 			if (key == GLFW_KEY_SPACE) {
 				g_EstatSimulador.tempsSimulacio.enPausa = !g_EstatSimulador.tempsSimulacio.enPausa;
@@ -1048,6 +1199,13 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 				g_EstatSimulador.origenReferenciaSol = true;
 				InterficieUI::ActualitzarDadesCosActiu(g_EstatSimulador, escenariActual);
 				g_EstatSimulador.canviCameraPendent = true;
+				return;
+			}
+			else if (key == GLFW_KEY_TAB) {
+				ModeSimulacio nouMode = (g_EstatSimulador.modeActual == ModeSimulacio::INTUITIU)
+					? ModeSimulacio::ESCALA_REAL
+					: ModeSimulacio::INTUITIU;
+				InterficieUI::SolicitarCanviModeDirecte(g_EstatSimulador, nouMode);
 				return;
 			}
 		}

@@ -112,6 +112,23 @@ void InterficieUI::ActualitzarDadesCosActiu(EstatSimulacio& estat, const Escenar
     }
 }
 
+// Commuta directament entre INTUITIU i ESCALA_REAL sense passar pel selector inicial, recordant l'estat del panell 
+// de temps de ESCALA_REAL i conservant camera, focus i rellotge.
+void InterficieUI::SolicitarCanviModeDirecte(EstatSimulacio& estat, ModeSimulacio modeDesti)
+{
+    if (estat.modeActual == modeDesti) return;
+
+    if (estat.modeActual == ModeSimulacio::ESCALA_REAL) {
+        estat.panellTempsPreferitReal = estat.mostrarPanellTemps;
+        estat.mostrarPanellTemps = false;
+    } else if (modeDesti == ModeSimulacio::ESCALA_REAL) {
+        estat.mostrarPanellTemps = estat.panellTempsPreferitReal;
+    }
+
+    estat.modeActual = modeDesti;
+    estat.canviModeDirectePendent = true;
+}
+
 // =========================================================================
 // 1. INICIALITZACIO D'ESTIL VISUAL I TIPOGRAFIES
 // =========================================================================
@@ -686,6 +703,7 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
                 estat.modeActual = ModeSimulacio::ESCALA_REAL;
                 estat.mostrarSelectorModes = false;
                 estat.mostrarPanellTemps = true;
+                estat.panellTempsPreferitReal = true;
                 estat.cosEnfocatId = CB_SUN;
                 estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
                 estat.configuracioInicialPendent = true;
@@ -847,17 +865,11 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
         if (ImGui::BeginMenu("Escenari"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
-            if (ImGui::MenuItem("Canviar de Mode...")) {
+            if (ImGui::MenuItem("Obrir Selector de Modes...")) {
                 estat.mostrarSelectorModes = true;
             }
-            if (ImGui::MenuItem("Canviar a Mode a Escala Real")) {
-                estat.modeActual = ModeSimulacio::ESCALA_REAL;
-                estat.mostrarPanellTemps = true;
-                estat.configuracioInicialPendent = true;
-                estat.canviCameraPendent = true;
-                if (escenaris != nullptr) {
-                    currentEscenari = &escenaris[1];
-                }
+            if (ImGui::MenuItem("Canviar a Mode a Escala Real", "Tab")) {
+                SolicitarCanviModeDirecte(estat, ModeSimulacio::ESCALA_REAL);
             }
             ImGui::Separator();
             if (ImGui::MenuItem(estat.tempsSimulacio.enPausa ? "Reprendre Moviment" : "Pausar Moviment", "Espai")) {
@@ -968,18 +980,11 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
         if (ImGui::BeginMenu("Escenari"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
-            if (ImGui::MenuItem("Canviar de Mode...")) {
+            if (ImGui::MenuItem("Obrir Selector de Modes...")) {
                 estat.mostrarSelectorModes = true;
             }
-            if (ImGui::MenuItem("Canviar a Mode Didàctic")) {
-                estat.modeActual = ModeSimulacio::INTUITIU;
-                estat.mostrarPanellTemps = false;
-                estat.cameraConfig.mode = ModeCamera::FIXA_INCLINADA_25;
-                estat.configuracioInicialPendent = true;
-                estat.canviCameraPendent = true;
-                if (escenaris != nullptr) {
-                    currentEscenari = &escenaris[0];
-                }
+            if (ImGui::MenuItem("Canviar a Mode Didàctic", "Tab")) {
+                SolicitarCanviModeDirecte(estat, ModeSimulacio::INTUITIU);
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Reiniciar Vista", "R")) {
@@ -1167,9 +1172,17 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
 
     ImGui::SameLine();
 
-    // Reobre el selector inicial per canviar entre Mode Didactic i Escala Real
+    // Commutacio directa entre Mode Didactic i Mode a Escala Real conservant la vista actual
     if (ImGui::Button("Canviar")) {
-        estat.mostrarSelectorModes = true;
+        ModeSimulacio nouMode = (estat.modeActual == ModeSimulacio::INTUITIU)
+            ? ModeSimulacio::ESCALA_REAL
+            : ModeSimulacio::INTUITIU;
+        SolicitarCanviModeDirecte(estat, nouMode);
+    }
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(estat.modeActual == ModeSimulacio::INTUITIU
+            ? "Canviar en directe a Mode a Escala Real (conserva posició i càmera) [Tab]"
+            : "Canviar en directe a Mode Didàctic (conserva posició i càmera) [Tab]");
     }
     ImGui::SameLine();
 
