@@ -86,16 +86,29 @@ void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, glm
 	// Shader Visualització Objectes
 	glUseProgram(sh_programID);
 
-	// Parametrització inicial de textures
-	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_FALSE);
-	glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_FALSE);
-	glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), GL_TRUE);
+	// Cache d'uniform locations per evitar consultes al driver cada fotograma
+	static GLuint s_cachedProgramID = 0;
+	static GLint s_locTextur = -1;
+	static GLint s_locModulate = -1;
+	static GLint s_locFlagInvertY = -1;
+	static GLint s_locModelMatrix = -1;
+	static GLint s_locUseNormalMatrixPV = -1;
+	static GLint s_locUNormalMatrixPV = -1;
+	if (s_cachedProgramID != sh_programID)
+	{
+		s_cachedProgramID = sh_programID;
+		s_locTextur = glGetUniformLocation(sh_programID, "textur");
+		s_locModulate = glGetUniformLocation(sh_programID, "modulate");
+		s_locFlagInvertY = glGetUniformLocation(sh_programID, "flag_invert_y");
+		s_locModelMatrix = glGetUniformLocation(sh_programID, "modelMatrix");
+		s_locUseNormalMatrixPV = glGetUniformLocation(sh_programID, "useNormalMatrixPV");
+		s_locUNormalMatrixPV = glGetUniformLocation(sh_programID, "uNormalMatrixPV");
+	}
 
-	// Attribute Locations must be setup before calling glLinkProgram()
-	glBindAttribLocation(sh_programID, 0, "in_Vertex");		// Vèrtexs
-	glBindAttribLocation(sh_programID, 1, "in_Color");		// Color
-	glBindAttribLocation(sh_programID, 2, "in_Normal");		// Normals
-	glBindAttribLocation(sh_programID, 3, "in_TexCoord");	// Textura
+	// Parametritzacio inicial de textures
+	if (s_locTextur != -1) glUniform1i(s_locTextur, GL_FALSE);
+	if (s_locModulate != -1) glUniform1i(s_locModulate, GL_FALSE);
+	if (s_locFlagInvertY != -1) glUniform1i(s_locFlagInvertY, GL_TRUE);
 
 	if (escenariActual != nullptr)
 		escenariActual->dibuixaEscenari(sh_programID, shader_programIDNormalMap, MatriuVista, MatriuTG, sw_mat, mostrarOrbites);
@@ -159,11 +172,25 @@ void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, glm
 
 		ModelMatrix = glm::scale(ModelMatrix, glm::vec3(0.5f));
 
-		glUniformMatrix4fv(
-			glGetUniformLocation(sh_programID, "modelMatrix"),
-			1, GL_FALSE, &ModelMatrix[0][0]
-		);
+		if (s_locModelMatrix != -1)
+			glUniformMatrix4fv(s_locModelMatrix, 1, GL_FALSE, &ModelMatrix[0][0]);
+
+		// Precalcula la matriu normal a CPU i activa face culling nomes durant el dibuix de la nau
+		if (s_locUseNormalMatrixPV != -1 && s_locUNormalMatrixPV != -1)
+		{
+			glm::mat3 normalMatPV = glm::mat3(glm::transpose(glm::inverse(MatriuVista * ModelMatrix)));
+			glUniform1i(s_locUseNormalMatrixPV, GL_TRUE);
+			glUniformMatrix3fv(s_locUNormalMatrixPV, 1, GL_FALSE, &normalMatPV[0][0]);
+		}
+
+		GLboolean prevCullEnabled = glIsEnabled(GL_CULL_FACE);
+		glEnable(GL_CULL_FACE);
+		glCullFace(GL_BACK);
 
 		objecteOBJ->draw_TriVAO_OBJ(sh_programID);
+
+		if (!prevCullEnabled) glDisable(GL_CULL_FACE);
+		if (s_locUseNormalMatrixPV != -1)
+			glUniform1i(s_locUseNormalMatrixPV, GL_FALSE);
 	}
 }

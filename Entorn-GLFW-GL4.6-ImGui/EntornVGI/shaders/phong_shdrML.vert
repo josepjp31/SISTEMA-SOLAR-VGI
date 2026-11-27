@@ -48,6 +48,8 @@ layout (location = 3) in vec2 in_TexCoord; 	// Coordenades (s,t) Coordenada text
 uniform mat4 projectionMatrix;	// Projection Matrix
 uniform mat4 viewMatrix; 	// View Matrix
 uniform mat4 modelMatrix;	// Model Matrix
+uniform bool useNormalMatrixPV = false;
+uniform mat3 uNormalMatrixPV;
 
 uniform sampler2D texture0;	// Imatge textura
 uniform bool textur;		// Booleana d�activaci� (TRUE) de textures o no (FALSE).
@@ -68,16 +70,16 @@ out vec4 vertexColor;
 void main()	// --- L68-
 {
 // --- L70- Calcul variables out.
-    vertexPV = vec3(viewMatrix * modelMatrix * vec4(in_Vertex,1.0));
+    mat4 mvMatrix = viewMatrix * modelMatrix;
+    vec4 posPV = mvMatrix * vec4(in_Vertex, 1.0);
+    vertexPV = posPV.xyz;
 
-	// La matriz de normales transforma las normales del modelo
-	// al mismo espacio de vista que las posiciones y la luz.
-	// Usamos solo la parte 3x3 porque una normal es una dirección,
-	// no una posición afectada por la traslación.
-	mat3 normalMatrixPV = transpose(inverse(mat3(viewMatrix * modelMatrix)));
+    // Reutilitza la matriu normal precalculada a CPU quan s'indica des de l'aplicacio
+    mat3 normalMatrixPV = useNormalMatrixPV
+        ? uNormalMatrixPV
+        : transpose(inverse(mat3(mvMatrix)));
 
-	// Transformamos y normalizamos la normal de este vértice.
-	vertexNormalPV = normalize(normalMatrixPV * in_Normal);
+    vertexNormalPV = normalize(normalMatrixPV * in_Normal);
 
 // --- L77- Textura
     if (flag_invert_y) vertexTexCoord = vec2(in_TexCoord.x,1.0-in_TexCoord.y); // SOIL_FLAG_INVERT_Y
@@ -87,5 +89,5 @@ void main()	// --- L68-
     vertexColor = in_Color;
 
 // --- L84- Transformacio de Visualitzacio amb Matriu Projeccio (PMatrix), Matriu C�mera (VMatrix) i Matriu TG (MMatrix)
-    gl_Position = vec4(projectionMatrix * viewMatrix * modelMatrix * vec4(in_Vertex,1.0));
+    gl_Position = projectionMatrix * posPV;
 }

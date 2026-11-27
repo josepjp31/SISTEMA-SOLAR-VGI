@@ -19,6 +19,8 @@
 #include "main.h"
 #include "escenari.h"
 #include "InterficieUI.h"
+#include <thread>
+#include <atomic>
 
 // Escenari actiu i llista d'escenaris reservats a main():
 // - escenaris[0]: Mode Didactic / Intuitiu
@@ -389,20 +391,76 @@ void OnShaderNormalMap()
 
 double toJ2000Seconds(int year, int month, int day, int hour = 0, int minute = 0, double second = 0.0);
 
-// Carrega el model 3D de la nau Milano si encara no es a memoria (usat en Pilota coet i quan s'enfoca CB_MILANO)
-static void AssegurarCoetCarregat()
+// Estat de precarrega asincrona en segon pla del model 3D de la nau Milano
+static std::thread g_coetPreloadThread;
+static OBJPreloadData g_coetPreloadData;
+static std::atomic<bool> g_coetPreloadStarted(false);
+static std::atomic<bool> g_coetPreloadDone(false);
+static std::atomic<bool> g_coetPreloadSuccess(false);
+static const char* kMilanoObjPath = "textures/coet/milano_gotg.obj";
+
+// Inicia la lectura i decodificacio a RAM (.mbin o .obj + textura) en un fil secundari
+static void IniciarPrecarregaCoet()
 {
-	if (ObOBJ == NULL)
+	if (!g_coetPreloadStarted.exchange(true))
+	{
+		g_coetPreloadThread = std::thread([]() {
+			bool ok = COBJModel::LoadToCPU(kMilanoObjPath, g_coetPreloadData);
+			g_coetPreloadSuccess.store(ok);
+			g_coetPreloadDone.store(true);
+		});
+	}
+}
+
+// Puia la geometria i textura precarregades a la GPU al fil principal OpenGL
+// Si esperarSiCal es true (p. ex. en entrar a Pilota coet o enfocar CB_MILANO), fa join() si cal.
+static void FinalitzarCarregaCoetGPU(bool esperarSiCal)
+{
+	if (ObOBJ != NULL) return;
+
+	if (!g_coetPreloadStarted.load())
+	{
+		if (!esperarSiCal) return;
+		ObOBJ = new COBJModel;
+		char nomFitxer[260];
+		strcpy_s(nomFitxer, kMilanoObjPath);
+		int error = ObOBJ->LoadModel(nomFitxer);
+		if (error == 0) printf("Milano carregada correctament!\n");
+		else printf("Error carregant la Milano: %d\n", error);
+		return;
+	}
+
+	if (!g_coetPreloadDone.load() && !esperarSiCal) return;
+
+	if (g_coetPreloadThread.joinable())
+		g_coetPreloadThread.join();
+
+	if (g_coetPreloadSuccess.load())
 	{
 		ObOBJ = new COBJModel;
-		char nomFitxer[] = "textures/coet/milano_gotg.obj";
-		int error = ObOBJ->LoadModel(nomFitxer);
-		if (error == 0) {
+		int error = ObOBJ->UploadFromCPU(g_coetPreloadData);
+		if (error == 0)
 			printf("Milano carregada correctament!\n");
-		} else {
+		else
 			printf("Error carregant la Milano: %d\n", error);
-		}
 	}
+	else if (esperarSiCal)
+	{
+		ObOBJ = new COBJModel;
+		char nomFitxer[260];
+		strcpy_s(nomFitxer, kMilanoObjPath);
+		int error = ObOBJ->LoadModel(nomFitxer);
+		if (error == 0)
+			printf("Milano carregada correctament!\n");
+		else
+			printf("Error carregant la Milano: %d\n", error);
+	}
+}
+
+// Carrega el model 3D de la nau Milano si encara no es a GPU (usat en Pilota coet i en enfocar CB_MILANO)
+static void AssegurarCoetCarregat()
+{
+	FinalitzarCarregaCoetGPU(true);
 }
 
 // Resol la posicio en coordenades del mon, el radi visual d'enquadrament i el nom
@@ -2005,6 +2063,8 @@ int main()
 	OPV.R = 550.0;	OPV.alfa = 65.0;	OPV.beta = 0.0;
 	cam_Esferica[0] = (float)OPV.R;	cam_Esferica[1] = (float)OPV.alfa;	cam_Esferica[2] = (float)OPV.beta;
 
+	// Precarrega asincrona del coet Milano en segon pla mentre es mostra el selector inicial
+	IniciarPrecarregaCoet();
 
 // Loop until the user closes the window
 	while (!glfwWindowShouldClose(window))
@@ -2048,6 +2108,10 @@ int main()
 			}
 		}
 
+		// Finalitzar pujada a GPU del coet Milano quan la precarrega en segon pla hagi acabat
+		if (ObOBJ == NULL && g_coetPreloadDone.load())
+			FinalitzarCarregaCoetGPU(false);
+
 		// Poll for and process events
 		glfwPollEvents();
 
@@ -2079,6 +2143,15 @@ int main()
 	delete[] escenaris;
 	escenaris = nullptr;
 	escenariActual = nullptr;
+
+	// Neteja segura del fil de precarrega i recursos OpenGL del coet Milano abans de tancar el context
+	if (g_coetPreloadThread.joinable()) g_coetPreloadThread.join();
+	COBJModel::FreePreloadData(g_coetPreloadData);
+	if (ObOBJ != NULL)
+	{
+		delete ObOBJ;
+		ObOBJ = NULL;
+	}
 
 	glfwDestroyWindow(window);
 

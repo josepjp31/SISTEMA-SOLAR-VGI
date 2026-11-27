@@ -1,9 +1,10 @@
-//******** PRACTICA VISUALITZACIÓ GRÀFICA INTERACTIVA (Escola Enginyeria - UAB)
-//******** Entorn bàsic VS2026 MONOFINESTRA amb OpenGL 4.6, interfície GLFW 3.4, ImGui i llibreries GLM
-//******** Enric Martí (Setembre 2026)
-// objLoader.h: Inteface of the class COBJModel.
+//******** PRACTICA VISUALITZACIO GRAFICA INTERACTIVA (Escola Enginyeria - UAB)
+//******** Entorn basic VS2026 MONOFINESTRA amb OpenGL 4.6, interficie GLFW 3.4, ImGui i llibreries GLM
+//******** Enric Marti (Setembre 2026)
+// objLoader.h: Interface of the class COBJModel.
 //
-//	  Versió 2.0:	- Adaptació funcions a crear un VAO per a cada material del fitxer
+//	  Versio 3.0:	- Carregador rapid d'una passada, cache binaria .mbin, VBO GL_FLOAT + EBO
+//					  i suport de precarrega en segon pla (LoadToCPU / UploadFromCPU).
 //////////////////////////////////////////////////////////////////////////////////////
 
 #ifndef OBJLOADER_H
@@ -15,8 +16,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <stdint.h>
+#include <vector>
 
-// Màxima mida vector VAOList
+// Maxima mida vector VAOList
 #define MAX_SIZE_VAOLIST 125
 
 // Needed structures
@@ -53,17 +56,50 @@ struct Face
 
 struct Material
 {
-  char	szName[1024];		 // Name of the material
-  char	szTexture[_MAX_PATH];// Filename of the texture
-  uint	iTextureID;			 // OpenGL name of the texture
-  float fDiffuse[3];		 // Diffuse component
-  float fAmbient[3];		 // Ambient component
-  float fSpecular[3];		 // Specular component
-  float fEmmissive[3];		 // Emmissive component
-  float fShininess;			 // Specular exponent
+	char	szName[1024];		 // Name of the material
+	char	szTexture[_MAX_PATH];// Filename of the texture
+	uint	iTextureID;			 // OpenGL name of the texture
+	float fDiffuse[3];		 // Diffuse component
+	float fAmbient[3];		 // Ambient component
+	float fSpecular[3];		 // Specular component
+	float fEmmissive[3];		 // Emmissive component
+	float fShininess;			 // Specular exponent
 };
 
-class OBJLOADER_CLASS_DECL COBJModel  
+// Compact interleaved vertex format (32 bytes/vertex)
+struct VertexOBJ
+{
+	float px, py, pz;   // location 0: in_Vertex
+	float nx, ny, nz;   // location 2: in_Normal
+	float u, v;         // location 3: in_TexCoord
+};
+
+struct OBJSubMeshCPU
+{
+	int materialIndex;
+	std::vector<VertexOBJ> vertices;
+	std::vector<unsigned int> indices;
+};
+
+struct OBJTextureCPU
+{
+	unsigned char* pixels;
+	int width;
+	int height;
+	int channels;
+	OBJTextureCPU() : pixels(NULL), width(0), height(0), channels(0) {}
+};
+
+struct OBJPreloadData
+{
+	std::vector<Material> materials;
+	std::vector<OBJSubMeshCPU> submeshes;
+	std::vector<OBJTextureCPU> textures;
+	bool valid;
+	OBJPreloadData() : valid(false) {}
+};
+
+class OBJLOADER_CLASS_DECL COBJModel
 {
   public:
 	void _stdcall DrawModel(int prim_Id);
@@ -72,51 +108,47 @@ class OBJLOADER_CLASS_DECL COBJModel
 	virtual _stdcall ~COBJModel();
 	void _stdcall EliminaLlista(int prim_Id);
 
-// Funcions CVAO
+	// Precarrega desacoplada CPU -> GPU (thread-safe per LoadToCPU)
+	static bool _stdcall LoadToCPU(const char* szFileName, OBJPreloadData& outData);
+	int _stdcall UploadFromCPU(OBJPreloadData& data);
+	static void _stdcall FreePreloadData(OBJPreloadData& data);
+
+	// Funcions CVAO
 	void _stdcall netejaVAOList_OBJ();
 	void _stdcall netejaTextures_OBJ();
 	void _stdcall draw_TriVAO_OBJ(GLuint sh_programID);
 
-private:
-	void _stdcall ReadNextString(char szString[], FILE *hStream);
-//	  int _stdcall LoadTexture(const char szFileName[_MAX_PATH]);
-	  int _stdcall LoadTexture2(const char szFileName[_MAX_PATH]);
-	  void _stdcall UseMaterial(const Material *pMaterial);
-	  void _stdcall UseMaterial_ShaderID(GLuint sh_programID, Material pMaterial);
-	  void _stdcall GetTokenParameter(char szString[], const unsigned int iStrSize, FILE *hFile);
-	  void _stdcall MakePath(char szFileAndPath[]);
-	  bool _stdcall LoadMaterialLib(const char szFileName[], Material *pMaterials,
-				unsigned int *iCurMaterialIndex, char szBasePath[]);
-	CVAO _stdcall RenderToVAOList(const Face* pFaces, const unsigned int iFaceCount,
-				const Material *pMaterials);
-	void _stdcall loadToVAOList(const Face* pFaces, const unsigned int iFaceCount,
-				const Material* pMaterials);
-	void _stdcall GetFaceNormal(float fNormalOut[3], const Face *pFace);
-	void _stdcall ParseFaceString(char szFaceString[], Face *FaceOut, const Vector3D *pVertices,
-			  const Vector3D *pNormals, const Vector2D *pTexCoords, const unsigned int iMaterialIndex);
-	void _stdcall GetFileInfo(FILE *hStream, OBJFileInfo *Stat, const char szConstBasePath[]);
- 	void _stdcall GenTexCoords();
+  private:
+	void _stdcall UseMaterial_ShaderID(GLuint sh_programID, const Material& pMaterial);
+	void _stdcall updateUniformCache(GLuint sh_programID);
 
-// CVAO
-	GLint numMaterials = 0;
+	// CVAO
+	GLint numMaterials;
+	GLint numSubmeshes;
 	int vector_Materials[MAX_SIZE_VAOLIST];
 	CVAO VAOList_OBJ[MAX_SIZE_VAOLIST];
 	Material vMaterials[MAX_SIZE_VAOLIST];
 
-// Funcions CVAO
+	// Cache de localitzacions d'uniforms
+	GLuint cachedProgramID;
+	GLint loc_texture0;
+	GLint loc_textur;
+	GLint loc_matAmbient;
+	GLint loc_matDiffuse;
+	GLint loc_matSpecular;
+	GLint loc_matShininess;
+
+	// Funcions CVAO
 	void _stdcall initVAOList_OBJ();
 	void _stdcall Set_VAOList_OBJ(GLint k, CVAO auxVAO);
 	void _stdcall deleteVAOList_OBJ(GLint k);
 	void _stdcall draw_TriVAO_Object_OBJ(GLint k);
 };
 
-// Callback function for comparing two faces with qsort
-static int CompareFaceByMaterial(const void *Arg1, const void *Arg2);
-
-//Returns a newly created COBJModel object. 
+// Returns a newly created COBJModel object.
 OBJLOADER_CLASS_DECL COBJModel* _stdcall InitObject();
 
-//Destroys a COBJModel object
+// Destroys a COBJModel object
 OBJLOADER_CLASS_DECL void _stdcall UnInitObject(COBJModel *obj);
 
-#endif // !defined(AFX_OBJMODEL_H__32C5F722_AD3D_11D1_8F4D_E0B57CC10800__INCLUDED_)
+#endif // OBJLOADER_H
