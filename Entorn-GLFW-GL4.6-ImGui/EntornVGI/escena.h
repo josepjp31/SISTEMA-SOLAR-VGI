@@ -23,7 +23,7 @@ void dibuixa_Skybox(GLuint sk_programID, GLuint cmTexture, char eix_Polar, glm::
 // Dibuixa l'escena OpenGL principal delegant el Sistema Solar a Escenari
 // (shader_programIDNormalMap: shader de normal mapping dels planetes; objecteOBJ: model de la nau Milano)
 void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5],
-	Escenari* escenariActual, COBJModel* objecteOBJ, bool mostrarOrbites = true, bool mostrarMilano = true/*COET*/);
+	Escenari* escenariActual, COBJModel* objecteOBJ, bool mostrarOrbites = true, bool mostrarMilano = true/*COET*/, const ParametresIluminacioEscenari* ilum = nullptr);
 
 //VARIABLES GLOBALS COET
 extern glm::vec3 posMilano;

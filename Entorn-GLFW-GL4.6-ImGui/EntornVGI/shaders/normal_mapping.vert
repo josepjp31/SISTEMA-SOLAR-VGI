@@ -48,6 +48,8 @@ uniform mat4 projectionMatrix;
 uniform mat4 viewMatrix;
 uniform mat4 modelMatrix;
 uniform mat4 normalMatrix;
+uniform bool useNormalMatrixPV = false;
+uniform mat3 uNormalMatrixPV;
 
 uniform sampler2D texture0;
 uniform sampler2D normalMap;
@@ -78,9 +80,10 @@ void main()
     // Posición en coordenadas de vista
     vertexPV = vec3(modelView * vec4(in_Vertex, 1.0));
 
-    // Matriz normal
-    mat3 normalMatrixPV =
-        transpose(inverse(mat3(modelView)));
+    // Reutilitza la matriu normal precalculada a CPU quan s'indica des de l'aplicacio
+    mat3 normalMatrixPV = useNormalMatrixPV
+        ? uNormalMatrixPV
+        : transpose(inverse(mat3(modelView)));
 
     // Normal
     vec3 N = normalize(normalMatrixPV * in_Normal);

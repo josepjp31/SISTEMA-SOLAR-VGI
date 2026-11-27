@@ -14,21 +14,82 @@ static void activarShaderSiCal(ContextRenderEscenari& ctx, GLuint shaderObjectiu
 	}
 }
 
+// Aplica el material blanc (1,1,1,1) i flags d'intensitat usant el cache d'uniforms (zero glGetUniformLocation)
+static void aplicarMaterialCache(const CacheUniformsShader& cache, const bool sw_mater[5])
+{
+	if (cache.locSwIntensity != -1)
+		glUniform4i(cache.locSwIntensity, sw_mater[0], sw_mater[1], sw_mater[2], sw_mater[3]);
+	if (cache.locSwMaterial != -1)
+		glUniform1i(cache.locSwMaterial, sw_mater[4]);
+
+	const float em = sw_mater[0] ? 1.0f : 0.0f;
+	const float am = sw_mater[1] ? 1.0f : 0.0f;
+	const float di = sw_mater[2] ? 1.0f : 0.0f;
+	const float sp = sw_mater[3] ? 1.0f : 0.0f;
+	const float sh = sw_mater[3] ? 32.0f : 0.0f;
+
+	if (cache.locMatEmission != -1)  glUniform4f(cache.locMatEmission, em, em, em, 1.0f);
+	if (cache.locMatAmbient != -1)   glUniform4f(cache.locMatAmbient, am, am, am, 1.0f);
+	if (cache.locMatDiffuse != -1)   glUniform4f(cache.locMatDiffuse, di, di, di, 1.0f);
+	if (cache.locMatSpecular != -1)  glUniform4f(cache.locMatSpecular, sp, sp, sp, 1.0f);
+	if (cache.locMatShininess != -1) glUniform1f(cache.locMatShininess, sh);
+}
+
+// Sincronitza matrius i llums al shader de normal mapping directament des de CPU (zero glGetUniform*)
+static void SincronitzarShaderNormalMap(const CacheUniformsShader& cache, const glm::mat4& matriuVista, const ParametresIluminacioEscenari& ilum)
+{
+	if (cache.locProjectionMatrix != -1)
+		glUniformMatrix4fv(cache.locProjectionMatrix, 1, GL_FALSE, &ilum.matriuProjeccio[0][0]);
+	if (cache.locViewMatrix != -1)
+		glUniformMatrix4fv(cache.locViewMatrix, 1, GL_FALSE, &matriuVista[0][0]);
+	if (cache.locNormalMatrix != -1) {
+		glm::mat4 nm = glm::transpose(glm::inverse(matriuVista));
+		glUniformMatrix4fv(cache.locNormalMatrix, 1, GL_FALSE, &nm[0][0]);
+	}
+	if (cache.locLightModelAmbient != -1) {
+		if (ilum.llumAmbient) glUniform4f(cache.locLightModelAmbient, 0.5f, 0.5f, 0.5f, 1.0f);
+		else glUniform4f(cache.locLightModelAmbient, 0.0f, 0.0f, 0.0f, 1.0f);
+	}
+	if (cache.locFixedLight != -1)
+		glUniform1i(cache.locFixedLight, ilum.llumFixa ? GL_TRUE : GL_FALSE);
+
+	if (ilum.llums != nullptr) {
+		const int count = (ilum.numLlums < 8) ? ilum.numLlums : 8;
+		for (int i = 0; i < count; ++i) {
+			const LLUM& l = ilum.llums[i];
+			const CacheUniformsShader::LocLlum& loc = cache.locLlums[i];
+			if (loc.swLight != -1)       glUniform1i(loc.swLight, l.encesa ? GL_TRUE : GL_FALSE);
+			if (loc.position != -1)      glUniform4f(loc.position, (GLfloat)l.posicio.x, (GLfloat)l.posicio.y, (GLfloat)l.posicio.z, (GLfloat)l.posicio.w);
+			if (loc.diffuse != -1)       glUniform4f(loc.diffuse, (GLfloat)l.difusa.r, (GLfloat)l.difusa.g, (GLfloat)l.difusa.b, (GLfloat)l.difusa.a);
+			if (loc.specular != -1)      glUniform4f(loc.specular, (GLfloat)l.especular.r, (GLfloat)l.especular.g, (GLfloat)l.especular.b, (GLfloat)l.especular.a);
+			if (loc.attenuation != -1)   glUniform3f(loc.attenuation, (GLfloat)l.atenuacio.a, (GLfloat)l.atenuacio.b, (GLfloat)l.atenuacio.c);
+			if (loc.restricted != -1)    glUniform1i(loc.restricted, l.restringida ? GL_TRUE : GL_FALSE);
+			if (loc.spotDirection != -1) glUniform3f(loc.spotDirection, (GLfloat)l.spotdirection.x, (GLfloat)l.spotdirection.y, (GLfloat)l.spotdirection.z);
+			if (loc.spotCosCutoff != -1) glUniform1f(loc.spotCosCutoff, l.spotcoscutoff);
+			if (loc.spotExponent != -1)  glUniform1f(loc.spotExponent, l.spotexponent);
+		}
+	}
+}
+
 void EsferaInt::drawObject(ContextRenderEscenari& ctx, const glm::mat4& matriuPare)
 {
 	// 1. DIBUIXAR L'ÒRBITA (nomes si mostrarOrbites esta actiu a la UI i el cos te orbita)
 	if (ctx.mostrarOrbites && m_radiOrbita > 0.0)
 	{
 		activarShaderSiCal(ctx, ctx.shaderPhongID);
+		const CacheUniformsShader* cacheOrb = ctx.cacheActual();
 
 		// Pla orbital inclinat respecte al sistema de referencia del pare
 		glm::mat4 matriuPlaOrbita = glm::rotate(matriuPare, (float)glm::radians(m_inclinacioOrbita), vec3(1.0f, 0.0f, 0.0f));
 		glm::mat4 matriuOrb = glm::scale(matriuPlaOrbita, vec3((float)m_radiOrbita));
 
-		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "textur"), GL_FALSE);
-		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "sw_material"), GL_FALSE);
-		glUniform4i(glGetUniformLocation(ctx.shaderActualID, "sw_intensity"), GL_TRUE, GL_FALSE, GL_FALSE, GL_FALSE);
-		glUniformMatrix4fv(glGetUniformLocation(ctx.shaderActualID, "modelMatrix"), 1, GL_FALSE, &matriuOrb[0][0]);
+		if (cacheOrb) {
+			if (cacheOrb->locTextur != -1)            glUniform1i(cacheOrb->locTextur, GL_FALSE);
+			if (cacheOrb->locSwMaterial != -1)        glUniform1i(cacheOrb->locSwMaterial, GL_FALSE);
+			if (cacheOrb->locSwIntensity != -1)       glUniform4i(cacheOrb->locSwIntensity, GL_TRUE, GL_FALSE, GL_FALSE, GL_FALSE);
+			if (cacheOrb->locUseNormalMatrixPV != -1) glUniform1i(cacheOrb->locUseNormalMatrixPV, GL_FALSE);
+			if (cacheOrb->locModelMatrix != -1)       glUniformMatrix4fv(cacheOrb->locModelMatrix, 1, GL_FALSE, &matriuOrb[0][0]);
+		}
 
 		CVAO orbitVAO = Get_VAOList(GLUT_TORUS);
 		if (orbitVAO.vaoId != 0)
@@ -47,43 +108,56 @@ void EsferaInt::drawObject(ContextRenderEscenari& ctx, const glm::mat4& matriuPa
 	// 3. SELECCIÓ DE SHADER (normal mapping si disposa de mapa normal valid)
 	const bool usaNormalMap = (m_normalMapID != 0 && ctx.shaderNormalMapID != 0);
 	activarShaderSiCal(ctx, usaNormalMap ? ctx.shaderNormalMapID : ctx.shaderPhongID);
+	const CacheUniformsShader* cache = ctx.cacheActual();
 
-	// 4. CONFIGURACIÓ DE MATRIU, TEXTURA DIFUSA (GL_TEXTURE0) I MAPA NORMAL (GL_TEXTURE1)
-	glUniformMatrix4fv(glGetUniformLocation(ctx.shaderActualID, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
+	// 4. CONFIGURACIÓ DE MATRIUS (incloent normalMatrixPV precalculada a CPU), TEXTURA DIFUSA I MAPA NORMAL
+	if (cache) {
+		if (cache->locModelMatrix != -1)
+			glUniformMatrix4fv(cache->locModelMatrix, 1, GL_FALSE, &ModelMatrix[0][0]);
 
-	if (m_textureID != 0)
-	{
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, m_textureID);
-		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "textur"), GL_TRUE);
-		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "texture0"), 0);
+		if (cache->locUseNormalMatrixPV != -1 && cache->locUNormalMatrixPV != -1) {
+			glm::mat3 normalMatPV = glm::mat3(glm::transpose(glm::inverse(ctx.matriuVista * ModelMatrix)));
+			glUniform1i(cache->locUseNormalMatrixPV, GL_TRUE);
+			glUniformMatrix3fv(cache->locUNormalMatrixPV, 1, GL_FALSE, &normalMatPV[0][0]);
+		}
+
+		if (m_textureID != 0)
+		{
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, m_textureID);
+			if (cache->locTextur != -1)  glUniform1i(cache->locTextur, GL_TRUE);
+			if (cache->locTexture0 != -1) glUniform1i(cache->locTexture0, 0);
+		}
+		else
+		{
+			if (cache->locTextur != -1) glUniform1i(cache->locTextur, GL_FALSE);
+		}
+
+		if (usaNormalMap)
+		{
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, m_normalMapID);
+			if (cache->locNormalMap != -1) glUniform1i(cache->locNormalMap, 1);
+		}
+
+		// Combinar m_sw_mat de l'objecte amb les opcions globals del menu Visualitzacio
+		bool swMatCombinat[5] = {
+			m_sw_mat[0] && ctx.iluminacioSolar,
+			ctx.vistaClara,
+			ctx.sw_mat[2],
+			ctx.sw_mat[3],
+			m_sw_mat[4]
+		};
+		aplicarMaterialCache(*cache, swMatCombinat);
 	}
-	else
-	{
-		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "textur"), GL_FALSE);
-	}
-
-	if (usaNormalMap)
-	{
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, m_normalMapID);
-		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "normalMap"), 1);
-	}
-
-	// Combinar m_sw_mat de l'objecte amb les opcions globals del menu Visualitzacio
-	bool swMatCombinat[5] = {
-		m_sw_mat[0] && ctx.iluminacioSolar,
-		ctx.vistaClara,
-		ctx.sw_mat[2],
-		ctx.sw_mat[3],
-		m_sw_mat[4]
-	};
-	SeleccionaColorMaterial(ctx.shaderActualID, { 1.0, 1.0, 1.0, 1.0 }, swMatCombinat);
 
 	// 5. DIBUIXAR L'ESFERA
 	draw_TriEBO_Object(GLU_SPHERE);
 
-	// Restaurar estat de textures per seguretat
+	// Restaurar estat de textures i normal matrix per seguretat
+	if (cache && cache->locUseNormalMatrixPV != -1)
+		glUniform1i(cache->locUseNormalMatrixPV, GL_FALSE);
+
 	if (usaNormalMap)
 	{
 		glActiveTexture(GL_TEXTURE1);
@@ -93,7 +167,7 @@ void EsferaInt::drawObject(ContextRenderEscenari& ctx, const glm::mat4& matriuPa
 	{
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, 0);
-		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "textur"), GL_FALSE);
+		if (cache && cache->locTextur != -1) glUniform1i(cache->locTextur, GL_FALSE);
 	}
 
 	// 6. DIBUIXAR ELS FILLS (satèl·lits, anells, etc.) AMB LA POSICIÓ DEL PARE
@@ -138,37 +212,46 @@ void AnellInt::drawObject(ContextRenderEscenari& ctx, const glm::mat4& matriuPar
 {
 	// 1. Dibuixar amb el shader Phong estandard (suporta sw_twoSided per a superficies primes)
 	activarShaderSiCal(ctx, ctx.shaderPhongID);
+	const CacheUniformsShader* cache = ctx.cacheActual();
 
 	// 2. Hereta la posició del planeta pare i aplica inclinació axial (els radis ja estan al CVAO)
 	m_trMatrix = matriuPare;
 	glm::mat4 ModelMatrix = glm::rotate(m_trMatrix, (float)glm::radians(m_inclinacioEix), vec3(1.0f, 0.0f, 0.0f));
-	glUniformMatrix4fv(glGetUniformLocation(ctx.shaderActualID, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
+	if (cache) {
+		if (cache->locModelMatrix != -1)
+			glUniformMatrix4fv(cache->locModelMatrix, 1, GL_FALSE, &ModelMatrix[0][0]);
 
-	// 3. Configuració de textura difusa
-	if (m_textureID != 0)
-	{
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, m_textureID);
-		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "textur"), GL_TRUE);
-		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "texture0"), 0);
+		if (cache->locUseNormalMatrixPV != -1 && cache->locUNormalMatrixPV != -1) {
+			glm::mat3 normalMatPV = glm::mat3(glm::transpose(glm::inverse(ctx.matriuVista * ModelMatrix)));
+			glUniform1i(cache->locUseNormalMatrixPV, GL_TRUE);
+			glUniformMatrix3fv(cache->locUNormalMatrixPV, 1, GL_FALSE, &normalMatPV[0][0]);
+		}
+
+		// 3. Configuració de textura difusa
+		if (m_textureID != 0)
+		{
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, m_textureID);
+			if (cache->locTextur != -1)  glUniform1i(cache->locTextur, GL_TRUE);
+			if (cache->locTexture0 != -1) glUniform1i(cache->locTexture0, 0);
+		}
+		else
+		{
+			if (cache->locTextur != -1) glUniform1i(cache->locTextur, GL_FALSE);
+		}
+
+		// 4. Combinar material amb opcions de la UI i activar il·luminació bilateral + transparència
+		bool swMatAnell[5] = {
+			m_sw_mat[0] && ctx.iluminacioSolar,
+			ctx.vistaClara,
+			ctx.sw_mat[2],
+			false,
+			true
+		};
+		aplicarMaterialCache(*cache, swMatAnell);
+
+		if (cache->locSwTwoSided != -1) glUniform1i(cache->locSwTwoSided, GL_TRUE);
 	}
-	else
-	{
-		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "textur"), GL_FALSE);
-	}
-
-	// 4. Combinar material amb opcions de la UI i activar il·luminació bilateral + transparència
-	bool swMatAnell[5] = {
-		m_sw_mat[0] && ctx.iluminacioSolar,
-		ctx.vistaClara,
-		ctx.sw_mat[2],
-		false,
-		true
-	};
-	SeleccionaColorMaterial(ctx.shaderActualID, { 1.0, 1.0, 1.0, 1.0 }, swMatAnell);
-
-	GLint locTwoSided = glGetUniformLocation(ctx.shaderActualID, "sw_twoSided");
-	if (locTwoSided != -1) glUniform1i(locTwoSided, GL_TRUE);
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -187,97 +270,22 @@ void AnellInt::drawObject(ContextRenderEscenari& ctx, const glm::mat4& matriuPar
 	// 6. Restaurar estats d'OpenGL i uniforms
 	glDepthMask(GL_TRUE);
 	glDisable(GL_BLEND);
-	if (locTwoSided != -1) glUniform1i(locTwoSided, GL_FALSE);
+	if (cache) {
+		if (cache->locSwTwoSided != -1) glUniform1i(cache->locSwTwoSided, GL_FALSE);
+		if (cache->locUseNormalMatrixPV != -1) glUniform1i(cache->locUseNormalMatrixPV, GL_FALSE);
+	}
 
 	if (m_textureID != 0)
 	{
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, 0);
-		glUniform1i(glGetUniformLocation(ctx.shaderActualID, "textur"), GL_FALSE);
+		if (cache && cache->locTextur != -1) glUniform1i(cache->locTextur, GL_FALSE);
 	}
 
 	// 7. Propagar als fills
 	for (Object* o : m_sons)
 		if (o)
 			o->drawObject(ctx, m_trMatrix);
-}
-
-
-
-
-
-// Copia matrius i llums del shader Phong al shader de normal mapping (perque tots dos il.luminin igual)
-static void copiaUniformsShader(GLuint src, GLuint dst)
-{
-	auto locs = [&](const char* nom, GLint& ls, GLint& ld) {
-		ls = glGetUniformLocation(src, nom);
-		ld = glGetUniformLocation(dst, nom);
-		return ls >= 0 && ld >= 0;
-		};
-	auto copiaMat4 = [&](const char* nom) {
-		GLint ls, ld; GLfloat m[16];
-		if (!locs(nom, ls, ld)) return;
-		glGetUniformfv(src, ls, m);
-		glProgramUniformMatrix4fv(dst, ld, 1, GL_FALSE, m);
-		};
-	auto copiaF = [&](const char* nom, int n) {	// vecN de floats (n = 1..4)
-		GLint ls, ld; GLfloat v[4];
-		if (!locs(nom, ls, ld)) return;
-		glGetUniformfv(src, ls, v);
-		if (n == 1) glProgramUniform1fv(dst, ld, 1, v);
-		else if (n == 3) glProgramUniform3fv(dst, ld, 1, v);
-		else glProgramUniform4fv(dst, ld, 1, v);
-		};
-	auto copiaI = [&](const char* nom) {		// int / bool
-		GLint ls, ld, v;
-		if (!locs(nom, ls, ld)) return;
-		glGetUniformiv(src, ls, &v);
-		glProgramUniform1i(dst, ld, v);
-		};
-
-	copiaMat4("projectionMatrix");
-	copiaMat4("viewMatrix");
-
-	// normalMatrix (solo la usa el frag para spots): inversa-transpuesta de la vista
-	GLint lsV = glGetUniformLocation(src, "viewMatrix");
-	GLint ldN = glGetUniformLocation(dst, "normalMatrix");
-	if (lsV >= 0 && ldN >= 0) {
-		glm::mat4 V; glGetUniformfv(src, lsV, &V[0][0]);
-		glm::mat4 NM = glm::transpose(glm::inverse(V));
-		glProgramUniformMatrix4fv(dst, ldN, 1, GL_FALSE, &NM[0][0]);
-	}
-
-	copiaF("LightModelAmbient", 4);
-	copiaI("fixedLight");
-
-	char n[64];
-	for (int i = 0; i < 8; i++) {
-		sprintf_s(n, "LightSource[%d].sw_light", i);		copiaI(n);
-		sprintf_s(n, "LightSource[%d].position", i);		copiaF(n, 4);
-		sprintf_s(n, "LightSource[%d].ambient", i);		copiaF(n, 4);
-		sprintf_s(n, "LightSource[%d].diffuse", i);		copiaF(n, 4);
-		sprintf_s(n, "LightSource[%d].specular", i);		copiaF(n, 4);
-		sprintf_s(n, "LightSource[%d].attenuation", i);	copiaF(n, 3);
-		sprintf_s(n, "LightSource[%d].restricted", i);		copiaI(n);
-		sprintf_s(n, "LightSource[%d].spotDirection", i);	copiaF(n, 3);
-		sprintf_s(n, "LightSource[%d].spotCosCutoff", i);	copiaF(n, 1);
-		sprintf_s(n, "LightSource[%d].spotExponent", i);	copiaF(n, 1);
-	}
-}
-
-GLuint createDefaultNormalMap()
-{
-	GLuint texID = 0;
-	unsigned char flatNormal[3] = { 128, 128, 255 }; // Vector (0, 0, 1)
-
-	glGenTextures(1, &texID);
-	glBindTexture(GL_TEXTURE_2D, texID);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, flatNormal);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	return texID;
 }
 
 // creaOrbita: genera un cercle de radi 1 al pla XY com a GL_LINE_LOOP.
@@ -322,15 +330,8 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	glUniform1i(glGetUniformLocation(shader_programID, "texture0"), GLint(0));
 	glUniform1i(glGetUniformLocation(shader_programID, "flag_invert_y"), GL_TRUE);
 
-	CColor colObj;
-	colObj.r = 1.0; colObj.g = 1.0; colObj.b = 1.0; colObj.a = 1.0;
-	SetColor4d(colObj.r, colObj.g, colObj.b, colObj.a);
-	if (Get_VAOList(GLU_SPHERE).vaoId == 0) {
-		Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(1.0, 40, 40)); // Esfera de radi 1 (cossos)
-	}
-	if (Get_VAOList(GLUT_TORUS).vaoId == 0) {
-		Set_VAOList(GLUT_TORUS, creaOrbita()); // Cercle de linies de radi 1 (orbites)
-	}
+	// VAOs compartits (creats un sol cop entre escenaris)
+	GestorRecursos::AssegurarVAOsEscenari();
 
 	const double x = 360.0 / 86400; // 360 graus / dies_orbita -> velocitat en graus/dia (1s simulat = 1 dia)
 	const double factorRotacio = 1.0 / 86400;
@@ -380,61 +381,67 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	configurarMetadades(CB_URANUS,  CategoriaObjecte::PLANETA,          70);
 	configurarMetadades(CB_NEPTUNE, CategoriaObjecte::PLANETA,          80);
 
-	// Càrrega de textures difuses
-	m_objectList[CB_SUN]->loadTexture(".\\textures\\sun\\2k_sun.jpg");
-	m_objectList[CB_MERCURY]->loadTexture(".\\textures\\planet\\Mercury\\2k_mercury.jpg");
-	m_objectList[CB_VENUS]->loadTexture(".\\textures\\planet\\Venus\\2k_venus_surface.jpg");
-	m_objectList[CB_EARTH]->loadTexture(".\\textures\\planet\\Earth\\earth2048.bmp");
-	m_objectList[CB_MARS]->loadTexture(".\\textures\\planet\\Mars\\2k_mars.jpg");
-	m_objectList[CB_JUPITER]->loadTexture(".\\textures\\planet\\Jupiter\\2k_jupiter.jpg");
-	m_objectList[CB_SATURN]->loadTexture(".\\textures\\planet\\Saturn\\2k_saturn.jpg");
-	m_objectList[CB_URANUS]->loadTexture(".\\textures\\planet\\Uranus\\2k_uranus.jpg");
-	m_objectList[CB_NEPTUNE]->loadTexture(".\\textures\\planet\\Neptune\\2k_neptune.jpg");
-	m_objectList[CB_MOON]->loadTexture(".\\textures\\planet\\Moon\\2k_moon.jpg");
-	anellSat->loadTexture(".\\textures\\planet\\Saturn\\2k_saturn_ring_alpha.png");
+	// Càrrega de textures difuses compartides via GestorRecursos (zero duplicacio en VRAM entre escenaris)
+	m_objectList[CB_SUN]->m_textureID     = GestorRecursos::ObtenirTextura2D("textures/sun/2k_sun.jpg");
+	m_objectList[CB_MERCURY]->m_textureID = GestorRecursos::ObtenirTextura2D("textures/planet/Mercury/2k_mercury.jpg");
+	m_objectList[CB_VENUS]->m_textureID   = GestorRecursos::ObtenirTextura2D("textures/planet/Venus/2k_venus_surface.jpg");
+	m_objectList[CB_EARTH]->m_textureID   = GestorRecursos::ObtenirTextura2D("textures/planet/Earth/earth2048.bmp");
+	m_objectList[CB_MARS]->m_textureID    = GestorRecursos::ObtenirTextura2D("textures/planet/Mars/2k_mars.jpg");
+	m_objectList[CB_JUPITER]->m_textureID = GestorRecursos::ObtenirTextura2D("textures/planet/Jupiter/2k_jupiter.jpg");
+	m_objectList[CB_SATURN]->m_textureID  = GestorRecursos::ObtenirTextura2D("textures/planet/Saturn/2k_saturn.jpg");
+	m_objectList[CB_URANUS]->m_textureID  = GestorRecursos::ObtenirTextura2D("textures/planet/Uranus/2k_uranus.jpg");
+	m_objectList[CB_NEPTUNE]->m_textureID = GestorRecursos::ObtenirTextura2D("textures/planet/Neptune/2k_neptune.jpg");
+	m_objectList[CB_MOON]->m_textureID    = GestorRecursos::ObtenirTextura2D("textures/planet/Moon/2k_moon.jpg");
+	anellSat->m_textureID                 = GestorRecursos::ObtenirTextura2D("textures/planet/Saturn/2k_saturn_ring_alpha.png");
 
-	// Càrrega de mapes normals
-	m_objectList[CB_SUN]->m_normalMapID = createDefaultNormalMap();
-	m_objectList[CB_MERCURY]->loadNormMap(".\\textures\\planet\\NormalTextures\\NormalMapMercury.png");
-	m_objectList[CB_VENUS]->loadNormMap(".\\textures\\planet\\NormalTextures\\NormalMapVenus.png");
-	m_objectList[CB_EARTH]->loadNormMap(".\\textures\\planet\\NormalTextures\\NormalMapEarth.png");
-	m_objectList[CB_MARS]->loadNormMap(".\\textures\\planet\\NormalTextures\\NormalMapMars.png");
-	m_objectList[CB_JUPITER]->loadNormMap(".\\textures\\planet\\NormalTextures\\NormalMapJupiter.png");
-	m_objectList[CB_SATURN]->loadNormMap(".\\textures\\planet\\NormalTextures\\NormalMapSaturn.png");
-	m_objectList[CB_URANUS]->m_normalMapID = createDefaultNormalMap();
-	m_objectList[CB_NEPTUNE]->loadNormMap(".\\textures\\planet\\NormalTextures\\NormalMapNeptune.png");
-	m_objectList[CB_MOON]->m_normalMapID = createDefaultNormalMap();
-	anellSat->m_normalMapID = createDefaultNormalMap();
+	// Càrrega de mapes normals compartits (i textura plana 1x1 unica per defecte)
+	GLuint normalDefecte = GestorRecursos::ObtenirNormalMapPerDefecte();
+	m_objectList[CB_SUN]->m_normalMapID     = normalDefecte;
+	m_objectList[CB_MERCURY]->m_normalMapID = GestorRecursos::ObtenirTextura2D("textures/planet/NormalTextures/NormalMapMercury.png");
+	m_objectList[CB_VENUS]->m_normalMapID   = GestorRecursos::ObtenirTextura2D("textures/planet/NormalTextures/NormalMapVenus.png");
+	m_objectList[CB_EARTH]->m_normalMapID   = GestorRecursos::ObtenirTextura2D("textures/planet/NormalTextures/NormalMapEarth.png");
+	m_objectList[CB_MARS]->m_normalMapID    = GestorRecursos::ObtenirTextura2D("textures/planet/NormalTextures/NormalMapMars.png");
+	m_objectList[CB_JUPITER]->m_normalMapID = GestorRecursos::ObtenirTextura2D("textures/planet/NormalTextures/NormalMapJupiter.png");
+	m_objectList[CB_SATURN]->m_normalMapID  = GestorRecursos::ObtenirTextura2D("textures/planet/NormalTextures/NormalMapSaturn.png");
+	m_objectList[CB_URANUS]->m_normalMapID  = normalDefecte;
+	m_objectList[CB_NEPTUNE]->m_normalMapID = GestorRecursos::ObtenirTextura2D("textures/planet/NormalTextures/NormalMapNeptune.png");
+	m_objectList[CB_MOON]->m_normalMapID    = normalDefecte;
+	anellSat->m_normalMapID                 = normalDefecte;
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 	m_inicialitzat = true;
 }
 
 // dibuixaEscenari: renderitza orbites (si mostrarOrbites es true des del menu Visualitzacio),
-// anells de Saturn i cossos celestes amb Phong i normal mapping.
-void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5], bool mostrarOrbites)
+// anells de Saturn i cossos celestes amb Phong i normal mapping sense consultes glGetUniform* per frame.
+void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5], bool mostrarOrbites, const ParametresIluminacioEscenari* ilum)
 {
-	(void)MatriuVista;
-	CColor col_blanc;
-	col_blanc.r = 1.0;	col_blanc.g = 1.0;	col_blanc.b = 1.0;	col_blanc.a = 1.0;
+	static CacheUniformsShader s_cachePhong;
+	static CacheUniformsShader s_cacheNormalMap;
+	s_cachePhong.ActualitzarSiCal(sh_programID);
+	if (shaderNormalMapID != 0) {
+		s_cacheNormalMap.ActualitzarSiCal(shaderNormalMapID);
+	}
 
-	// Preparamos el shader estandard (Phong)
+	// Preparamos el shader estandard (Phong) amb cache d'uniforms
 	glUseProgram(sh_programID);
-	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_TRUE);
-	glUniform1i(glGetUniformLocation(sh_programID, "modulate"), GL_TRUE);
-	glUniform1i(glGetUniformLocation(sh_programID, "flag_invert_y"), GL_TRUE);
-	SeleccionaColorMaterial(sh_programID, col_blanc, sw_mat);
+	if (s_cachePhong.locTextur != -1)     glUniform1i(s_cachePhong.locTextur, GL_TRUE);
+	if (s_cachePhong.locModulate != -1)   glUniform1i(s_cachePhong.locModulate, GL_TRUE);
+	if (s_cachePhong.locFlagInvertY != -1) glUniform1i(s_cachePhong.locFlagInvertY, GL_TRUE);
+	aplicarMaterialCache(s_cachePhong, sw_mat);
 
-	// Preparamos el shader de normal mapping una sola vez antes del bucle
+	// Preparamos el shader de normal mapping una sola vegada des de CPU (zero glGetUniform*)
 	GLuint shaderInicialActiu = sh_programID;
 	if (shaderNormalMapID != 0)
 	{
 		glUseProgram(shaderNormalMapID);
-		copiaUniformsShader(sh_programID, shaderNormalMapID);
-		glUniform1i(glGetUniformLocation(shaderNormalMapID, "textur"), GL_TRUE);
-		glUniform1i(glGetUniformLocation(shaderNormalMapID, "modulate"), GL_TRUE);
-		glUniform1i(glGetUniformLocation(shaderNormalMapID, "flag_invert_y"), GL_TRUE);
-		SeleccionaColorMaterial(shaderNormalMapID, col_blanc, sw_mat);
+		if (ilum != nullptr) {
+			SincronitzarShaderNormalMap(s_cacheNormalMap, MatriuVista, *ilum);
+		}
+		if (s_cacheNormalMap.locTextur != -1)     glUniform1i(s_cacheNormalMap.locTextur, GL_TRUE);
+		if (s_cacheNormalMap.locModulate != -1)   glUniform1i(s_cacheNormalMap.locModulate, GL_TRUE);
+		if (s_cacheNormalMap.locFlagInvertY != -1) glUniform1i(s_cacheNormalMap.locFlagInvertY, GL_TRUE);
+		aplicarMaterialCache(s_cacheNormalMap, sw_mat);
 		shaderInicialActiu = shaderNormalMapID;
 	}
 
@@ -446,6 +453,9 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 	ctx.iluminacioSolar = sw_mat[0];
 	ctx.vistaClara = sw_mat[1];
 	for (int k = 0; k < 5; ++k) ctx.sw_mat[k] = sw_mat[k];
+	ctx.matriuVista = MatriuVista;
+	ctx.cachePhong = &s_cachePhong;
+	ctx.cacheNormalMap = &s_cacheNormalMap;
 
 	// Recorregut recursiu des dels nodes arrel del graf d'escena
 	for (auto& p : m_objectList)
@@ -463,9 +473,12 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	activarShaderSiCal(ctx, sh_programID);
-	glUniform4i(glGetUniformLocation(sh_programID, "sw_intensity"), sw_mat[0], sw_mat[1], sw_mat[2], sw_mat[3]);
-	glUniform1i(glGetUniformLocation(sh_programID, "sw_material"), sw_mat[4]);
-	glUniform1i(glGetUniformLocation(sh_programID, "textur"), GL_FALSE);
+	if (s_cachePhong.locSwIntensity != -1)
+		glUniform4i(s_cachePhong.locSwIntensity, sw_mat[0], sw_mat[1], sw_mat[2], sw_mat[3]);
+	if (s_cachePhong.locSwMaterial != -1)
+		glUniform1i(s_cachePhong.locSwMaterial, sw_mat[4]);
+	if (s_cachePhong.locTextur != -1)
+		glUniform1i(s_cachePhong.locTextur, GL_FALSE);
 }
 
 // updateVariables: avanca les orbites i rotacions dels cossos segons els controls de la UI:

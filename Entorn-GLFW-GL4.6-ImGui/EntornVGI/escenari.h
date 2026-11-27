@@ -5,6 +5,7 @@
 #include "visualitzacio.h"
 #include <vector>
 #include "CelestialBodyData.h"
+#include "GestorRecursos.h"
 
 // Categoria astronomica/tecnica per agrupar l'objecte als menus i gestionar l'enfocament
 enum class CategoriaObjecte {
@@ -25,6 +26,15 @@ struct ContextRenderEscenari {
 	bool iluminacioSolar = true;    // sw_mat[0]: emissio del Sol i llum puntual #0
 	bool vistaClara = false;        // sw_mat[1]: llum ambient global
 	bool sw_mat[5] = { false, false, true, false, true };
+	glm::mat4 matriuVista = glm::mat4(1.0f);
+	CacheUniformsShader* cachePhong = nullptr;
+	CacheUniformsShader* cacheNormalMap = nullptr;
+
+	CacheUniformsShader* cacheActual() const {
+		return (shaderActualID == shaderNormalMapID && shaderNormalMapID != 0)
+			? cacheNormalMap
+			: cachePhong;
+	}
 };
 
 // Dades individuals de cada cos qualsevol dins de l'escenari
@@ -43,12 +53,13 @@ public:
 		m_sons.clear();
 	}
 
-	//REALMENTE lo correcto seria que las texturas se guardasen en las herencias determinadas, ya que hay objetos que no tienen. pero como es codigo exactamente igual lo dejamos aqui de momento
-	void unloadTexture() { if (m_textureID != 0) { glDeleteTextures(1, &m_textureID); m_textureID = 0; } }
-	void unloadNormMap() { if (m_normalMapID != 0) { glDeleteTextures(1, &m_normalMapID); m_normalMapID = 0; } }
+	// Nomes allibera textures si l'objecte n'es propietari directe (les compartides les allibera GestorRecursos)
+	void unloadTexture() { if (m_propietariTextures && m_textureID != 0) { glDeleteTextures(1, &m_textureID); } m_textureID = 0; }
+	void unloadNormMap() { if (m_propietariTextures && m_normalMapID != 0) { glDeleteTextures(1, &m_normalMapID); } m_normalMapID = 0; }
 	GLuint loadTexture(const char* filepath) {
 		unloadTexture();
 		if (filepath == nullptr) return 0;
+		m_propietariTextures = true;
 		m_textureID = loadIMA_SOIL(filepath);
 		if (m_textureID == 0)
 			fprintf(stderr, "No s'ha pogut carregar: %s\n", filepath);
@@ -65,6 +76,7 @@ public:
 	GLuint loadNormMap(const char* filepath) {
 		unloadNormMap();
 		if (filepath == nullptr) return 0;
+		m_propietariTextures = true;
 		m_normalMapID = loadIMA_SOIL(filepath);
 		if (m_normalMapID == 0)
 			fprintf(stderr, "No s'ha pogut carregar: %s\n", filepath);
@@ -99,6 +111,7 @@ public:
 
 	GLuint m_textureID = 0;
 	GLuint m_normalMapID = 0;
+	bool m_propietariTextures = false; // false quan provenen de GestorRecursos (compartides entre escenaris)
 
 	glm::mat4 m_trMatrix = glm::mat4(1.0f);
 	double m_scale = 1.0f; //Scale / radi del objecte, s'utilitza per la camara, hauria de canviar el nom pero bue. Més tard ja veig
@@ -219,7 +232,7 @@ public:
 	void creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID);
 
 	// Renderitza els cossos celestes, l'anell de Saturn i les orbites (controlades pel flag mostrarOrbites de la UI)
-	void dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5], bool mostrarOrbites = true);
+	void dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5], bool mostrarOrbites = true, const ParametresIluminacioEscenari* ilum = nullptr);
 
 	// Actualitza els angles orbitals i de rotacio segons els parametres temporals d'EstatSimulacio
 	// (enPausa, direccioTemps [+1/-1], escalaReal i factorVelocitat del timelapse).
@@ -240,13 +253,9 @@ public:
 	// Retorna el radi maxim de referencia del sistema (p. ex. orbita de Neptu) per escalar vistes globals entre modes
 	virtual double obtenirRadiReferenciaSistema() const { return 210.0; }
 
-	// Allibera els objectes (i els seus VAO). Cal cridar-la ABANS de destruir el context OpenGL.
+	// Allibera els objectes de l'escenari (els VAOs i textures compartides s'alliberen un sol cop a GestorRecursos::AlliberarTot).
 	void alliberaEscenari() {
 		if (!m_inicialitzat && m_objectList.empty()) return;
-
-		deleteVAOList(GLU_SPHERE);
-		deleteVAOList(GLU_DISK);
-		deleteVAOList(GLUT_TORUS);
 
 		std::vector<Object*> roots;
 		for (auto& p : m_objectList)

@@ -292,23 +292,9 @@ void InitGL()
 	fprintf(stderr, "SkyBox: \n");
 	if (!skC_programID) skC_programID = shader_SkyBoxC.loadFileShaders(".\\shaders\\skybox.VERT", ".\\shaders\\skybox.FRAG");
 
-	// Entorn VGI: Càrrega VAO Skybox Cube
+	// Entorn VGI: Càrrega VAO Skybox Cube (el cubemap es carrega en segon pla via GestorRecursos)
 	if (skC_VAOID.vaoId == 0) skC_VAOID = loadCubeSkybox_VAO();
 	Set_VAOList(CUBE_SKYBOX, skC_VAOID);
-
-	if (!cubemapTexture)
-	{	// load Skybox textures
-		// -------------
-		std::vector<std::string> faces =
-		{ ".\\textures\\skybox\\right.png",
-			".\\textures\\skybox\\left.png",
-			".\\textures\\skybox\\top.png",
-			".\\textures\\skybox\\bottom.png",
-			".\\textures\\skybox\\front.png",
-			".\\textures\\skybox\\back.png"
-		};
-		cubemapTexture = loadCubemap(faces);
-	}
 
 	// Càrrega Shader de Phong
 	shader_programID = 0;
@@ -587,8 +573,10 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		// Assegurar que l'escenari te els VAOs i textures vinculats als shaders actius
 		if (escenariActual != nullptr)
 		{
-			if (!escenariActual->esInicialitzat())
+			if (!escenariActual->esInicialitzat()) {
+				GestorRecursos::FinalitzarPrecarregaGPU();
 				escenariActual->creaEscenari(shader_programID, shader_programIDNormalMap);
+			}
 			g_EstatSimulador.recalculEfemeridesNecessari = true;
 		}
 
@@ -629,6 +617,7 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 			int idxNou = (g_EstatSimulador.modeActual == ModeSimulacio::INTUITIU) ? 0 : 1;
 			escenariActual = &escenaris[idxNou];
 			if (!escenariActual->esInicialitzat()) {
+				GestorRecursos::FinalitzarPrecarregaGPU();
 				escenariActual->creaEscenari(shader_programID, shader_programIDNormalMap);
 			}
 		}
@@ -773,7 +762,7 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 	if (objecte == SISTEMA_SOLAR)
 	{
 		SkyBoxCube = g_EstatSimulador.opcionsVisualitzacio.mostrarSkybox;
-		if (SkyBoxCube && skC_VAOID.vaoId == 0) OnVistaSkyBox();
+		if (SkyBoxCube && (skC_VAOID.vaoId == 0 || cubemapTexture == 0)) OnVistaSkyBox();
 
 		eixos = g_EstatSimulador.opcionsVisualitzacio.mostrarEixos;
 
@@ -1010,13 +999,21 @@ void dibuixa_Escena() {
 	// Escalat d'objectes, per adequar-los a les vistes ortogràfiques (Pràctica 2)
 	//	GTMatrix = glm::scale();
 
-	//	Dibuix geometria de l'escena amb comandes GL.
+	//	Dibuix geometria de l'escena amb comandes GL (passant matrius i llums directament des de CPU).
+	ParametresIluminacioEscenari ilumEscena;
+	ilumEscena.matriuProjeccio = ProjectionMatrix;
+	ilumEscena.llums = llumGL;
+	ilumEscena.numLlums = NUM_MAX_LLUMS;
+	ilumEscena.llumAmbient = llum_ambient;
+	ilumEscena.llumFixa = ifixe;
+
 	bool mostrarMilano = (camera == CAM_NAVEGA) || (g_EstatSimulador.cosEnfocatId == CB_MILANO);
 	dibuixa_EscenaGL(shader_programID, shader_programIDNormalMap, ViewMatrix, GTMatrix, sw_material,
 		escenariActual,
 		ObOBJ,				// COET: model OBJ de la nau Milano
 		g_EstatSimulador.opcionsVisualitzacio.mostrarOrbites,
-		mostrarMilano);
+		mostrarMilano,
+		&ilumEscena);
 }
 
 
@@ -1155,17 +1152,8 @@ void OnVistaSkyBox()
 	Set_VAOList(CUBE_SKYBOX, skC_VAOID);
 
 	if (!cubemapTexture)
-	{	// load Skybox textures
-		// -------------
-		std::vector<std::string> faces =
-		{ ".\\textures\\skybox\\right.png",
-			".\\textures\\skybox\\left.png",
-			".\\textures\\skybox\\top.png",
-			".\\textures\\skybox\\bottom.png",
-			".\\textures\\skybox\\front.png",
-			".\\textures\\skybox\\back.png"
-		};
-		cubemapTexture = loadCubemap(faces);
+	{
+		cubemapTexture = GestorRecursos::ObtenirTexturaSkybox();
 	}
 }
 
@@ -2063,8 +2051,9 @@ int main()
 	OPV.R = 550.0;	OPV.alfa = 65.0;	OPV.beta = 0.0;
 	cam_Esferica[0] = (float)OPV.R;	cam_Esferica[1] = (float)OPV.alfa;	cam_Esferica[2] = (float)OPV.beta;
 
-	// Precarrega asincrona del coet Milano en segon pla mentre es mostra el selector inicial
+	// Precarrega asincrona del coet Milano i de les textures/Skybox en segon pla
 	IniciarPrecarregaCoet();
+	GestorRecursos::IniciarPrecarregaEscena();
 
 // Loop until the user closes the window
 	while (!glfwWindowShouldClose(window))
@@ -2108,7 +2097,8 @@ int main()
 			}
 		}
 
-		// Finalitzar pujada a GPU del coet Milano quan la precarrega en segon pla hagi acabat
+		// Pujada progressiva a GPU de textures precarregades (2-3 per frame) i coet Milano
+		GestorRecursos::ProcessarCuaPujadaGPU(3);
 		if (ObOBJ == NULL && g_coetPreloadDone.load())
 			FinalitzarCarregaCoetGPU(false);
 
@@ -2144,7 +2134,7 @@ int main()
 	escenaris = nullptr;
 	escenariActual = nullptr;
 
-	// Neteja segura del fil de precarrega i recursos OpenGL del coet Milano abans de tancar el context
+	// Neteja segura dels fils de precarrega, textures compartides, VAOs i coet Milano abans de tancar OpenGL
 	if (g_coetPreloadThread.joinable()) g_coetPreloadThread.join();
 	COBJModel::FreePreloadData(g_coetPreloadData);
 	if (ObOBJ != NULL)
@@ -2152,6 +2142,8 @@ int main()
 		delete ObOBJ;
 		ObOBJ = NULL;
 	}
+	GestorRecursos::AlliberarTot();
+	cubemapTexture = 0;
 
 	glfwDestroyWindow(window);
 

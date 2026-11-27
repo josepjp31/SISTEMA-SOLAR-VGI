@@ -79,7 +79,7 @@ void dibuixa_Skybox(GLuint sk_programID, GLuint cmTexture, char eix_Polar, glm::
 
 // dibuixa_EscenaGL: Dibuix de l'escena amb comandes GL
 void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, glm::mat4 MatriuVista, glm::mat4 MatriuTG, bool sw_mat[5],
-	Escenari* escenariActual, COBJModel* objecteOBJ, bool mostrarOrbites, bool mostrarMilano)
+	Escenari* escenariActual, COBJModel* objecteOBJ, bool mostrarOrbites, bool mostrarMilano, const ParametresIluminacioEscenari* ilum)
 {
 	glm::mat4 ModelMatrix(1.0);
 
@@ -111,7 +111,7 @@ void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, glm
 	if (s_locFlagInvertY != -1) glUniform1i(s_locFlagInvertY, GL_TRUE);
 
 	if (escenariActual != nullptr)
-		escenariActual->dibuixaEscenari(sh_programID, shader_programIDNormalMap, MatriuVista, MatriuTG, sw_mat, mostrarOrbites);
+		escenariActual->dibuixaEscenari(sh_programID, shader_programIDNormalMap, MatriuVista, MatriuTG, sw_mat, mostrarOrbites, ilum);
 
 	//COET
 	if (mostrarMilano && objecteOBJ != nullptr)
