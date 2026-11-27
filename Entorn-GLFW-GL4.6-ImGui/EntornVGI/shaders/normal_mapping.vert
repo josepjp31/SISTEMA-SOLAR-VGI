@@ -1,14 +1,14 @@
-//******** PRACTICA VISUALITZACI” GR¿FICA INTERACTIVA (EE-UAB)
-//******** Entorn b‡sic VS2026 amb interficie MFC/GLFW i Status Bar
+//******** PRACTICA VISUALITZACI√ì GR√ÄFICA INTERACTIVA (EE-UAB)
+//******** Entorn b√†sic VS2026 amb interficie MFC/GLFW i Status Bar
 //******** Enric Marti (Setembre 2026)
-// normal_mapping.vert: Vertex Program en GLSL en versiÛ OpenGL 3.3 o 4.60 per a implementar:
-//     a) IluminaciÛ de Gouraud + normal Mapping
+// normal_mapping.vert: Vertex Program en GLSL en versi√≥ OpenGL 3.3 o 4.60 per a implementar:
+//     a) Iluminaci√≥ de Gouraud + normal Mapping
 //     b) Fonts de llum puntuals o direccionals
 //     c) Fonts de llum restringides
-//     d) AtenuaciÛ de fonts de llum
-//     e) Modus d'assignaciÛ de textura MODULATE o DECAL
-//     f) Calcul component a de transparËncia segons color sigui provinent de material o de VAO
-//     g) Algorisme incremental  iluminaciÛ Gouraud encapsulat en gouraudModel()
+//     d) Atenuaci√≥ de fonts de llum
+//     e) Modus d'assignaci√≥ de textura MODULATE o DECAL
+//     f) Calcul component a de transpar√®ncia segons color sigui provinent de material o de VAO
+//     g) Algorisme incremental  iluminaci√≥ Gouraud encapsulat en gouraudModel()
 
 //#version 330 core
 #version 460 core
@@ -77,7 +77,7 @@ void main()
 {
     mat4 modelView = viewMatrix * modelMatrix;
 
-    // PosiciÛn en coordenadas de vista
+    // Posici√≥n en coordenadas de vista
     vertexPV = vec3(modelView * vec4(in_Vertex, 1.0));
 
     // Reutilitza la matriu normal precalculada a CPU quan s'indica des de l'aplicacio

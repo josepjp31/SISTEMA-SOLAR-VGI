@@ -1,20 +1,20 @@
-//******** PRACTICA VISUALITZACI” GR¿FICA INTERACTIVA (Escola Enginyeria - UAB)
-//******** Entorn b‡sic VS2026 MONOFINESTRA amb OpenGL 4.6, interfÌcie GLFW 3.4, ImGui i llibreries GLM
-//******** Ferran Poveda, Marc Vivet, Carme Juli‡, DÈbora Gil, Enric MartÌ (Setembre 2026)
-// constants.h : DefiniciÛ de constants compartides
+//******** PRACTICA VISUALITZACI√ì GR√ÄFICA INTERACTIVA (Escola Enginyeria - UAB)
+//******** Entorn b√†sic VS2026 MONOFINESTRA amb OpenGL 4.6, interf√≠cie GLFW 3.4, ImGui i llibreries GLM
+//******** Ferran Poveda, Marc Vivet, Carme Juli√†, D√©bora Gil, Enric Mart√≠ (Setembre 2026)
+// constants.h : Definici√≥ de constants compartides
 //				 CENtornVGIView.cpp, visualitzacio.cpp i escena.cpp
 
 
 #ifndef CONST_H
 #define CONST_H
 
-//--------------- VGI: Tipus de C‡mera
+//--------------- VGI: Tipus de C√†mera
 #define CAP ' '
 #define CAM_ESFERICA 'E'
 #define CAM_GEODE 'G'
 #define CAM_NAVEGA 'N'
 
-//--------------- VGI: Tipus de ProjecciÛ
+//--------------- VGI: Tipus de Projecci√≥
 #define AXONOM 'A'
 #define ORTO 'O'
 #define PERSPECT 'P'
@@ -22,7 +22,7 @@
 #define PASSEIG_V 4
 
 
-//--------------- VGI: Tipus de Polars (per la VisualitzaciÛ Interactiva)
+//--------------- VGI: Tipus de Polars (per la Visualitzaci√≥ Interactiva)
 #define POLARZ 'Z'
 #define POLARY 'Y'
 #define POLARX 'X'
@@ -64,7 +64,7 @@
 #define SUAU 's'
 
 
-// -------------- VGI: DefiniciÛ dels valors del pla near i far del Volum de VisualitzaciÛ en Perspectiva
+// -------------- VGI: Definici√≥ dels valors del pla near i far del Volum de Visualitzaci√≥ en Perspectiva
 const double p_near = 0.01;
 const double p_far = 50000.0;
 
@@ -75,7 +75,7 @@ const double p_far = 50000.0;
 #define PICKHIDRO 3 
 
 // -------------- VGI: CONSTANTS TEXTURES
-// Nombre m‡xim de textures
+// Nombre m√†xim de textures
 #define NUM_MAX_TEXTURES 15
 
 // Tipus de textures
@@ -90,7 +90,7 @@ const double p_far = 50000.0;
 #define TEXTURA_FITXERBMP 'f'
 #define TEXTURA_FITXERIMA 'I'
 
-// --------------  VGI: NOMBRE DE LLUMS: Nombre de Llums de l'aplicaciÛ, les d'OpenGL
+// --------------  VGI: NOMBRE DE LLUMS: Nombre de Llums de l'aplicaci√≥, les d'OpenGL
 const int NUM_MAX_LLUMS = 8;
 
 // -------------- VGI: SHADERS --> Tipus de Shaders
@@ -139,7 +139,7 @@ struct CPunt3D
 	GLdouble w;
 };
 
-// --------------- GMS: 3M‡scara booleana sobre coordenades 3D
+// --------------- GMS: 3M√†scara booleana sobre coordenades 3D
 struct CMask3D
 {
 	bool x;
@@ -157,7 +157,7 @@ struct CColor
 	GLdouble a;
 };
 
-// --------------- VGI: Estructura coordenada EsfËrica 3D
+// --------------- VGI: Estructura coordenada Esf√®rica 3D
 struct CEsfe3D
 {
 	GLdouble R;
@@ -175,15 +175,15 @@ struct CVAO
 	GLint nIndices;
 };
 
-// --------------- VGI: INSTANCIA (TG d'instanciaciÛ d'un objecte)
+// --------------- VGI: INSTANCIA (TG d'instanciaci√≥ d'un objecte)
 struct INSTANCIA
 {
-	CPunt3D VTras;	// Vector de TraslaciÛ
+	CPunt3D VTras;	// Vector de Traslaci√≥
 	CPunt3D VScal;	// Vector d'Escalatge
-	CPunt3D VRota;	// Vector de RotaciÛ
+	CPunt3D VRota;	// Vector de Rotaci√≥
 };
 
-// --------------- VGI: Coeficients equaciÛ d'atenuaciÛ de la llum fatt=1/(ad2+bd+c)
+// --------------- VGI: Coeficients equaci√≥ d'atenuaci√≥ de la llum fatt=1/(ad2+bd+c)
 struct CAtenua
 {
 	GLdouble a;
@@ -204,15 +204,15 @@ struct MATERIAL
 // --------------- VGI: Estructura font de llum
 struct LLUM
 {
-	bool encesa;				// Booleana que controla si la llum Ès encesa [TRUE] o no [FALSE]
-	CPunt3D posicio;		// PosiciÛ (x,y,z) de la font de llum en coordenades esfËriques.
+	bool encesa;				// Booleana que controla si la llum √©s encesa [TRUE] o no [FALSE]
+	CPunt3D posicio;		// Posici√≥ (x,y,z) de la font de llum en coordenades esf√®riques.
 	CColor difusa;			// Intensitat difusa de la font de llum (r,g,b,a)
 	CColor especular;		// Intensitat especular de la font de llum (r,g,b,a)
-	CAtenua atenuacio;		// Coeficients de l'equaciÛ d'atenuaciÛ de la llum fatt=1/(ad2+bd+c)
-	bool restringida;		// Booleana que indica si la font de llum Ès restringida [TRUE] i per tant sÛn v‡lids els coeficients posteriors o no [FALSE].
-	CPunt3D spotdirection;	// Vector de direciÛ de la font de llum restringida (x,y,z).
+	CAtenua atenuacio;		// Coeficients de l'equaci√≥ d'atenuaci√≥ de la llum fatt=1/(ad2+bd+c)
+	bool restringida;		// Booleana que indica si la font de llum √©s restringida [TRUE] i per tant s√≥n v√†lids els coeficients posteriors o no [FALSE].
+	CPunt3D spotdirection;	// Vector de direci√≥ de la font de llum restringida (x,y,z).
 	GLfloat spotcoscutoff;	// Coseno de l'angle d'obertura de la font de llum restringida.
-	GLfloat spotexponent;	// Exponent que indica l'atenuaciÛ de la font del centre de l'eix a l'exterior, segons model de Warn.
+	GLfloat spotexponent;	// Exponent que indica l'atenuaci√≥ de la font del centre de l'eix a l'exterior, segons model de Warn.
 };
 
 #endif

@@ -1,10 +1,10 @@
-//******** PRACTICA VISUALITZACI” GR¿FICA INTERACTIVA (Escola Enginyeria - UAB)
-//******** Entorn b‡sic VS2026 MONOFINESTRA amb OpenGL 4.6, interfÌcie GLFW 3.4, ImGui i llibreries GLM
-//******** Ferran Poveda, Marc Vivet, Carme Juli‡, DÈbora Gil, Enric MartÌ (Setembre 2026)
-// Shader.cpp: implementaciÛn de la clase Shader
+//******** PRACTICA VISUALITZACI√ì GR√ÄFICA INTERACTIVA (Escola Enginyeria - UAB)
+//******** Entorn b√†sic VS2026 MONOFINESTRA amb OpenGL 4.6, interf√≠cie GLFW 3.4, ImGui i llibreries GLM
+//******** Ferran Poveda, Marc Vivet, Carme Juli√†, D√©bora Gil, Enric Mart√≠ (Setembre 2026)
+// Shader.cpp: implementaci√≥n de la clase Shader
 // FUNCIONS:		- Constructor (Shader)
-//					- C‡rrega, compilaciÛ, linkediciÛ del Vertex i Fragment Shader i definiciÛ del Program (loadFileShaders())
-//					- C‡rrega, compilaciÛ, linkediciÛ del Vertex, Geometry i Fragment Shader i definiciÛ del Program (loadFileShadersG())
+//					- C√†rrega, compilaci√≥, linkedici√≥ del Vertex i Fragment Shader i definici√≥ del Program (loadFileShaders())
+//					- C√†rrega, compilaci√≥, linkedici√≥ del Vertex, Geometry i Fragment Shader i definici√≥ del Program (loadFileShadersG())
 
 #include "framework.h"
 #include "Shader.h"	
@@ -12,7 +12,7 @@
 #include <string>
 
 /////////////////////////////////////////////////////////////////////////////
-// ConstrucciÛn o destrucciÛn de Shader
+// Construcci√≥n o destrucci√≥n de Shader
 /*****************************************************************************
 * loadFileShaders()
 *      Loads custom shader by specifying filename (expects frag/vert pair)
@@ -60,7 +60,7 @@ GLuint Shader::loadFileShaders(std::string file_Vert, std::string file_Frag)
 	const char* fitxer_Frag = file_Frag.c_str();
 	fs = textFileRead(fitxer_Frag);
 
-	if ((vs == NULL) || (fs == NULL)) return GL_FALSE;	// Si no síhan trobat els fitxers, retornar GL_FALSE
+	if ((vs == NULL) || (fs == NULL)) return GL_FALSE;	// Si no s‚Äôhan trobat els fitxers, retornar GL_FALSE
 
 	const char* vv = vs;
 	const char* ff = fs;
@@ -71,10 +71,10 @@ GLuint Shader::loadFileShaders(std::string file_Vert, std::string file_Frag)
 	free(vs);
 	free(fs);
 
-// COMPILACI” VERTEX SHADER (VS)
+// COMPILACI√ì VERTEX SHADER (VS)
 	glCompileShader(v);
 	glGetShaderiv(v, GL_COMPILE_STATUS, &compile_result);
-	// Llista error de compilaciÛ
+	// Llista error de compilaci√≥
 	if (compile_result == GL_FALSE) {
 		GLint maxLength = 0;
 
@@ -84,7 +84,7 @@ GLuint Shader::loadFileShaders(std::string file_Vert, std::string file_Frag)
 		glGetShaderInfoLog(v, maxLength, &maxLength, &errorLog[0]);
 
 		//DisplayMessageBox("Error compilacio Vertex Shader", file_Vert);
-		//AfxMessageBox(_T("Error compilaciÛ Vertex Shader"));
+		//AfxMessageBox(_T("Error compilaci√≥ Vertex Shader"));
 		fprintf(stderr, "%s \n", "Error compilacio Vertex Shader");
 
 		// Volcar missatges error a fitxer GLSL_Error.VERT
@@ -108,10 +108,10 @@ GLuint Shader::loadFileShaders(std::string file_Vert, std::string file_Frag)
 	}
 	else fprintf(stderr, "%s \n", "Compilacio Vertex Shader OK"); //DisplayMessageBox("Compilacio Vertex Shader OK", file_Vert); //AfxMessageBox(_T("Compilacio Vertex Shader OK"));
 
-// COMPILACI” FRAGMENT SHADER (FS)
+// COMPILACI√ì FRAGMENT SHADER (FS)
 	glCompileShader(f);
 	glGetShaderiv(f, GL_COMPILE_STATUS, &compile_result);
-	// Llista error de compilaciÛ
+	// Llista error de compilaci√≥
 	if (compile_result == GL_FALSE) {
 		GLint maxLength = 0;
 
@@ -121,7 +121,7 @@ GLuint Shader::loadFileShaders(std::string file_Vert, std::string file_Frag)
 		glGetShaderInfoLog(f, maxLength, &maxLength, &errorLog[0]);
 
 		//DisplayMessageBox("Error compilacio Fragment Shader", file_Frag);
-		//AfxMessageBox(_T("Error compilaciÛ Fragment Shader"));
+		//AfxMessageBox(_T("Error compilaci√≥ Fragment Shader"));
 		fprintf(stderr, "%s \n", "Error compilacio Fragment Shader");
 
 		// Volcar missatges error a fitxer Compile_Error.FRAG
@@ -141,22 +141,22 @@ GLuint Shader::loadFileShaders(std::string file_Vert, std::string file_Frag)
 	}
 	else fprintf(stderr, "%s \n", "Compilacio Fragment Shader OK"); //DisplayMessageBox("Compilacio Fragment Shader OK", file_Frag); // AfxMessageBox(_T("Compilacio Fragment Shader OK"));
 
-// CreaciÛ del Program que inclou Vertex i Fragment Shader
+// Creaci√≥ del Program que inclou Vertex i Fragment Shader
 	programID = glCreateProgram();
 	glAttachShader(programID, v);
 	glAttachShader(programID, f);
 
 // Attribute Locations must be setup before calling glLinkProgram()
-//	glBindAttribLocation(programID, 0, "in_Vertex"); // VËrtexs
+//	glBindAttribLocation(programID, 0, "in_Vertex"); // V√®rtexs
 //	glBindAttribLocation(programID, 1, "in_Normal"); // Normals
 //	glBindAttribLocation(programID, 2, "in_TexCoord"); // Textura
 //	glBindAttribLocation(programID, 3, "in_Color"); // Color
 
-// LINKEDICI” SHADER PROGRAM (programID)
+// LINKEDICI√ì SHADER PROGRAM (programID)
 	glLinkProgram(programID);
 	glGetProgramiv(programID, GL_LINK_STATUS, &link_result);
 
-	// Llista error de linkediciÛ del Shader Program
+	// Llista error de linkedici√≥ del Shader Program
 	if (link_result == GL_FALSE) {
 		GLint maxLength = 0;
 
@@ -187,10 +187,10 @@ GLuint Shader::loadFileShaders(std::string file_Vert, std::string file_Frag)
 	glDeleteShader(v);		// Don't leak the shader.
 	glDeleteShader(f);		// Don't leak the shader.
 
-// ActivaciÛ del Programa
+// Activaci√≥ del Programa
 	glUseProgram(programID);
 
-// Retorna referËncia al Program creat
+// Retorna refer√®ncia al Program creat
 	return programID;
 }
 
@@ -223,7 +223,7 @@ GLuint Shader::loadFileShadersG(std::string file_Vert, std::string file_Frag, st
 	const char* fitxer_Frag = file_Frag.c_str();
 	fs = textFileRead(fitxer_Frag);
 
-	if ((vs == NULL) || (fs == NULL)) return GL_FALSE;	// Si no síhan trobat els fitxers, retornar GL_FALSE
+	if ((vs == NULL) || (fs == NULL)) return GL_FALSE;	// Si no s‚Äôhan trobat els fitxers, retornar GL_FALSE
 
 	const char* vv = vs;
 	const char* ff = fs;
@@ -234,10 +234,10 @@ GLuint Shader::loadFileShadersG(std::string file_Vert, std::string file_Frag, st
 	free(vs);
 	free(fs);
 
-	// COMPILACI” VERTEX SHADER (VS)
+	// COMPILACI√ì VERTEX SHADER (VS)
 	glCompileShader(v);
 	glGetShaderiv(v, GL_COMPILE_STATUS, &compile_result);
-	// Llista error de compilaciÛ
+	// Llista error de compilaci√≥
 	if (compile_result == GL_FALSE) {
 		GLint maxLength = 0;
 
@@ -247,7 +247,7 @@ GLuint Shader::loadFileShadersG(std::string file_Vert, std::string file_Frag, st
 		glGetShaderInfoLog(v, maxLength, &maxLength, &errorLog[0]);
 
 		//DisplayMessageBox("Error compilacio Vertex Shader", file_Vert);
-		//AfxMessageBox(_T("Error compilaciÛ Vertex Shader"));
+		//AfxMessageBox(_T("Error compilaci√≥ Vertex Shader"));
 		fprintf(stderr, "%s \n", "Error compilacio Vertex Shader");
 
 		// Volcar missatges error a fitxer GLSL_Error.VERT
@@ -271,10 +271,10 @@ GLuint Shader::loadFileShadersG(std::string file_Vert, std::string file_Frag, st
 	}
 	else fprintf(stderr, "%s \n", "Compilacio Vertex Shader OK"); //DisplayMessageBox("Compilacio Vertex Shader OK", file_Vert);  //AfxMessageBox(_T("Compilacio Vertex Shader OK"));
 
-	// COMPILACI” FRAGMENT SHADER (FS)
+	// COMPILACI√ì FRAGMENT SHADER (FS)
 	glCompileShader(f);
 	glGetShaderiv(f, GL_COMPILE_STATUS, &compile_result);
-	// Llista error de compilaciÛ
+	// Llista error de compilaci√≥
 	if (compile_result == GL_FALSE) {
 		GLint maxLength = 0;
 
@@ -284,7 +284,7 @@ GLuint Shader::loadFileShadersG(std::string file_Vert, std::string file_Frag, st
 		glGetShaderInfoLog(f, maxLength, &maxLength, &errorLog[0]);
 
 		DisplayMessageBox("Error compilacio Fragment Shader", file_Frag);
-		//AfxMessageBox(_T("Error compilaciÛ Fragment Shader"));
+		//AfxMessageBox(_T("Error compilaci√≥ Fragment Shader"));
 		//fprintf(stderr, "%s \n", "Error compilacio Fragment Shader");
 
 		// Volcar missatges error a fitxer Compile_Error.FRAG
@@ -316,10 +316,10 @@ GLuint Shader::loadFileShadersG(std::string file_Vert, std::string file_Frag, st
 		glShaderSource(g, 1, &gg, NULL);
 		free(gs);
 
-		// COMPILACI” GEOMETRY SHADER (GS)
+		// COMPILACI√ì GEOMETRY SHADER (GS)
 		glCompileShader(g);
 		glGetShaderiv(g, GL_COMPILE_STATUS, &compile_result);
-		// Llista error de compilaciÛ
+		// Llista error de compilaci√≥
 		if (compile_result == GL_FALSE) {
 			GLint maxLength = 0;
 
@@ -329,7 +329,7 @@ GLuint Shader::loadFileShadersG(std::string file_Vert, std::string file_Frag, st
 			glGetShaderInfoLog(g, maxLength, &maxLength, &errorLog[0]);
 
 			//DisplayMessageBox("Error compilacio Geometry Shader", file_Geom);
-			//AfxMessageBox(_T("Error compilaciÛ Geometry Shader"));
+			//AfxMessageBox(_T("Error compilaci√≥ Geometry Shader"));
 			fprintf(stderr, "%s \n", "Error compilacio Geometry Shader");
 
 			// Volcar missatges error a fitxer Compile_Error.GEOM
@@ -351,19 +351,19 @@ GLuint Shader::loadFileShadersG(std::string file_Vert, std::string file_Frag, st
 		else fprintf(stderr, "%s \n", "Compilacio Geometry Shader OK"); //DisplayMessageBox("Compilacio Geometry Shader OK", file_Geom); //AfxMessageBox(_T("Compilacio Geometry Shader OK"));
 	}
 
-	// CreaciÛ del Program que inclou Vertex i Fragment Shader
+	// Creaci√≥ del Program que inclou Vertex i Fragment Shader
 	programID = glCreateProgram();
 	glAttachShader(programID, v);
 	glAttachShader(programID, f);
 
-	// InclusiÛ Geometry Shader, si existeix
+	// Inclusi√≥ Geometry Shader, si existeix
 	if (file_Geom.c_str() != nullptr) glAttachShader(programID, g);
 
-	// LINKEDICI” SHADER PROGRAM (programID)
+	// LINKEDICI√ì SHADER PROGRAM (programID)
 	glLinkProgram(programID);
 	glGetProgramiv(programID, GL_LINK_STATUS, &link_result);
 
-	// Llista error de linkediciÛ del Shader Program
+	// Llista error de linkedici√≥ del Shader Program
 	if (link_result == GL_FALSE) {
 		GLint maxLength = 0;
 
@@ -395,17 +395,17 @@ GLuint Shader::loadFileShadersG(std::string file_Vert, std::string file_Frag, st
 	glDeleteShader(f);		// Don't leak the shader.
 	glDeleteShader(g);		// Don't leak the shader.
 
-// ActivaciÛ del Programa
+// Activaci√≥ del Programa
 	glUseProgram(programID);
 
-	// Retorna referËncia al Program creat
+	// Retorna refer√®ncia al Program creat
 	return programID;
 }
 
 
 int Shader::DisplayMessageBox(std::string mess, std::string fileShader)
 {
-	// ConversiÛ std::string --> LPCWSTR
+	// Conversi√≥ std::string --> LPCWSTR
 	std::wstring stemp = std::wstring(mess.begin(), mess.end());
 	//LPCWSTR msg = stemp.c_str();
 

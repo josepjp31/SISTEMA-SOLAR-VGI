@@ -71,13 +71,17 @@ struct DataHoraSimulacio {
     }
 };
 
-// Control de temps i timelapse (Rang permes: 1 min/s [60 s/s] a 20 dies/s [1.728.000 s/s])
+// Control de temps i timelapse (Rang permès: 1 h/s [3.600 s/s] a 50 dies/s [4.320.000 s/s]; per defecte: 1 dia/s)
 struct EstatTempsSimulacio {
+    static constexpr double VELOCITAT_MIN_S_PER_S     = 3600.0;    // 1 hora/s
+    static constexpr double VELOCITAT_DEFECTE_S_PER_S = 86400.0;   // 1 dia/s (valor inicial per defecte)
+    static constexpr double VELOCITAT_MAX_S_PER_S     = 4320000.0; // 50 dies/s
+
     DataHoraSimulacio dataHora;
-    bool enPausa = false;                        // true atura l'avanc del rellotge i del moviment orbital
-    int direccioTemps = 1;                       // +1: Endavant, -1: Enrere (Rebobinar)
-    double factorVelocitatSegonsPerSegon = 60.0; // Minim inicial: 1 min/s (60 s/s); maxim: 20 dies/s (1728000 s/s)
-    double acumulatSegons = 0.0;                 // Fraccio de segons pendents d'acumular entre frames
+    bool enPausa = false;                                           // true atura l'avanç del rellotge i del moviment orbital
+    int direccioTemps = 1;                                          // +1: Endavant, -1: Enrere (Rebobinar)
+    double factorVelocitatSegonsPerSegon = VELOCITAT_DEFECTE_S_PER_S; // Per defecte: 1 dia/s (86.400 s/s)
+    double acumulatSegons = 0.0;                                    // Fracció de segons pendents d'acumular entre frames
 
     // Sincronitza la data/hora simulada amb el rellotge local del sistema operatiu
     void EstablirDataActual() {
@@ -92,21 +96,21 @@ struct EstatTempsSimulacio {
         dataHora.segon = ltm.tm_sec;
     }
 
-    // Situa la simulacio a l'epoca astronomica estandard J2000 (1 de gener de 2000 a les 12:00:00)
+    // Situa la simulació a l'època astronòmica estàndard J2000 (1 de gener de 2000 a les 12:00:00)
     void EstablirJ2000() {
         dataHora = { 2000, 1, 1, 12, 0, 0 };
     }
 
-    // Duplica la velocitat de simulacio fins al limit superior de 20 dies/s
+    // Duplica la velocitat de simulació fins al límit superior de 50 dies/s
     void AugmentarVelocitat() {
         factorVelocitatSegonsPerSegon *= 2.0;
-        if (factorVelocitatSegonsPerSegon > 1728000.0) factorVelocitatSegonsPerSegon = 1728000.0;
+        if (factorVelocitatSegonsPerSegon > VELOCITAT_MAX_S_PER_S) factorVelocitatSegonsPerSegon = VELOCITAT_MAX_S_PER_S;
     }
 
-    // Redueix a la meitat la velocitat de simulacio fins al limit inferior de 1 min/s
+    // Redueix a la meitat la velocitat de simulació fins al límit inferior d'1 h/s
     void ReduirVelocitat() {
         factorVelocitatSegonsPerSegon *= 0.5;
-        if (factorVelocitatSegonsPerSegon < 60.0) factorVelocitatSegonsPerSegon = 60.0;
+        if (factorVelocitatSegonsPerSegon < VELOCITAT_MIN_S_PER_S) factorVelocitatSegonsPerSegon = VELOCITAT_MIN_S_PER_S;
     }
 
     // Acumula el temps transcorregut del frame (deltaSegons) multiplicat pel timelapse i aplica els segons sencers
@@ -196,22 +200,19 @@ struct CosAstronomicDades {
 
 // Estat global de la interficie del simulador (instancia unica g_EstatSimulador a main.cpp)
 struct EstatSimulacio {
-    ModeSimulacio modeActual = ModeSimulacio::INTUITIU; // Mode de simulacio actiu (INTUITIU o ESCALA_REAL)
-    bool mostrarSelectorModes = true;  // Quan es true, mostra el modal inicial amb 2 targetes i bloqueja l'escena 3D
-    bool mostrarPanellTemps = false;   // Mostra el pop-up de control temporal (cantonada inferior dreta en ESCALA_REAL)
-    bool mostrarFitxaHUD = false;      // Mostra la fitxa flotant amb dades fisiques de l'astre enfocat
-    bool mostrarDialegQuantA = false;  // Mostra el dialeg informatiu "Quant al Simulador"
-    bool recalculEfemeridesNecessari = false; // Flag per notificar canvi manual de data/hora a futurs calculs d'efemerides
+    ModeSimulacio modeActual = ModeSimulacio::INTUITIU; // Mode de simulació actiu (INTUITIU o ESCALA_REAL)
+    bool mostrarSelectorModes = true;  // Quan és true, mostra el modal inicial amb 2 targetes i bloqueja l'escena 3D
+    bool mostrarPanellTemps = true;    // Mostra el pop-up de control temporal (cantonada inferior dreta en ambdós modes)
+    bool mostrarFitxaHUD = false;      // Mostra la fitxa flotant amb dades físiques de l'astre enfocat
+    bool mostrarDialegQuantA = false;  // Mostra el diàleg informatiu "Quant al Simulador"
+    bool recalculEfemeridesNecessari = false; // Flag per notificar canvi manual de data/hora a futurs càlculs d'efemèrides
     bool origenReferenciaSol = true;   // true: origen al Sol; false: centrat en el planeta seleccionat
-    CelestialBodyId cosEnfocatId = CB_SUN;              // Index de l'astre enfocat (0=Sol, 1=Mercuri .. 8=Neptu)
+    CelestialBodyId cosEnfocatId = CB_SUN;              // Identificador de l'astre enfocat (Sol, planetes, satèl·lits...)
 
-    // Flags de sincronitzacio amb el motor OpenGL (llegits i netejats a SincronitzarEstatSimuladorAmbOpenGL de main.cpp)
-    bool configuracioInicialPendent = false; // Nomes al sortir del selector inicial (configura shaders, llums, skybox)
-    bool canviModeDirectePendent = false;    // Activat pel boto "Canviar" o menu rapid: commuta escenari conservant vista
-    bool canviCameraPendent = false;         // Activat quan l'usuari canvia manualment d'astre o mode de camera
-
-    // Preferencia del panell de temps en mode ESCALA_REAL (per recordar si estava obert en tornar-hi)
-    bool panellTempsPreferitReal = true;
+    // Flags de sincronització amb el motor OpenGL (llegits i netejats a SincronitzarEstatSimuladorAmbOpenGL de main.cpp)
+    bool configuracioInicialPendent = false; // Només al sortir del selector inicial (configura shaders, llums, skybox)
+    bool canviModeDirectePendent = false;    // Activat pel botó "Canviar" o menú ràpid: commuta escenari conservant vista
+    bool canviCameraPendent = false;         // Activat quan l'usuari canvia manualment d'astre o mode de càmera
 
     // Snapshot de la vista abans d'un canvi directe de mode per conservar exactament l'enquadrament
     struct EstatVistaTransicio {
@@ -255,7 +256,7 @@ public:
     // 2.2 Barra de Menu Superior Dinamica: construeix els menus segons estat.modeActual i la zona dreta (estat, pausa, Canviar, FPS)
     static void DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID, GLuint& shader_programIDNormalMap);
 
-    // 2.3 Panell de Control de Temps i Velocitat (cantonada inferior dreta, nomes visible en mode ESCALA_REAL)
+    // 2.3 Panell de Control de Temps i Velocitat (cantonada inferior dreta, disponible en ambdós modes)
     static void DibuixarPanellDataHoraTimelapse(EstatSimulacio& estat);
 
     // 2.6 Panell d'Informacio i Telemetria Astronomica (HUD flotant a la cantonada superior dreta)

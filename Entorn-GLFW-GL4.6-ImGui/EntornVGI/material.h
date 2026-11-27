@@ -1,7 +1,7 @@
-//******** PRACTICA VISUALITZACI” GR¿FICA INTERACTIVA (Escola Enginyeria - UAB)
-//******** Entorn b‡sic VS2026 MONOFINESTRA amb OpenGL 4.6, interfÌcie GLFW 3.4, ImGui i llibreries GLM
-//******** Ferran Poveda, Marc Vivet, Carme Juli‡, DÈbora Gil, Enric MartÌ (Setembre 2026)
-// material.h : InterfÌcie de material.cpp (configuraciÛ de color i reflectivitat de materials al shader)
+//******** PRACTICA VISUALITZACI√ì GR√ÄFICA INTERACTIVA (Escola Enginyeria - UAB)
+//******** Entorn b√†sic VS2026 MONOFINESTRA amb OpenGL 4.6, interf√≠cie GLFW 3.4, ImGui i llibreries GLM
+//******** Ferran Poveda, Marc Vivet, Carme Juli√†, D√©bora Gil, Enric Mart√≠ (Setembre 2026)
+// material.h : Interf√≠cie de material.cpp (configuraci√≥ de color i reflectivitat de materials al shader)
 //
 
 #ifndef GLMATERIAL_H
@@ -13,7 +13,7 @@
 /*                            Funcions de material                           */
 /* ------------------------------------------------------------------------- */
 
-// Configura i envia al shader la reflectivitat del material (emissiÛ, ambient, difusa, especular) segons un color base
+// Configura i envia al shader la reflectivitat del material (emissi√≥, ambient, difusa, especular) segons un color base
 void SeleccionaColorMaterial(GLuint sh_programID, CColor c_obj, bool sw_mater[5]);
 
 #endif

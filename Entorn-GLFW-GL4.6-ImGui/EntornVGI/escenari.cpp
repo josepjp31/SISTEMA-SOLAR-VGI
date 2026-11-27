@@ -341,10 +341,10 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	m_objectList[CB_VENUS] = new EsferaInt("Venus", 3.5, 40.0, 181.98, x / 224.70, 0.0, 1.481 * factorRotacio, 177.36, 3.39);
 	m_objectList[CB_EARTH] = new EsferaInt("Terra", 3.7, 55.0, 100.46, x / 365.256, 100.46, 361.015 * factorRotacio, -23.44, 0.00);
 	m_objectList[CB_MARS] = new EsferaInt("Mart", 2.8, 70.0, 355.45, x / 686.98, 0.0, 351.220 * factorRotacio, 25.19, 1.85);
-	m_objectList[CB_JUPITER] = new EsferaInt("J\xFApiter", 9.0, 105.0, 34.40, x / 4332.59, 0.0, 871.249 * factorRotacio, 3.13, 1.30);
+	m_objectList[CB_JUPITER] = new EsferaInt("Júpiter", 9.0, 105.0, 34.40, x / 4332.59, 0.0, 871.249 * factorRotacio, 3.13, 1.30);
 	m_objectList[CB_SATURN] = new EsferaInt("Saturn", 7.5, 140.0, 49.94, x / 10759.2, 0.0, 818.182 * factorRotacio, 26.73, 2.49);
-	m_objectList[CB_URANUS] = new EsferaInt("Ur\xE0", 5.5, 175.0, 313.23, x / 30688.5, 0.0, 501.393 * factorRotacio, 97.77, 0.77);
-	m_objectList[CB_NEPTUNE] = new EsferaInt("Nept\xFA", 5.3, 210.0, 304.88, x / 60195.0, 0.0, 545.455 * factorRotacio, 28.32, 1.77);
+	m_objectList[CB_URANUS] = new EsferaInt("Urà", 5.5, 175.0, 313.23, x / 30688.5, 0.0, 501.393 * factorRotacio, 97.77, 0.77);
+	m_objectList[CB_NEPTUNE] = new EsferaInt("Neptú", 5.3, 210.0, 304.88, x / 60195.0, 0.0, 545.455 * factorRotacio, 28.32, 1.77);
 	m_objectList[CB_MOON] = new EsferaInt("Lluna", 1.0, 7.0, 218.32, x / 27.322, 128.32, x / 27.322, 6.68, 5.14);
 	Object* anellSat = new AnellInt("Anells de Saturn", 9.0, 17.5, 26.73);
 

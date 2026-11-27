@@ -1,7 +1,7 @@
-//******** PRACTICA VISUALITZACI” GR¿FICA INTERACTIVA (Escola Enginyeria - UAB)
-//******** Entorn b‡sic VS2026 MONOFINESTRA amb OpenGL 4.6, interfÌcie GLFW  3.4, ImGui i llibreries GLM
-//******** Ferran Poveda, Marc Vivet, Carme Juli‡, DÈbora Gil, Enric MartÌ (Setembre 2026)
-// escena.h : InterfÌcie de escena.cpp (eixos, skybox i renderitzat de l'escena del Sistema Solar)
+//******** PRACTICA VISUALITZACI√ì GR√ÄFICA INTERACTIVA (Escola Enginyeria - UAB)
+//******** Entorn b√†sic VS2026 MONOFINESTRA amb OpenGL 4.6, interf√≠cie GLFW  3.4, ImGui i llibreries GLM
+//******** Ferran Poveda, Marc Vivet, Carme Juli√†, D√©bora Gil, Enric Mart√≠ (Setembre 2026)
+// escena.h : Interf√≠cie de escena.cpp (eixos, skybox i renderitzat de l'escena del Sistema Solar)
 //
 
 #ifndef GLSOURCE_H
@@ -14,7 +14,7 @@
 /*                            Funcions de les escenes                        */
 /* ------------------------------------------------------------------------- */
 
-// Dibuixa els eixos de coordenades del mÛn i les reixes actives
+// Dibuixa els eixos de coordenades del m√≥n i les reixes actives
 void dibuixa_Eixos(GLuint ax_programID, bool eix, GLuint axis_Id, CMask3D reixa, CPunt3D hreixa, glm::mat4 MatriuProjeccio, glm::mat4 MatriuVista);
 
 // Dibuixa el cubemap Skybox de fons

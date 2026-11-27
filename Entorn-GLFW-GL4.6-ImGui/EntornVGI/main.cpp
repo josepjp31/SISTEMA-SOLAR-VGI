@@ -1,4 +1,4 @@
-﻿
+
 //******** PRACTICA VISUALITZACIÓ GRÀFICA INTERACTIVA (Escola Enginyeria - UAB)
 //******** Entorn bàsic VS2026 MONOFINESTRA amb OpenGL 4.6, interfície GLFW 3.4, ImGui i llibreries GLM
 //******** Ferran Poveda, Marc Vivet, Carme Julià, Débora Gil, Enric Martí (Setembre 2026)
@@ -398,8 +398,8 @@ static void IniciarPrecarregaCoet()
 	}
 }
 
-// Puia la geometria i textura precarregades a la GPU al fil principal OpenGL
-// Si esperarSiCal es true (p. ex. en entrar a Pilota coet o enfocar CB_MILANO), fa join() si cal.
+// Puja la geometria i textura precarregades a la GPU al fil principal OpenGL.
+// Si esperarSiCal és true (en entrar a "Pilota coet"), fa join() si cal.
 static void FinalitzarCarregaCoetGPU(bool esperarSiCal)
 {
 	if (ObOBJ != NULL) return;
@@ -443,23 +443,17 @@ static void FinalitzarCarregaCoetGPU(bool esperarSiCal)
 	}
 }
 
-// Carrega el model 3D de la nau Milano si encara no es a GPU (usat en Pilota coet i en enfocar CB_MILANO)
+// Carrega el model 3D de la nau Milano si encara no és a GPU (usat únicament al mode "Pilota coet")
 static void AssegurarCoetCarregat()
 {
 	FinalitzarCarregaCoetGPU(true);
 }
 
-// Resol la posicio en coordenades del mon, el radi visual d'enquadrament i el nom
-// de qualsevol astre natural (dins escenariActual) o artificial (ex. coet Milano).
+// Resol la posició en coordenades del món, el radi visual d'enquadrament i el nom
+// de qualsevol astre observable dins escenariActual.
 static bool ObtenirDadesEnfocament(const Escenari* escenari, CelestialBodyId id,
                                    glm::vec3& outPosicio, double& outRadi, std::string* outNom = nullptr)
 {
-	if (id == CB_MILANO) {
-		outPosicio = posMilano;
-		outRadi = 6.0; // Radi aproximat d'enquadrament visual de la nau Milano (escala 0.5)
-		if (outNom) *outNom = "Nau Milano (Coet)";
-		return true;
-	}
 	if (escenari != nullptr) {
 		const Object* obj = escenari->obtenirObjecte(id);
 		if (obj != nullptr && obj->m_enfocable) {
@@ -672,10 +666,6 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		}
 		InterficieUI::ActualitzarDadesCosActiu(g_EstatSimulador, escenariActual);
 
-		if (cidDesti == CB_MILANO) {
-			AssegurarCoetCarregat();
-		}
-
 		if (transicio.modeCameraAnterior == ModeCamera::ORBITAL_CENTRADOR ||
 			transicio.modeCameraAnterior == ModeCamera::FIXA_INCLINADA_25)
 		{
@@ -780,11 +770,7 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		CelestialBodyId cid = g_EstatSimulador.cosEnfocatId;
 		if (cid == CB_NONE) cid = CB_SUN;
 
-		if (cid == CB_MILANO) {
-			AssegurarCoetCarregat();
-		}
-
-		// Distancia de camera proporcional al radi de l'objecte enfocat (natural o artificial)
+		// Distància de càmera proporcional al radi de l'objecte enfocat
 		glm::vec3 posObjecte(0.0f);
 		double radiObjecte = 16.0;
 		if (!ObtenirDadesEnfocament(escenariActual, cid, posObjecte, radiObjecte)) {
@@ -1007,7 +993,8 @@ void dibuixa_Escena() {
 	ilumEscena.llumAmbient = llum_ambient;
 	ilumEscena.llumFixa = ifixe;
 
-	bool mostrarMilano = (camera == CAM_NAVEGA) || (g_EstatSimulador.cosEnfocatId == CB_MILANO);
+	// La nau Milano només es mostra quan la càmera activa és el mode "Pilota coet" (CAM_NAVEGA)
+	bool mostrarMilano = (camera == CAM_NAVEGA);
 	dibuixa_EscenaGL(shader_programID, shader_programIDNormalMap, ViewMatrix, GTMatrix, sw_material,
 		escenariActual,
 		ObOBJ,				// COET: model OBJ de la nau Milano
@@ -1069,8 +1056,8 @@ void draw_Menu_ImGui()
 			InterficieUI::DibuixarEtiquetaPlaneta(obj->m_nom, posMon, ViewMatrix, ProjectionMatrix, viewport);
 		}
 
-		// Etiqueta 2D de la Nau Milano quan es visible a l'escena
-		if (camera == CAM_NAVEGA || g_EstatSimulador.cosEnfocatId == CB_MILANO)
+		// Etiqueta 2D de la Nau Milano només quan s'està pilotant (CAM_NAVEGA)
+		if (camera == CAM_NAVEGA)
 		{
 			glm::vec3 posMonMilano = posMilano + glm::vec3(0.0f, 0.0f, 6.0f * 1.15f);
 			InterficieUI::DibuixarEtiquetaPlaneta("Nau Milano", posMonMilano, ViewMatrix, ProjectionMatrix, viewport);
@@ -1902,6 +1889,11 @@ double toJ2000Seconds(int year, int month, int day, int hour, int minute, double
 // main(): Funció principal del programa. Inicialitza la finestra, els callbacks i el bucle principal d'operació
 int main()
 {
+#ifdef _WIN32
+	// Configurar la consola de Windows en UTF-8 per mostrar accents i caràcters especials catalans
+	SetConsoleOutputCP(CP_UTF8);
+	SetConsoleCP(CP_UTF8);
+#endif
 	//	std::cout << "Hello World!\n";
 
 	//    GLFWwindow* window;

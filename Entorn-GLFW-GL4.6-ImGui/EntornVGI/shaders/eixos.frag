@@ -1,7 +1,7 @@
-//******** PRACTICA VISUALITZACI” GR¿FICA INTERACTIVA (EE-UAB)
-//******** Entorn b‡sic VS2026 amb interfÌcie MFC/GLFW i Status Bar
+//******** PRACTICA VISUALITZACI√ì GR√ÄFICA INTERACTIVA (EE-UAB)
+//******** Entorn b√†sic VS2026 amb interf√≠cie MFC/GLFW i Status Bar
 //******** Enric Marti (Setembre 2026)
-// eixos.frag: Fragment Program en GLSL en versiÛ OpenGL 3.3 o 4.30 per a dibuixar eixos Coordenades MÛn
+// eixos.frag: Fragment Program en GLSL en versi√≥ OpenGL 3.3 o 4.30 per a dibuixar eixos Coordenades M√≥n
 
 //#version 330 core
 #version 460 core

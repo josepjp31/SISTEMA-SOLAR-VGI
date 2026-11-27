@@ -1,4 +1,4 @@
-﻿// InterficieUI.cpp : Implementacio dels components visuals (Selector de modes, Menus, Panells, Pop-ups i HUD)
+// InterficieUI.cpp : Implementacio dels components visuals (Selector de modes, Menus, Panells, Pop-ups i HUD)
 //
 // Guia rapida de manteniment:
 // - Per modificar dades fisiques mostrades a la Fitxa de l'Astre -> kCatalegCossos.
@@ -112,18 +112,11 @@ void InterficieUI::ActualitzarDadesCosActiu(EstatSimulacio& estat, const Escenar
     }
 }
 
-// Commuta directament entre INTUITIU i ESCALA_REAL sense passar pel selector inicial, recordant l'estat del panell 
-// de temps de ESCALA_REAL i conservant camera, focus i rellotge.
+// Commuta directament entre INTUITIU i ESCALA_REAL sense passar pel selector inicial,
+// conservant l'estat del panell de temps, càmera, focus i rellotge.
 void InterficieUI::SolicitarCanviModeDirecte(EstatSimulacio& estat, ModeSimulacio modeDesti)
 {
     if (estat.modeActual == modeDesti) return;
-
-    if (estat.modeActual == ModeSimulacio::ESCALA_REAL) {
-        estat.panellTempsPreferitReal = estat.mostrarPanellTemps;
-        estat.mostrarPanellTemps = false;
-    } else if (modeDesti == ModeSimulacio::ESCALA_REAL) {
-        estat.mostrarPanellTemps = estat.panellTempsPreferitReal;
-    }
 
     estat.modeActual = modeDesti;
     estat.canviModeDirectePendent = true;
@@ -180,8 +173,8 @@ void InterficieUI::InicialitzarEstil()
         if (rutaFontRegular != nullptr) {
             ImFontGlyphRangesBuilder builder;
             builder.AddRanges(io.Fonts->GetGlyphRangesDefault());
-            // Caracters catalans i unitats astronomiques necessaris als menus, panell i HUD
-            builder.AddText("ÀÁÈÉÍÏÒÓÚÜÇàáèéíïòóúüç·—°²");
+            // Caràcters catalans, símbols i unitats astronòmiques en UTF-8 necessaris als menús, panell i HUD
+            builder.AddText("ÀÁÈÉÍÏÒÓÚÜÇàáèéíïòóúüç·•—–°²³«»¿¡€");
             builder.BuildRanges(&s_rangCaractersCatala);
 
             // La primera font registrada passa a ser la font per defecte de tota la interficie
@@ -345,8 +338,8 @@ static void DibuixarDialegQuantA(bool* pObert)
         );
 
         const char* linia1 = "Explora els planetes i les seves òrbites en 3D.";
-        const char* linia2 = "• Mode Didàctic: vista clara de tot el sistema.";
-        const char* linia3 = "• Mode a Escala Real: distàncies reals i control del temps.";
+        const char* linia2 = "• Mode Didàctic: vista clara del sistema amb control del temps.";
+        const char* linia3 = "• Mode a Escala Real: distàncies reals i control temporal avançat.";
         const char* linia4 = "Projecte educatiu — Escola d'Enginyeria (UAB)";
 
         dl->AddText(ImVec2(caixaMin.x + 16.0f, caixaMin.y + 40.0f), IM_COL32(235, 245, 255, 250), linia1);
@@ -427,8 +420,8 @@ void InterficieUI::Renderitzar(EstatSimulacio& estat, Escenari*& currentEscenari
     // Fase 2: barra de menu superior adaptada a estat.modeActual (INTUITIU o ESCALA_REAL)
     DibuixarBarraMenuSuperior(estat, currentEscenari, escenaris, shader_programID, shader_programIDNormalMap);
 
-    // Fase 3: panell flotant de control de data, hora i timelapse (nomes visible en mode escala real)
-    if (estat.modeActual == ModeSimulacio::ESCALA_REAL && estat.mostrarPanellTemps) {
+    // Fase 3: panell flotant de control de data, hora i timelapse (disponible en ambdós modes)
+    if (estat.mostrarPanellTemps) {
         DibuixarPanellDataHoraTimelapse(estat);
     }
 
@@ -596,12 +589,12 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
             ImGui::Spacing();
 
             ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(235, 245, 255, 255));
-            DibuixarPuntLlista("Òrbites circulars coplanars.");
+            DibuixarPuntLlista("Òrbites circulars amb inclinació real.");
             DibuixarPuntLlista("Distàncies i radis ajustats visualment.");
-            DibuixarPuntLlista("Tots els planetes visibles simultàniament.");
-            DibuixarPuntLlista("Velocitats d'òrbita proporcionals.");
-            DibuixarPuntLlista("Càmera orbital inicial a 25 graus.");
-            DibuixarPuntLlista("Focus directe a qualsevol planeta.");
+            DibuixarPuntLlista("Tots els planetes i la Lluna visibles simultàniament.");
+            DibuixarPuntLlista("Control de data, hora i velocitat (1 h/s a 50 dies/s).");
+            DibuixarPuntLlista("Càmera orbital, vista a 25° i pilota coet.");
+            DibuixarPuntLlista("Focus directe a qualsevol astre i canvi en directe.");
             ImGui::PopStyleColor();
 
             // Posicionament resilient: fixa el boto a la base si hi ha espai, o just sota la llista
@@ -623,17 +616,17 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
             ImGui::SetCursorPosX((midaTargeta.x - ampleBoto) * 0.5f);
             if (ImGui::Button("INICIAR MODE DIDÀCTIC", ImVec2(ampleBoto, alcadaBoto)))
             {
-                // Configura l'estat per al Mode Didactic, tanca el selector i demana sincronitzar OpenGL
+                // Configura l'estat per al Mode Didàctic amb control del temps actiu, tanca el selector i sincronitza OpenGL
                 estat.modeActual = ModeSimulacio::INTUITIU;
                 estat.mostrarSelectorModes = false;
-                estat.mostrarPanellTemps = false;
+                estat.mostrarPanellTemps = true;
                 estat.cosEnfocatId = CB_SUN;
                 estat.cameraConfig.angleInclinacio = 25.0f;
                 estat.cameraConfig.mode = ModeCamera::FIXA_INCLINADA_25;
                 estat.configuracioInicialPendent = true;
                 estat.canviCameraPendent = true;
 
-                // Assignacio de l'escenari didactic (index 0); la inicialitzacio OpenGL es centralitza a main.cpp
+                // Assignació de l'escenari didàctic (índex 0); la inicialització OpenGL es centralitza a main.cpp
                 if (escenaris != nullptr)
                 {
                     currentEscenari = &escenaris[0];
@@ -675,10 +668,10 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
             ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 245, 230, 255));
             DibuixarPuntLlista("Distàncies i mides reals dels planetes.");
             DibuixarPuntLlista("Òrbites reals amb inclinació natural.");
-            DibuixarPuntLlista("Control complet de Data, Hora i Velocitat.");
-            DibuixarPuntLlista("Velocitat regulable: 1 min/s a 20 dies/s.");
-            DibuixarPuntLlista("Possibilitat d'avançar o rebobinar.");
-            DibuixarPuntLlista("Focus directe a cada astre.");
+            DibuixarPuntLlista("Control complet de data, hora i velocitat.");
+            DibuixarPuntLlista("Velocitat regulable: 1 h/s a 50 dies/s (defecte 1 dia/s).");
+            DibuixarPuntLlista("Possibilitat d'avançar, pausar o rebobinar.");
+            DibuixarPuntLlista("Focus directe a cada astre i canvi en directe.");
             ImGui::PopStyleColor();
 
             float padY = 16.0f * factorEscala;
@@ -699,11 +692,10 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
             ImGui::SetCursorPosX((midaTargeta.x - ampleBoto) * 0.5f);
             if (ImGui::Button("INICIAR MODE A ESCALA REAL", ImVec2(ampleBoto, alcadaBoto)))
             {
-                // Activa el mode a escala real amb el panell temporal obert i camera orbital lliure
+                // Activa el mode a escala real amb el panell temporal obert i càmera orbital lliure
                 estat.modeActual = ModeSimulacio::ESCALA_REAL;
                 estat.mostrarSelectorModes = false;
                 estat.mostrarPanellTemps = true;
-                estat.panellTempsPreferitReal = true;
                 estat.cosEnfocatId = CB_SUN;
                 estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
                 estat.configuracioInicialPendent = true;
@@ -727,9 +719,10 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
     ImGui::PopStyleVar(3);
 }
 
-// Construeix els elements de seleccio d'astre/objecte a partir dels objectes enfocables
-// de l'escenari actiu + la nau Milano, agrupats per categoria (Estrella, Planetes,
-// Satel-lits naturals, Planetes nans i Astres artificials).
+// Construeix els elements de selecció d'astre/objecte a partir dels objectes enfocables
+// de l'escenari actiu, agrupats per categoria (Estrella, Planetes, Satèl·lits naturals,
+// Planetes nans i Astres artificials presents a l'escena).
+// Nota: la nau Milano NO apareix aquí; només es mostra en activar la càmera "Pilota coet".
 static void DibuixarLlistaFocusObjectes(EstatSimulacio& estat, const Escenari* escenari, float factorFont)
 {
     auto seleccionarCos = [&](CelestialBodyId id) {
@@ -745,13 +738,11 @@ static void DibuixarLlistaFocusObjectes(EstatSimulacio& estat, const Escenari* e
     };
 
     std::vector<const Object*> estrelles, planetes, satelits, planetesNans, artificials;
-    bool milanoJaEnEscenari = false;
 
     if (escenari != nullptr) {
         std::vector<const Object*> enfocables = escenari->obtenirObjectesEnfocables();
         for (const Object* obj : enfocables) {
-            if (obj == nullptr) continue;
-            if (obj->m_id == CB_MILANO) milanoJaEnEscenari = true;
+            if (obj == nullptr || obj->m_id == CB_MILANO) continue;
             switch (obj->m_categoria) {
             case CategoriaObjecte::ESTRELLA:         estrelles.push_back(obj); break;
             case CategoriaObjecte::PLANETA:          planetes.push_back(obj); break;
@@ -805,21 +796,62 @@ static void DibuixarLlistaFocusObjectes(EstatSimulacio& estat, const Escenari* e
         teSeccioPrevia = true;
     }
 
-    if (!artificials.empty() || !milanoJaEnEscenari) {
-        if (teSeccioPrevia) ImGui::Separator();
-        ImGui::TextDisabled("Astres artificials");
-        for (const Object* obj : artificials) {
-            bool seleccionat = (estat.cosEnfocatId == obj->m_id);
-            if (ImGui::MenuItem(obj->m_nom.c_str(), nullptr, seleccionat)) {
-                seleccionarCos(obj->m_id);
-            }
+    if (!artificials.empty()) {
+        dibuixarSeccio("Astres artificials", artificials, teSeccioPrevia);
+    }
+}
+
+// Menú compartit "Temps & Data" disponible tant en Mode Didàctic com en Mode a Escala Real
+static void DibuixarMenuTempsIData(EstatSimulacio& estat, float factorFontMenu)
+{
+    if (ImGui::BeginMenu("Temps & Data"))
+    {
+        ImGui::SetWindowFontScale(factorFontMenu);
+        ImGui::MenuItem("Mostrar Control del Temps", nullptr, &estat.mostrarPanellTemps);
+        ImGui::Separator();
+        if (ImGui::MenuItem(estat.tempsSimulacio.enPausa ? "Reprendre Simulació" : "Pausar Simulació", "Espai")) {
+            estat.tempsSimulacio.enPausa = !estat.tempsSimulacio.enPausa;
         }
-        if (!milanoJaEnEscenari) {
-            bool seleccionatMilano = (estat.cosEnfocatId == CB_MILANO);
-            if (ImGui::MenuItem("Nau Milano (Coet)", nullptr, seleccionatMilano)) {
-                seleccionarCos(CB_MILANO);
-            }
+        if (ImGui::MenuItem("Invertir Sentit del Temps", "Backspace")) {
+            estat.tempsSimulacio.direccioTemps *= -1;
         }
+        ImGui::Separator();
+        if (ImGui::BeginMenu("Dates Destacades")) {
+            ImGui::SetWindowFontScale(factorFontMenu);
+            if (ImGui::MenuItem("Data i Hora Actual")) {
+                estat.tempsSimulacio.EstablirDataActual();
+                estat.recalculEfemeridesNecessari = true;
+            }
+            if (ImGui::MenuItem("Any 2000 (1 Gen 2000)")) {
+                estat.tempsSimulacio.EstablirJ2000();
+                estat.recalculEfemeridesNecessari = true;
+            }
+            if (ImGui::MenuItem("Eclipsi Solar Total (12 Ago 2026)")) {
+                estat.tempsSimulacio.dataHora = { 2026, 8, 12, 17, 30, 0 };
+                estat.recalculEfemeridesNecessari = true;
+            }
+            ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Velocitats Ràpides")) {
+            ImGui::SetWindowFontScale(factorFontMenu);
+            struct PresetVel { const char* nom; double val; };
+            static const PresetVel kPresets[5] = {
+                { "1 hora / s",  3600.0 },
+                { "1 dia / s",   86400.0 },
+                { "10 dies / s", 864000.0 },
+                { "20 dies / s", 1728000.0 },
+                { "50 dies / s", 4320000.0 }
+            };
+            double velAct = estat.tempsSimulacio.factorVelocitatSegonsPerSegon;
+            for (int i = 0; i < 5; ++i) {
+                bool activa = (std::fabs(velAct - kPresets[i].val) / kPresets[i].val) < 0.015;
+                if (ImGui::MenuItem(kPresets[i].nom, nullptr, activa)) {
+                    estat.tempsSimulacio.factorVelocitatSegonsPerSegon = kPresets[i].val;
+                }
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::EndMenu();
     }
 }
 
@@ -891,7 +923,10 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             ImGui::EndMenu();
         }
 
-        // 2) Seleccio de l'astre/objecte sobre el qual orbita la camera (generat dinamicament)
+        // 2) Control del temps, data i velocitat (disponible també en mode Didàctic)
+        DibuixarMenuTempsIData(estat, factorFontMenu);
+
+        // 3) Selecció de l'astre/objecte sobre el qual orbita la càmera (generat dinàmicament)
         if (ImGui::BeginMenu("Astres & Focus"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
@@ -1002,46 +1037,8 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             ImGui::EndMenu();
         }
 
-        // 2) Visibilitat del panell flotant de temps, pausa/direccio, dates i presets de velocitat
-        if (ImGui::BeginMenu("Temps & Data"))
-        {
-            ImGui::SetWindowFontScale(factorFontMenu);
-            ImGui::MenuItem("Mostrar Control del Temps", nullptr, &estat.mostrarPanellTemps);
-            ImGui::Separator();
-            if (ImGui::MenuItem(estat.tempsSimulacio.enPausa ? "Reprendre Simulació" : "Pausar Simulació", "Espai")) {
-                estat.tempsSimulacio.enPausa = !estat.tempsSimulacio.enPausa;
-            }
-            if (ImGui::MenuItem("Invertir Sentit del Temps", "Backspace")) {
-                estat.tempsSimulacio.direccioTemps *= -1;
-            }
-            ImGui::Separator();
-            if (ImGui::BeginMenu("Dates Destacades")) {
-                ImGui::SetWindowFontScale(factorFontMenu);
-                if (ImGui::MenuItem("Data i Hora Actual")) {
-                    estat.tempsSimulacio.EstablirDataActual();
-                    estat.recalculEfemeridesNecessari = true;
-                }
-                if (ImGui::MenuItem("Any 2000 (1 Gen 2000)")) {
-                    estat.tempsSimulacio.EstablirJ2000();
-                    estat.recalculEfemeridesNecessari = true;
-                }
-                if (ImGui::MenuItem("Eclipsi Solar Total (12 Ago 2026)")) {
-                    estat.tempsSimulacio.dataHora = { 2026, 8, 12, 17, 30, 0 };
-                    estat.recalculEfemeridesNecessari = true;
-                }
-                ImGui::EndMenu();
-            }
-            if (ImGui::BeginMenu("Velocitats Ràpides")) {
-                ImGui::SetWindowFontScale(factorFontMenu);
-                if (ImGui::MenuItem("1 minut / s")) estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 60.0;
-                if (ImGui::MenuItem("1 hora / s"))  estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 3600.0;
-                if (ImGui::MenuItem("1 dia / s"))   estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 86400.0;
-                if (ImGui::MenuItem("10 dies / s")) estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 864000.0;
-                if (ImGui::MenuItem("20 dies / s")) estat.tempsSimulacio.factorVelocitatSegonsPerSegon = 1728000.0;
-                ImGui::EndMenu();
-            }
-            ImGui::EndMenu();
-        }
+        // 2) Visibilitat del panell flotant de temps, pausa/direcció, dates i presets de velocitat
+        DibuixarMenuTempsIData(estat, factorFontMenu);
 
         // 3) Seleccio d'origen/astre centrat i modalitat de camera (incloent Pilota coet)
 
@@ -1198,12 +1195,12 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
 // =========================================================================
 // HELPERS DEL PANELL DE CONTROL DE TEMPS I VELOCITAT
 // =========================================================================
-// Marques equiespaiades del slider [0..1] amb mapeig logaritmic per trams de velocitat
+// Marques equiespaiades del slider [0..1] amb mapeig logarítmic per trams de velocitat (1 h/s a 50 dies/s)
 static const int kNumMarquesSlider = 5;
 static const float kPosMarques[kNumMarquesSlider] = { 0.00f, 0.25f, 0.50f, 0.75f, 1.00f };
-static const double kValMarques[kNumMarquesSlider] = { 60.0, 3600.0, 86400.0, 864000.0, 1728000.0 };
+static const double kValMarques[kNumMarquesSlider] = { 3600.0, 86400.0, 864000.0, 1728000.0, 4320000.0 };
 static const char* kEtiquetesMarques[kNumMarquesSlider] = {
-    "1 min/s", "1 h/s", "1 dia/s", "10 dies/s", "20 dies/s"
+    "1 h/s", "1 dia/s", "10 dies/s", "20 dies/s", "50 dies/s"
 };
 
 // Converteix una velocitat (en segons simulats/segon) a posicio normalitzada [0..1] del slider
@@ -1524,15 +1521,15 @@ static void DibuixarPopupSelectorData(EstatSimulacio& estat, bool& canviDataSoll
 }
 
 // =========================================================================
-// 2.3 CONTROL DE TEMPS I VELOCITAT (POP-UP FLOTANT EN MODE ESCALA REAL)
+// 2.3 CONTROL DE TEMPS I VELOCITAT (POP-UP FLOTANT EN AMBDÓS MODES)
 // =========================================================================
 // Panell ancorat inicialment a la cantonada inferior dreta amb:
-// 1) Marc espacial i titol; 2) Visor digital d'hora/data amb pop-ups;
-// 3) Botons de reproduccio (<<, ||/>, >>); 4) Slider logaritmic de velocitat;
-// 5) Dreceres rapides (1h/s, 1dia/s, 20dies/s); 6) Indicador d'estat inferior.
+// 1) Marc espacial i títol; 2) Visor digital d'hora/data amb pop-ups;
+// 3) Botons de reproducció (<<, ||/>, >>); 4) Slider logarítmic de velocitat (1h/s..50dies/s);
+// 5) Dreceres ràpides (1h/s, 1dia/s, 50dies/s); 6) Indicador d'estat inferior.
 void InterficieUI::DibuixarPanellDataHoraTimelapse(EstatSimulacio& estat)
 {
-    if (estat.modeActual != ModeSimulacio::ESCALA_REAL || !estat.mostrarPanellTemps) return;
+    if (!estat.mostrarPanellTemps) return;
 
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     const float ampleFinestra = 580.0f;
@@ -1877,9 +1874,9 @@ void InterficieUI::DibuixarPanellDataHoraTimelapse(EstatSimulacio& estat)
             double valorSegons;
         };
         static const DreceraVel kDreceres[3] = {
-            { "1 HORA / S", 3600.0 },
-            { "1 DIA / S",  86400.0 },
-            { "20 DIES / S", 1728000.0 }
+            { "1 HORA / S",  3600.0 },
+            { "1 DIA / S",   86400.0 },
+            { "50 DIES / S", 4320000.0 }
         };
 
         const float yBotonsDrecera = ySecDreceres + 22.0f;

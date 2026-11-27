@@ -1,14 +1,14 @@
-//******** PRACTICA VISUALITZACI” GR¿FICA INTERACTIVA (Escola Enginyeria - UAB)
-//******** Entorn b‡sic VS2026 MONOFINESTRA amb OpenGL 4.6, interfÌcie GLFW 3.4, ImGui i llibreries GLM
-//******** Ferran Poveda, Marc Vivet, Carme Juli‡, DÈbora Gil, Enric MartÌ (Setembre 2026)
+//******** PRACTICA VISUALITZACI√ì GR√ÄFICA INTERACTIVA (Escola Enginyeria - UAB)
+//******** Entorn b√†sic VS2026 MONOFINESTRA amb OpenGL 4.6, interf√≠cie GLFW 3.4, ImGui i llibreries GLM
+//******** Ferran Poveda, Marc Vivet, Carme Juli√†, D√©bora Gil, Enric Mart√≠ (Setembre 2026)
 // escena.cpp : Aqui es on ha d'anar el codi de les funcions que 
 //              dibuixin les escenes.
 //
-//    VersiÛ 2.0:	- Objectes Cub, Esfera, Tetera (primitives libreria GLUT)
+//    Versi√≥ 2.0:	- Objectes Cub, Esfera, Tetera (primitives libreria GLUT)
 //
-//	  VersiÛ 2.2:	- Objectes Cub, Esfera, Tetera definides en fitxer font glut_geometry amb altres primitives GLUT
+//	  Versi√≥ 2.2:	- Objectes Cub, Esfera, Tetera definides en fitxer font glut_geometry amb altres primitives GLUT
 //
-//	  VersiÛ 2.5:	- Objectes cubRGB i Tie (nau Star Wars fet per alumnes)
+//	  Versi√≥ 2.5:	- Objectes cubRGB i Tie (nau Star Wars fet per alumnes)
 //
 
 #include "escenari.h"
@@ -18,19 +18,19 @@
 #include "visualitzacio.h"
 #include "escena.h"
 
-// Dibuixa Eixos Coordenades MÛn i Reixes, activant un shader propi.
+// Dibuixa Eixos Coordenades M√≥n i Reixes, activant un shader propi.
 void dibuixa_Eixos(GLuint ax_programID, bool eix, GLuint axis_Id, CMask3D reixa, CPunt3D hreixa,
 	glm::mat4 MatriuProjeccio, glm::mat4 MatriuVista)
 {
-	// VisualitzaciÛ Eixos Coordenades MÚn
+	// Visualitzaci√≥ Eixos Coordenades M√≤n
 	glUseProgram(ax_programID);
 
-	// Pas Matrius ProjecciÛ i Vista Vista a shader
+	// Pas Matrius Projecci√≥ i Vista Vista a shader
 	glUniformMatrix4fv(glGetUniformLocation(ax_programID, "projectionMatrix"), 1, GL_FALSE, &MatriuProjeccio[0][0]);
 	glUniformMatrix4fv(glGetUniformLocation(ax_programID, "viewMatrix"), 1, GL_FALSE, &MatriuVista[0][0]);
 
 	// Attribute Locations must be setup before calling glLinkProgram()
-	glBindAttribLocation(ax_programID, 0, "in_Vertex"); // VËrtexs
+	glBindAttribLocation(ax_programID, 0, "in_Vertex"); // V√®rtexs
 	glBindAttribLocation(ax_programID, 1, "in_Color");	// Color
 
 	//  Dibuix dels eixos
@@ -83,7 +83,7 @@ void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, glm
 {
 	glm::mat4 ModelMatrix(1.0);
 
-	// Shader VisualitzaciÛ Objectes
+	// Shader Visualitzaci√≥ Objectes
 	glUseProgram(sh_programID);
 
 	// Cache d'uniform locations per evitar consultes al driver cada fotograma
@@ -116,7 +116,7 @@ void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, glm
 	//COET
 	if (mostrarMilano && objecteOBJ != nullptr)
 	{
-		// Centre geomËtric del model
+		// Centre geom√®tric del model
 		glm::vec3 centreModel(5.05f, 0.71f, -7.55f);
 
 		ModelMatrix = glm::translate(MatriuTG, posMilano);
@@ -133,7 +133,7 @@ void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, glm
 			0.0f
 		);
 
-		// InclinaciÛ vertical de la nau
+		// Inclinaci√≥ vertical de la nau
 		ModelMatrix = glm::rotate(
 			ModelMatrix,
 			glm::radians(-inclinacioMilano),
@@ -147,10 +147,10 @@ void dibuixa_EscenaGL(GLuint sh_programID, GLuint shader_programIDNormalMap, glm
 			glm::vec3(0.0f, 0.0f, 1.0f)
 		);
 
-		// Recuperar la posiciÛ original dels vËrtexs
+		// Recuperar la posici√≥ original dels v√®rtexs
 		ModelMatrix = glm::translate(ModelMatrix, -centreModel);
 
-		// OrientaciÛ fixa del model (sobre z)
+		// Orientaci√≥ fixa del model (sobre z)
 		ModelMatrix = glm::rotate(
 			ModelMatrix,
 			glm::radians(90.0f),

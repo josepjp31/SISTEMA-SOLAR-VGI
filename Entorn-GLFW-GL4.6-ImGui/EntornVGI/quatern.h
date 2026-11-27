@@ -1,6 +1,6 @@
-//******** PRACTICA VISUALITZACI” GR¿FICA INTERACTIVA (Escola Enginyeria - UAB)
-//******** Entorn b‡sic VS2026 MONOFINESTRA amb OpenGL 4.6, interfÌcie GLFW  3.4, ImGui i llibreries GLM
-//******** Ferran Poveda, Marc Vivet, Carme Juli‡, DÈbora Gil, Enric MartÌ (Setembre 2026)
+//******** PRACTICA VISUALITZACI√ì GR√ÄFICA INTERACTIVA (Escola Enginyeria - UAB)
+//******** Entorn b√†sic VS2026 MONOFINESTRA amb OpenGL 4.6, interf√≠cie GLFW  3.4, ImGui i llibreries GLM
+//******** Ferran Poveda, Marc Vivet, Carme Juli√†, D√©bora Gil, Enric Mart√≠ (Setembre 2026)
 // quatern.h : interface de quatern.cpp
 //
 
@@ -8,9 +8,9 @@
 #define QUATERN
 
 
-// -------------- V3D-QUATERNIONS: N˙mero de frames de l'animaciÛ de cossos rÌgids per QUATERNIONS.
+// -------------- V3D-QUATERNIONS: N√∫mero de frames de l'animaci√≥ de cossos r√≠gids per QUATERNIONS.
 const int NFRAMES_Q = 25;
-const int MAX_KEYFRAMES_Q = 3;	// Nombre m‡xim de keyframes
+const int MAX_KEYFRAMES_Q = 3;	// Nombre m√†xim de keyframes
 
 // -------- Estructura Quaternio representat com (w,[x,y,z])
 //	where:  w       - component escalar
@@ -35,7 +35,7 @@ void MatrixToQuat(double pMatrix, GL_Quat &quat);
 
 // Interpolacions per Quaternions
 void QuatLerp(GL_Quat from, GL_Quat to, GLdouble t, GL_Quat &res);   // Linial
-void QuatSlerp(GL_Quat from, GL_Quat to, GLdouble t,GL_Quat &res);			// EsfËrica
+void QuatSlerp(GL_Quat from, GL_Quat to, GLdouble t,GL_Quat &res);			// Esf√®rica
 
 // ALGEBRA DE QUATERNIONS
 void QuatNormalize(GL_Quat &quat);
