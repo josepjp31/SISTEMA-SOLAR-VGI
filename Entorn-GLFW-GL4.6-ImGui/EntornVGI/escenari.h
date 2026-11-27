@@ -22,6 +22,7 @@ public:
 		m_sons.clear();
 	}
 
+	//REALMENTE lo correcto seria que las texturas se guardasen en las herencias determinadas, ya que hay objetos que no tienen. pero como es codigo exactamente igual lo dejamos aqui de momento
 	void unloadTexture() { if (m_textureID != 0) { glDeleteTextures(1, &m_textureID); m_textureID = 0; } }
 	void unloadNormMap() { if (m_normalMapID != 0) { glDeleteTextures(1, &m_normalMapID); m_normalMapID = 0; } }
 	GLuint loadTexture(const char* filepath) {
@@ -66,13 +67,13 @@ public:
 	}
 
 	virtual void drawObject(GLuint& shaderActual, glm::mat4& matriuTG) = 0;
-	virtual void update(double dt) = 0;
+	virtual void update(double T) { for (Object* son : m_sons) if (son) son->update(T); }
 
 	GLuint m_textureID = 0;
 	GLuint m_normalMapID = 0;
 
 	glm::mat4 m_trMatrix = glm::mat4(1.0f);
-	double m_scale = 1.0f;
+	double m_scale = 1.0f; //Scale / radi del objecte, s'utilitza per la camara, hauria de canviar el nom pero bue. Més tard ja veig
 
 	std::string m_nom = "";
 
@@ -96,8 +97,11 @@ public:
 	double m_angleRotacio = 0.0f;
 	double m_velRotacio = 0.0f;
 
+	double m_inclinacioEix = 0.0;
+	double m_inclinacioOrbita = 0.0;
+
 	EsferaInt() {}
-	EsferaInt(const std::string& nom, double radiCos, double radiOrbita, double angleOrbita, double velAngular, double angleRotacio, double velRotacio) :
+	EsferaInt(const std::string& nom, double radiCos, double radiOrbita, double angleOrbita, double velAngular, double angleRotacio, double velRotacio, double inclinacioEix = 0.0, double inclinacioOrbita = 0.0) :
 		Object(nom, radiCos),
 		m_radiOrbita(radiOrbita),
 		m_angleOrbita(angleOrbita),
@@ -105,12 +109,14 @@ public:
 		m_velAngular(velAngular),
 		m_angleRotacio(angleRotacio),
 		m_angleRotacioInicial(angleRotacio),
-		m_velRotacio(velRotacio) {}
+		m_velRotacio(velRotacio),
+		m_inclinacioEix(inclinacioEix),
+		m_inclinacioOrbita(inclinacioOrbita) {}
 
 	~EsferaInt() {}
 
 	void drawObject(GLuint& shaderActual, glm::mat4& matriuTG) override;
-	void update(double dt) override;
+	void update(double T) override;
 
 };
 
@@ -118,11 +124,7 @@ public:
 class Escenari
 {
 public:
-	Escenari()
-	{
-		// CVAO no s'inicialitza sol: posar-lo a 0 evita alliberar identificadors brossa
-		m_orbitVAO = { 0, 0, 0, 0, 0 };
-	}
+	Escenari() {}
 	~Escenari() { alliberaEscenari(); }
 
 	// No es permet copiar un Escenari (gestiona memoria dinamica i recursos OpenGL)
@@ -143,7 +145,6 @@ public:
 		deleteVAOList(GLU_SPHERE);
 		deleteVAOList(GLU_DISK);
 		deleteVAOList(GLUT_TORUS);
-		alliberaOrbita();
 
 		std::vector<Object*> roots;
 		for (auto& p : m_objectList)
@@ -158,20 +159,4 @@ public:
 	}
 
 	std::unordered_map<CelestialBodyId, Object*> m_objectList;
-	
-	// Orbites: un unic cercle de radi 1 dibuixat com a linia (GL_LINE_LOOP). Cada orbita
-	// (8 planetes + Lluna) el reutilitza escalant-lo al seu radi amb la modelMatrix.
-	CVAO m_orbitVAO;
-
-	// Mapes normals per al shader de normal mapping (index = cos; 0 Sol i 7 Urà sense mapa)
-
-private:
-	void creaOrbita();
-	void alliberaOrbita() {
-		if (m_orbitVAO.vaoId != 0) {
-			glDeleteVertexArrays(1, &m_orbitVAO.vaoId);
-			glDeleteBuffers(1, &m_orbitVAO.vboId);
-			m_orbitVAO = { 0, 0, 0, 0, 0 };
-		}
-	}
 };

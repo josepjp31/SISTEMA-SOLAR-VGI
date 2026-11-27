@@ -2,36 +2,80 @@
 #include <cmath>
 #include <vector>
 
+
 void EsferaInt::drawObject(GLuint& shaderActual, glm::mat4& matriuTG)
 {
-	glUniform4i(glGetUniformLocation(shaderActual, "sw_intensity"), m_sw_mat[0], m_sw_mat[1], m_sw_mat[2], m_sw_mat[3]);
+	// Plano orbital inclinado respecto al sistema de referencia del padre
+	glm::mat4 matriuPlaOrbita = glm::rotate(matriuTG, (float)glm::radians(m_inclinacioOrbita), vec3(1.0f, 0.0f, 0.0f));
 
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	if (m_normalMapID != 0)
-		glBindTexture(GL_TEXTURE_2D, m_normalMapID);
+	// 1. DIBUIXAR L'ÒRBITA
+	if (m_radiOrbita > 0.0)
+	{
+		glUniform1i(glGetUniformLocation(shaderActual, "textur"), GL_FALSE);
+		glUniform1i(glGetUniformLocation(shaderActual, "sw_material"), GL_FALSE);
+		glUniform4i(glGetUniformLocation(shaderActual, "sw_intensity"), GL_TRUE, GL_FALSE, GL_FALSE, GL_FALSE);
 
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	if (m_textureID != 0)
-		glBindTexture(GL_TEXTURE_2D, m_textureID);
+		glm::mat4 matriuOrb = glm::scale(matriuPlaOrbita, vec3((float)m_radiOrbita));
+		glUniformMatrix4fv(glGetUniformLocation(shaderActual, "modelMatrix"), 1, GL_FALSE, &matriuOrb[0][0]);
 
-	//
-	double x = m_radiOrbita * cos(m_angleOrbita * PI / 180.0);
-	double y = m_radiOrbita * sin(m_angleOrbita * PI / 180.0);
+		CVAO orbitVAO = Get_VAOList(GLUT_TORUS);
+		if (orbitVAO.vaoId != 0)
+		{
+			glBindVertexArray(orbitVAO.vaoId);
+			glDrawArrays(GL_LINE_LOOP, 0, orbitVAO.nVertexs);
+			glBindVertexArray(0);
+		}
+	}
 
-	m_trMatrix = glm::translate(matriuTG, vec3(x, y, 0.0f));
+	// 2. POSICIÓ ORBITAL DEL COS (m_trMatrix pasa SOLO la posición a los hijos, sin torcer sus ejes)
+	float xOrb = (float)(m_radiOrbita * cos(glm::radians(m_angleOrbita)));
+	float yOrb = (float)(m_radiOrbita * sin(glm::radians(m_angleOrbita)));
 
-	glm::mat4 ModelMatrix = glm::rotate(m_trMatrix, (float)glm::radians(m_angleRotacio), vec3(0.0f, 0.0f, 1.0f));
-	ModelMatrix = glm::scale(ModelMatrix, vec3(m_scale));
+	glm::mat4 matriuPosicio = glm::translate(matriuPlaOrbita, vec3(xOrb, yOrb, 0.0f));
+
+	m_trMatrix = matriuTG;
+	m_trMatrix[3] = matriuPosicio[3];
+
+	// 3. MATRIU DE MODEL DEL PROPI COS (inclinació de l'eix + rotació + escala)
+	glm::mat4 ModelMatrix = glm::rotate(m_trMatrix, (float)glm::radians(m_inclinacioEix), vec3(1.0f, 0.0f, 0.0f));
+	ModelMatrix = glm::rotate(ModelMatrix, (float)glm::radians(m_angleRotacio), vec3(0.0f, 0.0f, 1.0f));
+	ModelMatrix = glm::scale(ModelMatrix, vec3((float)m_radiCos));
+
+	// 4. CONFIGURACIÓ DE SHADER, TEXTURA I MATERIAL PER A L'ESFERA
 	glUniformMatrix4fv(glGetUniformLocation(shaderActual, "modelMatrix"), 1, GL_FALSE, &ModelMatrix[0][0]);
-	//glUniform4i(glGetUniformLocation(shaderActual, "sw_intensity"), (i == 0 && sw_mat[0]), sw_mat[1], sw_mat[2], sw_mat[3]);
-	//Shader i tal se assigna fuera antes de cada objeto segun queramos
+
+	if (m_textureID != 0)
+	{
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, m_textureID);
+		glUniform1i(glGetUniformLocation(shaderActual, "textur"), GL_TRUE);
+		glUniform1i(glGetUniformLocation(shaderActual, "texImage"), 0);
+	}
+	else
+	{
+		glUniform1i(glGetUniformLocation(shaderActual, "textur"), GL_FALSE);
+	}
+
+	glUniform1i(glGetUniformLocation(shaderActual, "sw_material"), GL_TRUE);
+	glUniform4i(glGetUniformLocation(shaderActual, "sw_intensity"), m_sw_mat[0], m_sw_mat[1], m_sw_mat[2], m_sw_mat[3]);
+	SeleccionaColorMaterial(shaderActual, { 1.0,1.0,1.0,1.0 }, m_sw_mat);
+
+	// 5. DIBUIXAR L'ESFERA
 	draw_TriEBO_Object(GLU_SPHERE);
 
-	for (Object* son : m_sons)
-		if (son) son->drawObject(shaderActual, m_trMatrix);
+	// Restaurar estat de textura per seguretat
+	if (m_textureID != 0)
+	{
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glUniform1i(glGetUniformLocation(shaderActual, "textur"), GL_FALSE);
+	}
+
+	// 6. DIBUIXAR ELS FILLS (satèl·lits, anells, etc.) AMB LA POSICIÓ DEL PARE
+	for (Object* o : m_sons)
+		if (o)
+			o->drawObject(shaderActual, m_trMatrix);
 }
+
 void EsferaInt::update(double T)
 {
 	if (m_radiOrbita > 0.0)
@@ -46,8 +90,6 @@ void EsferaInt::update(double T)
 	for (Object* son : m_sons)
 		if (son) son->update(T);
 }
-
-
 
 // Copia matrius i llums del shader Phong al shader de normal mapping (perque tots dos il.luminin igual)
 static void copiaUniformsShader(GLuint src, GLuint dst)
@@ -123,6 +165,33 @@ GLuint createDefaultNormalMap()
 	return texID;
 }
 
+// creaOrbita: genera un cercle de radi 1 al pla XY com a GL_LINE_LOOP.
+// Abans les orbites eren tors 3D de gruix 0.03: vistes de lluny feien menys d'un pixel d'amplada
+// i el rasteritzador les dibuixava discontinues. Una linia sempre ocupa com a minim 1 pixel continu,
+// i amb el multisampling (MSAA, activat a main.cpp) les seves vores queden suavitzades.
+CVAO creaOrbita()
+{
+	const int nSegments = 512;	// Prou punts perque no es vegin trams rectes ni a l'orbita de Neptu
+	std::vector<double> vertices, normals, colors, textures;
+	vertices.reserve(nSegments * 3);	normals.reserve(nSegments * 3);
+	colors.reserve(nSegments * 4);		textures.reserve(nSegments * 2);
+
+	for (int k = 0; k < nSegments; k++)
+	{
+		double a = 2.0 * PI * k / nSegments;
+		vertices.push_back(cos(a));		vertices.push_back(sin(a));		vertices.push_back(0.0);
+		// Normal cap al centre de l'orbita (el Sol): la cara de la linia que "mira" el Sol rep la llum difusa
+		normals.push_back(-cos(a));		normals.push_back(-sin(a));		normals.push_back(0.0);
+		colors.push_back(0.7);	colors.push_back(0.7);	colors.push_back(0.7);	colors.push_back(1.0);
+		textures.push_back(0.0);	textures.push_back(0.0);
+	}
+
+	CVAO orbitVAO = load_TRIANGLES_VAO(vertices, normals, colors, textures);	// VAO generic: posicio, color, normal, textura
+	orbitVAO.eboId = 0;	// load_TRIANGLES_VAO no crea EBO ni inicialitza aquest camp
+	return orbitVAO;
+}
+
+
 CelestialBodyId mainBodies[10] = { CB_SUN, CB_MERCURY, CB_VENUS, CB_EARTH, CB_MARS, CB_JUPITER, CB_SATURN, CB_URANUS, CB_NEPTUNE, CB_MOON };
 
 void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
@@ -144,21 +213,24 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	SetColor4d(colObj.r, colObj.g, colObj.b, colObj.a);
 	Set_VAOList(GLU_SPHERE, loadgluSphere_EBO(1.0, 40, 40));				// Esfera de radi 1 (cossos)
 	Set_VAOList(GLU_DISK, loadgluDisk_EBO(8.0f, 12.0f, 80, 5)); //anell saturn
-	Set_VAOList(GLUT_TORUS, loadglutSolidTorus_EBO(0.005, 1.0, 8, 120));	// Anell fi de radi 1 (orbites)
+	Set_VAOList(GLUT_TORUS, creaOrbita());	// Anell fi de radi 1 (orbites). 
+
+	// Orbites: un unic cercle de linies de radi 1, compartit per les 8 orbites planetaries i la lunar
+	//creaOrbita();
 
 	const double x = 360.0 / 86400; // 360 graus / dies_orbita -> velocitat en graus/dia (1s simulat = 1 dia)
 	const double factorRotacio = 1.0 / 86400;
 	// Posicions i velocitats astronòmiques exactes a l'època J2000.0 (t = 0)
-	m_objectList[CB_SUN] = new EsferaInt("Sol", 16.0, 0.0, 0.00, 0.0, 0.0, 14.184 * factorRotacio); m_objectList[CB_SUN]->m_sw_mat[0] = true;
-	m_objectList[CB_MERCURY] = new EsferaInt("Mercuri", 2.0, 27.0, 252.25, x / 87.97, 0.0, 6.136 * factorRotacio);
-	m_objectList[CB_VENUS] = new EsferaInt("Venus", 3.5, 40.0, 181.98, x / 224.70, 0.0, -1.481 * factorRotacio);
-	m_objectList[CB_EARTH] = new EsferaInt("Terra", 3.7, 55.0, 100.46, x / 365.256, 0.0, 361.015 * factorRotacio);
-	m_objectList[CB_MARS] = new EsferaInt("Mart", 2.8, 70.0, 355.45, x / 686.98, 0.0, 351.220 * factorRotacio);
-	m_objectList[CB_JUPITER] = new EsferaInt("Júpiter", 9.0, 105.0, 34.40, x / 4332.59, 0.0, 871.249 * factorRotacio);
-	m_objectList[CB_SATURN] = new EsferaInt("Saturn", 7.5, 140.0, 49.94, x / 10759.2, 0.0, 818.182 * factorRotacio);
-	m_objectList[CB_URANUS] = new EsferaInt("Urà", 5.5, 175.0, 313.23, x / 30688.5, 0.0, -501.393 * factorRotacio);
-	m_objectList[CB_NEPTUNE] = new EsferaInt("Neptú", 5.3, 210.0, 304.88, x / 60195.0, 0.0, 545.455 * factorRotacio);
-	m_objectList[CB_MOON] = new EsferaInt("Lluna", 1.0, 7.0, 218.32, x / 27.322, 128.32, x / 27.322); // 218.32 - 90.0 per mantenir la cara visible cap a la Terra
+	m_objectList[CB_SUN] = new EsferaInt("Sol", 16.0, 0.0, 0.00, 0.0, 0.0, 14.184 * factorRotacio, 0.00, 0.00); m_objectList[CB_SUN]->m_sw_mat[0] = true;
+	m_objectList[CB_MERCURY] = new EsferaInt("Mercuri", 2.0, 27.0, 252.25, x / 87.97, 0.0, 6.136 * factorRotacio, 0.03, 7.00);
+	m_objectList[CB_VENUS] = new EsferaInt("Venus", 3.5, 40.0, 181.98, x / 224.70, 0.0, 1.481 * factorRotacio, 177.36, 3.39);
+	m_objectList[CB_EARTH] = new EsferaInt("Terra", 3.7, 55.0, 100.46, x / 365.256, 100.46, 361.015 * factorRotacio, -23.44, 0.00);
+	m_objectList[CB_MARS] = new EsferaInt("Mart", 2.8, 70.0, 355.45, x / 686.98, 0.0, 351.220 * factorRotacio, 25.19, 1.85);
+	m_objectList[CB_JUPITER] = new EsferaInt("J\xFApiter", 9.0, 105.0, 34.40, x / 4332.59, 0.0, 871.249 * factorRotacio, 3.13, 1.30);
+	m_objectList[CB_SATURN] = new EsferaInt("Saturn", 7.5, 140.0, 49.94, x / 10759.2, 0.0, 818.182 * factorRotacio, 26.73, 2.49);
+	m_objectList[CB_URANUS] = new EsferaInt("Ur\xE0", 5.5, 175.0, 313.23, x / 30688.5, 0.0, 501.393 * factorRotacio, 97.77, 0.77);
+	m_objectList[CB_NEPTUNE] = new EsferaInt("Nept\xFA", 5.3, 210.0, 304.88, x / 60195.0, 0.0, 545.455 * factorRotacio, 28.32, 1.77);
+	m_objectList[CB_MOON] = new EsferaInt("Lluna", 1.0, 7.0, 218.32, x / 27.322, 128.32, x / 27.322, 6.68, 5.14);
 	// m_objectList[CB_SATURN_RINGS] = new AnellsInt("Anells de Saturn", 1.0, 0.0, 0.0, 0.0, 0.0, 0.0); // radiOrbita i angleOrbita a 0.0 perquè hereten la posició de Saturn
 
 	// Build scene graph hierarchy
@@ -201,36 +273,6 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	// m_objectList[CB_SATURN_RINGS]->m_normalMapID = baseNorm;
 
 	glBindTexture(GL_TEXTURE_2D, 0);
-
-	// Orbites: un unic cercle de linies de radi 1, compartit per les 8 orbites planetaries i la lunar
-	creaOrbita();
-
-}
-
-// creaOrbita: genera un cercle de radi 1 al pla XY com a GL_LINE_LOOP.
-// Abans les orbites eren tors 3D de gruix 0.03: vistes de lluny feien menys d'un pixel d'amplada
-// i el rasteritzador les dibuixava discontinues. Una linia sempre ocupa com a minim 1 pixel continu,
-// i amb el multisampling (MSAA, activat a main.cpp) les seves vores queden suavitzades.
-void Escenari::creaOrbita()
-{
-	const int nSegments = 512;	// Prou punts perque no es vegin trams rectes ni a l'orbita de Neptu
-	std::vector<double> vertices, normals, colors, textures;
-	vertices.reserve(nSegments * 3);	normals.reserve(nSegments * 3);
-	colors.reserve(nSegments * 4);		textures.reserve(nSegments * 2);
-
-	for (int k = 0; k < nSegments; k++)
-	{
-		double a = 2.0 * PI * k / nSegments;
-		vertices.push_back(cos(a));		vertices.push_back(sin(a));		vertices.push_back(0.0);
-		// Normal cap al centre de l'orbita (el Sol): la cara de la linia que "mira" el Sol rep la llum difusa
-		normals.push_back(-cos(a));		normals.push_back(-sin(a));		normals.push_back(0.0);
-		colors.push_back(0.7);	colors.push_back(0.7);	colors.push_back(0.7);	colors.push_back(1.0);
-		textures.push_back(0.0);	textures.push_back(0.0);
-	}
-
-	alliberaOrbita();	// Si l'escenari es torna a crear (canvi de mode), no deixar el VAO anterior a la GPU
-	m_orbitVAO = load_TRIANGLES_VAO(vertices, normals, colors, textures);	// VAO generic: posicio, color, normal, textura
-	m_orbitVAO.eboId = 0;	// load_TRIANGLES_VAO no crea EBO ni inicialitza aquest camp
 }
 
 // Inclinacio del pla orbital de la Lluna respecte l'ecliptica (graus). Font: docs/planetes/planetes.json
@@ -263,7 +305,7 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 		SeleccionaColorMaterial(sh_programID, col_orbita, sw_mat_no_emisio);
 		GLint locModelMatOrb = glGetUniformLocation(sh_programID, "modelMatrix");
 		GLint locTwoSidedOrb = glGetUniformLocation(sh_programID, "sw_twoSided");
-		if (m_orbitVAO.vaoId != 0) glBindVertexArray(m_orbitVAO.vaoId);
+		//if (m_orbitVAO.vaoId != 0) glBindVertexArray(m_orbitVAO.vaoId);
 		for (i = 0; i < m_objectList.size(); i++)
 		{
 			// Les orbites planetaries es centren al Sol; la de la Lluna (i == 9) a la Terra
@@ -275,8 +317,8 @@ void Escenari::dibuixaEscenari(GLuint sh_programID, GLuint shaderNormalMapID, gl
 			// Amb il.luminacio bilateral (mateix uniform que l'anell de Saturn) mai queda totalment fosca.
 			if (locTwoSidedOrb != -1) glUniform1i(locTwoSidedOrb, (i == 9));
 
-			if (m_orbitVAO.vaoId != 0)
-				glDrawArrays(GL_LINE_LOOP, 0, m_orbitVAO.nVertexs);
+			//if (m_orbitVAO.vaoId != 0)
+				//glDrawArrays(GL_LINE_LOOP, 0, m_orbitVAO.nVertexs);
 		}
 		if (locTwoSidedOrb != -1) glUniform1i(locTwoSidedOrb, GL_FALSE);
 		glBindVertexArray(0);
