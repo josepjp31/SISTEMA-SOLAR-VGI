@@ -347,7 +347,7 @@ glm::mat4 Vista_Esferica(GLuint sh_programID,CEsfe3D opv,char VPol,bool pant,CPu
 	glm::mat4 TransMatrix(1.0);	// Matrius Traslació
 
 // Rectificar paràmetre R si negatiu.
-	if (opv.R < 1.0) opv.R = 1.0;
+	if (opv.R < p_near * 2.0) opv.R = p_near * 2.0;
 
 // Conversió angles radians -> graus
 	opv.alfa=opv.alfa*PI/180;

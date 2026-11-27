@@ -6,6 +6,16 @@
 #include <vector>
 #include "CelestialBodyData.h"
 
+// Categoria astronomica/tecnica per agrupar l'objecte als menus i gestionar l'enfocament
+enum class CategoriaObjecte {
+	ESTRELLA,           // Sol
+	PLANETA,            // Mercuri .. Neptu
+	PLANETA_NAN,        // Pluto, Ceres (quan s'incorporin)
+	SATELLIT_NATURAL,   // Lluna, Caront, llunes dels gegants...
+	ASTRE_ARTIFICIAL,   // Coet Milano, Voyager 1/2, ISS, sondes...
+	ORNAMENTAL          // Anells planetaris, cinturons visuals (no enfocables individualment)
+};
+
 // Context compartit durant el recorregut recursiu del graf d'escena
 struct ContextRenderEscenari {
 	GLuint shaderPhongID = 0;       // Shader estandard (orbites, anells, objectes sense normal map)
@@ -95,6 +105,13 @@ public:
 
 	std::string m_nom = "";
 
+	// Metadades unificades d'observacio i organitzacio als menus
+	CelestialBodyId m_id = CB_NONE;
+	CategoriaObjecte m_categoria = CategoriaObjecte::PLANETA;
+	bool m_enfocable = true;        // true: apareix als menus de focus i pot ser centre de camera
+	bool m_mostrarEtiqueta = true;  // true: mostra etiqueta 2D al viewport quan les etiquetes son actives
+	int m_ordreMenu = 0;            // Ordre deterministic de presentacio als menus (evita ordre aleatori d'unordered_map)
+
 	std::vector<Object*> m_sons;
 	Object* m_parent = nullptr;
 
@@ -152,6 +169,9 @@ public:
 		m_radiIntern(radiIntern),
 		m_inclinacioEix(inclinacioEix)
 	{
+		m_categoria = CategoriaObjecte::ORNAMENTAL;
+		m_enfocable = false;
+		m_mostrarEtiqueta = false;
 		m_vao = loadgluDisk_EBO(m_radiIntern, m_radiExtern, 80, 5);
 	}
 
@@ -213,6 +233,9 @@ public:
 		auto it = m_objectList.find(id);
 		return (it != m_objectList.end()) ? it->second : nullptr;
 	}
+
+	// Retorna tots els objectes enfocables de l'escenari ordenats per m_ordreMenu
+	std::vector<const Object*> obtenirObjectesEnfocables() const;
 
 	// Allibera els objectes (i els seus VAO). Cal cridar-la ABANS de destruir el context OpenGL.
 	void alliberaEscenari() {

@@ -190,6 +190,8 @@ struct CosAstronomicDades {
     double gravetat = 274.0;
     double periodeRotacioHores = 609.12;
     double periodeOrbitalAnys = 0.0;
+    std::string tipusEtiqueta = "Estrella";          // Categoria legible per a la Fitxa HUD
+    std::string distTextPersonalitzat = "";          // Text alternatiu (p. ex. satel-lits o naus)
 };
 
 // Estat global de la interficie del simulador (instancia unica g_EstatSimulador a main.cpp)
@@ -220,8 +222,8 @@ public:
     // Inicialitza l'estil visual (tema fosc espacial, arrodoniments) i carrega les fonts sans-serif amb suport catala
     static void InicialitzarEstil();
 
-    // Actualitza estat.dadesCosActiu a partir del cataleg intern segons estat.cosEnfocatId (0..8)
-    static void ActualitzarDadesCosActiu(EstatSimulacio& estat);
+    // Actualitza estat.dadesCosActiu a partir del cataleg intern (amb fallback segur des d'Escenari)
+    static void ActualitzarDadesCosActiu(EstatSimulacio& estat, const Escenari* escenari = nullptr);
 
     // Coordina i dibuixa tots els components actius de la UI a cada frame (cridada des de draw_Menu_ImGui a main.cpp)
     static void Renderitzar(EstatSimulacio& estat, Escenari*& currentEscenari, Escenari escenaris[], GLuint& shader_programID, GLuint& shader_programIDNormalMap);

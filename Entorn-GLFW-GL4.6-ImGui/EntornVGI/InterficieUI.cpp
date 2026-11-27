@@ -45,31 +45,70 @@ static void PopFontSegur(ImFont* f)
 }
 
 // =========================================================================
-// CATALEG DE DADES FISIQUES DELS 9 COSSOS DEL SISTEMA SOLAR (0: Sol .. 8: Neptu)
-// Ordre indexat igual que EstatSimulacio::cosEnfocatId i Escenari::m_objectList[0..8].
+// CATALEG DE DADES FISIQUES DELS COSSOS NATURALS I ARTIFICIALS
 // =========================================================================
 static std::unordered_map<CelestialBodyId, CosAstronomicDades> kCatalegCossos = {
-    { CB_SUN,     { "Sol",     696340.0,  0.000, 274.00,  609.12,   0.00 } },
-    { CB_MERCURY, { "Mercuri",   2439.7,  0.387,   3.70, 1407.60,   0.24 } },
-    { CB_VENUS,   { "Venus",     6051.8,  0.723,   8.87, 5832.50,   0.62 } },
-    { CB_EARTH,   { "Terra",     6371.0,  1.000,   9.81,   23.93,   1.00 } },
-    { CB_MARS,    { "Mart",      3389.5,  1.524,   3.72,   24.62,   1.88 } },
-    { CB_JUPITER, { "Júpiter",  69911.0,  5.204,  24.79,    9.93,  11.86 } },
-    { CB_SATURN,  { "Saturn",   58232.0,  9.582,  10.44,   10.70,  29.45 } },
-    { CB_URANUS,  { "Urà",      25362.0, 19.218,   8.69,   17.24,  84.02 } },
-    { CB_NEPTUNE, { "Neptú",    24622.0, 30.110,  11.15,   16.11, 164.79 } }
+    { CB_SUN,      { "Sol",        696340.0,  0.000,   274.00,  609.12,    0.00,   "Estrella",                "Centre del sistema" } },
+    { CB_MERCURY,  { "Mercuri",      2439.7,  0.387,     3.70, 1407.60,    0.24,   "Planeta",                 "" } },
+    { CB_VENUS,    { "Venus",        6051.8,  0.723,     8.87, 5832.50,    0.62,   "Planeta",                 "" } },
+    { CB_EARTH,    { "Terra",        6371.0,  1.000,     9.81,   23.93,    1.00,   "Planeta",                 "" } },
+    { CB_MARS,     { "Mart",         3389.5,  1.524,     3.72,   24.62,    1.88,   "Planeta",                 "" } },
+    { CB_JUPITER,  { "Júpiter",     69911.0,  5.204,    24.79,    9.93,   11.86,   "Planeta",                 "" } },
+    { CB_SATURN,   { "Saturn",      58232.0,  9.582,    10.44,   10.70,   29.45,   "Planeta",                 "" } },
+    { CB_URANUS,   { "Urà",         25362.0, 19.218,     8.69,   17.24,   84.02,   "Planeta",                 "" } },
+    { CB_NEPTUNE,  { "Neptú",       24622.0, 30.110,    11.15,   16.11,  164.79,   "Planeta",                 "" } },
+    { CB_MOON,     { "Lluna",        1737.4,  0.00257,   1.62,  655.70,    0.0748, "Satèl·lit natural",       "384.400 km (Terra)" } },
+    { CB_PLUTO,    { "Plutó",        1188.3, 39.482,     0.62,  153.30,  247.94,   "Planeta nan",             "" } },
+    { CB_CERES,    { "Ceres",         469.7,  2.768,     0.28,    9.07,    4.60,   "Planeta nan",             "" } },
+    { CB_CHARON,   { "Caront",        606.0, 39.482,     0.29,  153.30,    0.0175, "Satèl·lit natural",       "19.591 km (Plutó)" } },
+    { CB_VOYAGER1, { "Voyager 1",       0.0, 165.00,     0.00,    0.00,    0.00,   "Nau espacial artificial", "Espai interestel·lar" } },
+    { CB_VOYAGER2, { "Voyager 2",       0.0, 138.00,     0.00,    0.00,    0.00,   "Nau espacial artificial", "Espai interestel·lar" } },
+    { CB_MILANO,   { "Nau Milano",      0.0,   0.00,     0.00,    0.00,    0.00,   "Nau espacial artificial", "Òrbita lliure (pilotable)" } }
 };
 
+static const char* NomCategoriaLlegible(CategoriaObjecte cat)
+{
+    switch (cat) {
+    case CategoriaObjecte::ESTRELLA:         return "Estrella";
+    case CategoriaObjecte::PLANETA:          return "Planeta";
+    case CategoriaObjecte::PLANETA_NAN:      return "Planeta nan";
+    case CategoriaObjecte::SATELLIT_NATURAL: return "Satèl·lit natural";
+    case CategoriaObjecte::ASTRE_ARTIFICIAL: return "Nau espacial artificial";
+    default:                                 return "Objecte espacial";
+    }
+}
+
 // Copia les dades del cataleg de l'astre enfocant cap a estat.dadesCosActiu per al HUD
-void InterficieUI::ActualitzarDadesCosActiu(EstatSimulacio& estat)
+// (amb fallback segur a partir de les metadades de l'Object si el cos no es al cataleg)
+void InterficieUI::ActualitzarDadesCosActiu(EstatSimulacio& estat, const Escenari* escenari)
 {
     CelestialBodyId id = estat.cosEnfocatId;
     auto it = kCatalegCossos.find(id);
-    if (it == kCatalegCossos.end()) {
-        it = kCatalegCossos.find(CB_SUN); // Proteccio de rang (per defecte Sol)
-    }
     if (it != kCatalegCossos.end()) {
         estat.dadesCosActiu = it->second;
+        return;
+    }
+
+    if (escenari != nullptr) {
+        const Object* obj = escenari->obtenirObjecte(id);
+        if (obj != nullptr) {
+            CosAstronomicDades dadesFallback;
+            dadesFallback.nom = obj->m_nom.empty() ? "Objecte desconegut" : obj->m_nom;
+            dadesFallback.radiKm = 0.0;
+            dadesFallback.distSolUA = 0.0;
+            dadesFallback.gravetat = 0.0;
+            dadesFallback.periodeRotacioHores = 0.0;
+            dadesFallback.periodeOrbitalAnys = 0.0;
+            dadesFallback.tipusEtiqueta = NomCategoriaLlegible(obj->m_categoria);
+            dadesFallback.distTextPersonalitzat = "Dades físiques no catalogades";
+            estat.dadesCosActiu = dadesFallback;
+            return;
+        }
+    }
+
+    auto itSol = kCatalegCossos.find(CB_SUN); // Proteccio de rang (per defecte Sol)
+    if (itSol != kCatalegCossos.end()) {
+        estat.dadesCosActiu = itSol->second;
     }
 }
 
@@ -576,13 +615,13 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
                 estat.cameraConfig.mode = ModeCamera::FIXA_INCLINADA_25;
                 estat.configuracioInicialPendent = true;
                 estat.canviCameraPendent = true;
-                ActualitzarDadesCosActiu(estat);
 
                 // Assignacio de l'escenari didactic (index 0); la inicialitzacio OpenGL es centralitza a main.cpp
                 if (escenaris != nullptr)
                 {
                     currentEscenari = &escenaris[0];
                 }
+                ActualitzarDadesCosActiu(estat, currentEscenari);
             }
             ImGui::PopStyleColor(4);
         }
@@ -651,13 +690,13 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
                 estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
                 estat.configuracioInicialPendent = true;
                 estat.canviCameraPendent = true;
-                ActualitzarDadesCosActiu(estat);
 
                 // Assignacio de l'escenari a escala real (index 1); la inicialitzacio OpenGL es centralitza a main.cpp
                 if (escenaris != nullptr)
                 {
                     currentEscenari = &escenaris[1];
                 }
+                ActualitzarDadesCosActiu(estat, currentEscenari);
             }
             ImGui::PopStyleColor(4);
         }
@@ -668,6 +707,102 @@ void InterficieUI::DibuixarSelectorInicialModes(EstatSimulacio& estat, Escenari*
     ImGui::End();
     ImGui::PopStyleColor(2);
     ImGui::PopStyleVar(3);
+}
+
+// Construeix els elements de seleccio d'astre/objecte a partir dels objectes enfocables
+// de l'escenari actiu + la nau Milano, agrupats per categoria (Estrella, Planetes,
+// Satel-lits naturals, Planetes nans i Astres artificials).
+static void DibuixarLlistaFocusObjectes(EstatSimulacio& estat, const Escenari* escenari, float factorFont)
+{
+    auto seleccionarCos = [&](CelestialBodyId id) {
+        estat.cosEnfocatId = id;
+        estat.origenReferenciaSol = (id == CB_SUN);
+        if (estat.cameraConfig.mode == ModeCamera::GLOBAL_SISTEMA ||
+            estat.cameraConfig.mode == ModeCamera::COET_PRIMERA_PERSONA)
+        {
+            estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
+        }
+        estat.canviCameraPendent = true;
+        InterficieUI::ActualitzarDadesCosActiu(estat, escenari);
+    };
+
+    std::vector<const Object*> estrelles, planetes, satelits, planetesNans, artificials;
+    bool milanoJaEnEscenari = false;
+
+    if (escenari != nullptr) {
+        std::vector<const Object*> enfocables = escenari->obtenirObjectesEnfocables();
+        for (const Object* obj : enfocables) {
+            if (obj == nullptr) continue;
+            if (obj->m_id == CB_MILANO) milanoJaEnEscenari = true;
+            switch (obj->m_categoria) {
+            case CategoriaObjecte::ESTRELLA:         estrelles.push_back(obj); break;
+            case CategoriaObjecte::PLANETA:          planetes.push_back(obj); break;
+            case CategoriaObjecte::SATELLIT_NATURAL: satelits.push_back(obj); break;
+            case CategoriaObjecte::PLANETA_NAN:      planetesNans.push_back(obj); break;
+            case CategoriaObjecte::ASTRE_ARTIFICIAL: artificials.push_back(obj); break;
+            default: break;
+            }
+        }
+    }
+
+    auto dibuixarSeccio = [&](const char* titol, const std::vector<const Object*>& llista, bool posarSeparadorAbans) {
+        if (llista.empty()) return;
+        if (posarSeparadorAbans) ImGui::Separator();
+        ImGui::TextDisabled("%s", titol);
+        for (const Object* obj : llista) {
+            const char* label = (obj->m_id == CB_SUN) ? "Sol (Centre)" : obj->m_nom.c_str();
+            bool seleccionat = (estat.cosEnfocatId == obj->m_id);
+            if (ImGui::MenuItem(label, nullptr, seleccionat)) {
+                seleccionarCos(obj->m_id);
+            }
+        }
+    };
+
+    (void)factorFont;
+    bool teSeccioPrevia = false;
+
+    if (!estrelles.empty()) {
+        dibuixarSeccio("Estrella", estrelles, teSeccioPrevia);
+        teSeccioPrevia = true;
+    } else {
+        // Fallback segur si l'escenari encara no s'ha inicialitzat
+        if (ImGui::MenuItem("Sol (Centre)", nullptr, estat.cosEnfocatId == CB_SUN)) {
+            seleccionarCos(CB_SUN);
+        }
+        teSeccioPrevia = true;
+    }
+
+    if (!planetes.empty()) {
+        dibuixarSeccio("Planetes", planetes, teSeccioPrevia);
+        teSeccioPrevia = true;
+    }
+
+    if (!satelits.empty()) {
+        dibuixarSeccio("Satèl·lits naturals", satelits, teSeccioPrevia);
+        teSeccioPrevia = true;
+    }
+
+    if (!planetesNans.empty()) {
+        dibuixarSeccio("Planetes nans", planetesNans, teSeccioPrevia);
+        teSeccioPrevia = true;
+    }
+
+    if (!artificials.empty() || !milanoJaEnEscenari) {
+        if (teSeccioPrevia) ImGui::Separator();
+        ImGui::TextDisabled("Astres artificials");
+        for (const Object* obj : artificials) {
+            bool seleccionat = (estat.cosEnfocatId == obj->m_id);
+            if (ImGui::MenuItem(obj->m_nom.c_str(), nullptr, seleccionat)) {
+                seleccionarCos(obj->m_id);
+            }
+        }
+        if (!milanoJaEnEscenari) {
+            bool seleccionatMilano = (estat.cosEnfocatId == CB_MILANO);
+            if (ImGui::MenuItem("Nau Milano (Coet)", nullptr, seleccionatMilano)) {
+                seleccionarCos(CB_MILANO);
+            }
+        }
+    }
 }
 
 // =========================================================================
@@ -705,15 +840,6 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
 
     ImGui::SetWindowFontScale(factorFontMenu);
 
-    // Noms mostrables dels 9 astres indexats segons Escenari::m_objectList[0..8]
-    const int numBodies = 9;
-    static const char* nomsPlanetesMenu[numBodies] = {
-        "Sol (Centre)", "Mercuri", "Venus", "Terra", "Mart", "Júpiter", "Saturn", "Urà", "Neptú"
-    };
-    CelestialBodyId mainBodies[numBodies] = {
-        CB_SUN, CB_MERCURY, CB_VENUS, CB_EARTH, CB_MARS, CB_JUPITER, CB_SATURN, CB_URANUS, CB_NEPTUNE
-    };
-
     if (estat.modeActual == ModeSimulacio::INTUITIU)
     {
         // ==================== MENUS MODE DIDACTIC / INTUITIU ====================
@@ -739,10 +865,11 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             }
             if (ImGui::MenuItem("Reiniciar Vista", "R")) {
                 estat.cosEnfocatId = CB_SUN;
+                estat.origenReferenciaSol = true;
                 estat.cameraConfig.angleInclinacio = 25.0f;
                 estat.cameraConfig.mode = ModeCamera::FIXA_INCLINADA_25;
                 estat.canviCameraPendent = true;
-                ActualitzarDadesCosActiu(estat);
+                ActualitzarDadesCosActiu(estat, currentEscenari);
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Sortir", "Alt+F4")) {
@@ -752,25 +879,18 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             ImGui::EndMenu();
         }
 
-        // 2) Seleccio de l'astre sobre el qual orbita la camera (0=Sol .. 8=Neptu)
-        if (ImGui::BeginMenu("Planetes & Focus"))
+        // 2) Seleccio de l'astre/objecte sobre el qual orbita la camera (generat dinamicament)
+        if (ImGui::BeginMenu("Astres & Focus"))
         {
             ImGui::SetWindowFontScale(factorFontMenu);
-            for (int i = 0; i < numBodies; ++i) {
-                bool seleccionat = (estat.cosEnfocatId == mainBodies[i]);
-                if (ImGui::MenuItem(nomsPlanetesMenu[i], nullptr, seleccionat)) {
-                    estat.cosEnfocatId = mainBodies[i];
-                    estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
-                    estat.canviCameraPendent = true;
-                    ActualitzarDadesCosActiu(estat);
-                }
-            }
+            DibuixarLlistaFocusObjectes(estat, currentEscenari, factorFontMenu);
             ImGui::Separator();
             if (ImGui::MenuItem("Vista Global del Sol", "Home")) {
                 estat.cosEnfocatId = CB_SUN;
+                estat.origenReferenciaSol = true;
                 estat.cameraConfig.mode = ModeCamera::GLOBAL_SISTEMA;
                 estat.canviCameraPendent = true;
-                ActualitzarDadesCosActiu(estat);
+                ActualitzarDadesCosActiu(estat, currentEscenari);
             }
             ImGui::EndMenu();
         }
@@ -795,9 +915,10 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
             }
             if (ImGui::MenuItem("Vista Global del Sistema", nullptr, estat.cameraConfig.mode == ModeCamera::GLOBAL_SISTEMA)) {
                 estat.cosEnfocatId = CB_SUN;
+                estat.origenReferenciaSol = true;
                 estat.cameraConfig.mode = ModeCamera::GLOBAL_SISTEMA;
                 estat.canviCameraPendent = true;
-                ActualitzarDadesCosActiu(estat);
+                ActualitzarDadesCosActiu(estat, currentEscenari);
             }
             ImGui::EndMenu();
         }
@@ -866,7 +987,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 estat.origenReferenciaSol = true;
                 estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
                 estat.canviCameraPendent = true;
-                ActualitzarDadesCosActiu(estat);
+                ActualitzarDadesCosActiu(estat, currentEscenari);
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Sortir", "Alt+F4")) {
@@ -923,27 +1044,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
         {
             ImGui::SetWindowFontScale(factorFontMenu);
             ImGui::TextDisabled("Centrar Vista en:");
-            if (ImGui::MenuItem("El Sol", nullptr, estat.cosEnfocatId == CB_SUN)) {
-                estat.origenReferenciaSol = true;
-                estat.cosEnfocatId = CB_SUN;
-                estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
-                estat.canviCameraPendent = true;
-                ActualitzarDadesCosActiu(estat);
-            }
-            if (ImGui::BeginMenu("El Planeta Seleccionat")) {
-                ImGui::SetWindowFontScale(factorFontMenu);
-                for (int i = 1; i < numBodies; ++i) {
-                    bool seleccionat = (!estat.origenReferenciaSol && estat.cosEnfocatId == mainBodies[i]);
-                    if (ImGui::MenuItem(nomsPlanetesMenu[i], nullptr, seleccionat)) {
-                        estat.cosEnfocatId = mainBodies[i];
-                        estat.origenReferenciaSol = false;
-                        estat.cameraConfig.mode = ModeCamera::ORBITAL_CENTRADOR;
-                        estat.canviCameraPendent = true;
-                        ActualitzarDadesCosActiu(estat);
-                    }
-                }
-                ImGui::EndMenu();
-            }
+            DibuixarLlistaFocusObjectes(estat, currentEscenari, factorFontMenu);
 
             ImGui::Separator();
             ImGui::TextDisabled("Tipus de Càmera:");
@@ -965,7 +1066,7 @@ void InterficieUI::DibuixarBarraMenuSuperior(EstatSimulacio& estat, Escenari*& c
                 estat.origenReferenciaSol = true;
                 estat.cameraConfig.mode = ModeCamera::GLOBAL_SISTEMA;
                 estat.canviCameraPendent = true;
-                ActualitzarDadesCosActiu(estat);
+                ActualitzarDadesCosActiu(estat, currentEscenari);
             }
             ImGui::EndMenu();
         }
@@ -1852,8 +1953,8 @@ void InterficieUI::DibuixarFitxaAstronomicaHUD(const CosAstronomicDades& dades, 
     if (!pObert || !*pObert) return;
 
     const ImGuiViewport* vp = ImGui::GetMainViewport();
-    const float ampleFinestra = 340.0f;
-    const float alcadaFinestra = 276.0f;
+    const float ampleFinestra = 350.0f;
+    const float alcadaFinestra = 294.0f;
 
     ImVec2 pos(vp->WorkPos.x + vp->WorkSize.x - ampleFinestra - 20.0f, vp->WorkPos.y + 44.0f);
     ImGui::SetNextWindowPos(pos, ImGuiCond_FirstUseEver);
@@ -1881,37 +1982,71 @@ void InterficieUI::DibuixarFitxaAstronomicaHUD(const CosAstronomicDades& dades, 
 
         DibuixarMarcFinestraEspacial(dl, winPos, winSize, "FITXA DE L'ASTRE", pObert, "##TancarFitxaAstre", alcadaCapcalera);
 
-        // Nom de l'astre destacat
+        // Nom i categoria de l'astre destacat
         PushFontSegur(s_fontPanellTitol);
         ImVec2 midaNom = ImGui::CalcTextSize(dades.nom.c_str());
         dl->AddText(
-            ImVec2(winPos.x + (winSize.x - midaNom.x) * 0.5f, winPos.y + alcadaCapcalera + 12.0f),
+            ImVec2(winPos.x + (winSize.x - midaNom.x) * 0.5f, winPos.y + alcadaCapcalera + 10.0f),
             IM_COL32(105, 225, 255, 255),
             dades.nom.c_str()
         );
         PopFontSegur(s_fontPanellTitol);
 
+        if (!dades.tipusEtiqueta.empty()) {
+            PushFontSegur(s_fontPanellPetit);
+            ImVec2 midaTipus = ImGui::CalcTextSize(dades.tipusEtiqueta.c_str());
+            dl->AddText(
+                ImVec2(winPos.x + (winSize.x - midaTipus.x) * 0.5f, winPos.y + alcadaCapcalera + 32.0f),
+                IM_COL32(165, 208, 235, 220),
+                dades.tipusEtiqueta.c_str()
+            );
+            PopFontSegur(s_fontPanellPetit);
+        }
+
         // Caixa interior de dades simples
         const float padLat = 18.0f;
-        ImVec2 caixaMin(winPos.x + padLat, winPos.y + alcadaCapcalera + 42.0f);
+        ImVec2 caixaMin(winPos.x + padLat, winPos.y + alcadaCapcalera + 56.0f);
         ImVec2 caixaMax(winPos.x + winSize.x - padLat, winPos.y + winSize.y - 18.0f);
         dl->AddRectFilled(caixaMin, caixaMax, IM_COL32(12, 28, 48, 232), 9.0f);
         dl->AddRect(caixaMin, caixaMax, IM_COL32(55, 165, 220, 165), 9.0f, 0, 1.2f);
 
-        char valRadi[48], valDist[48], valGrav[48], valDia[48], valAny[48];
-        snprintf(valRadi, sizeof(valRadi), "%.0f km", dades.radiKm);
-        if (dades.distSolUA <= 0.0001) {
+        char valRadi[48], valDist[64], valGrav[48], valDia[48], valAny[48];
+        if (dades.radiKm <= 0.0001) {
+            snprintf(valRadi, sizeof(valRadi), "—");
+        } else {
+            snprintf(valRadi, sizeof(valRadi), "%.1f km", dades.radiKm);
+        }
+
+        if (!dades.distTextPersonalitzat.empty()) {
+            snprintf(valDist, sizeof(valDist), "%s", dades.distTextPersonalitzat.c_str());
+        } else if (dades.distSolUA <= 0.0001) {
             snprintf(valDist, sizeof(valDist), "Centre del sistema");
         } else {
             snprintf(valDist, sizeof(valDist), "%.2f UA", dades.distSolUA);
         }
-        snprintf(valGrav, sizeof(valGrav), "%.1f m/s²", dades.gravetat);
-        snprintf(valDia, sizeof(valDia), "%.1f h", dades.periodeRotacioHores);
+
+        if (dades.gravetat <= 0.0001) {
+            snprintf(valGrav, sizeof(valGrav), "—");
+        } else {
+            snprintf(valGrav, sizeof(valGrav), "%.2f m/s²", dades.gravetat);
+        }
+
+        if (dades.periodeRotacioHores <= 0.0001) {
+            snprintf(valDia, sizeof(valDia), "—");
+        } else {
+            snprintf(valDia, sizeof(valDia), "%.1f h", dades.periodeRotacioHores);
+        }
+
         if (dades.periodeOrbitalAnys <= 0.0001) {
             snprintf(valAny, sizeof(valAny), "—");
+        } else if (dades.periodeOrbitalAnys < 0.2) {
+            snprintf(valAny, sizeof(valAny), "%.2f dies", dades.periodeOrbitalAnys * 365.256);
         } else {
             snprintf(valAny, sizeof(valAny), "%.2f anys", dades.periodeOrbitalAnys);
         }
+
+        const char* etiquetaDist = dades.distTextPersonalitzat.empty() ? "Distància al Sol:" : "Ubicació:";
+        const char* etiquetaOrb  = (dades.tipusEtiqueta == "Satèl·lit natural") ? "Període orbital:" : "Volta al Sol:";
 
         struct FilaDada {
             const char* etiqueta;
@@ -1919,10 +2054,10 @@ void InterficieUI::DibuixarFitxaAstronomicaHUD(const CosAstronomicDades& dades, 
         };
         FilaDada files[5] = {
             { "Radi:",            valRadi },
-            { "Distància al Sol:", valDist },
+            { etiquetaDist,       valDist },
             { "Gravetat:",        valGrav },
             { "Durada del dia:",  valDia },
-            { "Volta al Sol:",    valAny }
+            { etiquetaOrb,        valAny }
         };
 
         PushFontSegur(s_fontPanellRegular);

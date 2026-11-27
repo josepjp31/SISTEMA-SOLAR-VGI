@@ -1,4 +1,5 @@
 #include "escenari.h"
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -359,6 +360,26 @@ void Escenari::creaEscenari(GLuint& shader_programID, GLuint& shaderNormalMapID)
 	m_objectList[CB_EARTH]->addSon(m_objectList[CB_MOON]);
 	m_objectList[CB_SATURN]->addSon(anellSat);
 
+	// Assignacio d'identificadors, categories i ordre determinista als menus
+	auto configurarMetadades = [&](CelestialBodyId id, CategoriaObjecte cat, int ordre) {
+		Object* obj = obtenirObjecte(id);
+		if (obj != nullptr) {
+			obj->m_id = id;
+			obj->m_categoria = cat;
+			obj->m_ordreMenu = ordre;
+		}
+	};
+	configurarMetadades(CB_SUN,     CategoriaObjecte::ESTRELLA,         0);
+	configurarMetadades(CB_MERCURY, CategoriaObjecte::PLANETA,          10);
+	configurarMetadades(CB_VENUS,   CategoriaObjecte::PLANETA,          20);
+	configurarMetadades(CB_EARTH,   CategoriaObjecte::PLANETA,          30);
+	configurarMetadades(CB_MOON,    CategoriaObjecte::SATELLIT_NATURAL, 31);
+	configurarMetadades(CB_MARS,    CategoriaObjecte::PLANETA,          40);
+	configurarMetadades(CB_JUPITER, CategoriaObjecte::PLANETA,          50);
+	configurarMetadades(CB_SATURN,  CategoriaObjecte::PLANETA,          60);
+	configurarMetadades(CB_URANUS,  CategoriaObjecte::PLANETA,          70);
+	configurarMetadades(CB_NEPTUNE, CategoriaObjecte::PLANETA,          80);
+
 	// Càrrega de textures difuses
 	m_objectList[CB_SUN]->loadTexture(".\\textures\\sun\\2k_sun.jpg");
 	m_objectList[CB_MERCURY]->loadTexture(".\\textures\\planet\\Mercury\\2k_mercury.jpg");
@@ -465,6 +486,24 @@ void Escenari::updateVariables(double t, double dt, bool enPausa, int direccioTe
 		if (p.second && p.second->m_parent == nullptr)
 			p.second->update(t, glm::mat4(1.0f));
 	}
+}
+
+std::vector<const Object*> Escenari::obtenirObjectesEnfocables() const
+{
+	std::vector<const Object*> resultat;
+	resultat.reserve(m_objectList.size());
+	for (const auto& p : m_objectList)
+	{
+		const Object* obj = p.second;
+		if (obj != nullptr && obj->m_enfocable)
+			resultat.push_back(obj);
+	}
+	std::sort(resultat.begin(), resultat.end(), [](const Object* a, const Object* b) {
+		if (a->m_ordreMenu != b->m_ordreMenu)
+			return a->m_ordreMenu < b->m_ordreMenu;
+		return a->m_nom < b->m_nom;
+	});
+	return resultat;
 }
 
 

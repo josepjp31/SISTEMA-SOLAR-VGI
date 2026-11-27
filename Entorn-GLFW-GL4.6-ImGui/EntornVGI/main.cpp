@@ -389,6 +389,74 @@ void OnShaderNormalMap()
 
 double toJ2000Seconds(int year, int month, int day, int hour = 0, int minute = 0, double second = 0.0);
 
+// Carrega el model 3D de la nau Milano si encara no es a memoria (usat en Pilota coet i quan s'enfoca CB_MILANO)
+static void AssegurarCoetCarregat()
+{
+	if (ObOBJ == NULL)
+	{
+		ObOBJ = new COBJModel;
+		char nomFitxer[] = "textures/coet/milano_gotg.obj";
+		int error = ObOBJ->LoadModel(nomFitxer);
+		if (error == 0) {
+			printf("Milano carregada correctament!\n");
+		} else {
+			printf("Error carregant la Milano: %d\n", error);
+		}
+	}
+}
+
+// Resol la posicio en coordenades del mon, el radi visual d'enquadrament i el nom
+// de qualsevol astre natural (dins escenariActual) o artificial (ex. coet Milano).
+static bool ObtenirDadesEnfocament(const Escenari* escenari, CelestialBodyId id,
+                                   glm::vec3& outPosicio, double& outRadi, std::string* outNom = nullptr)
+{
+	if (id == CB_MILANO) {
+		outPosicio = posMilano;
+		outRadi = 6.0; // Radi aproximat d'enquadrament visual de la nau Milano (escala 0.5)
+		if (outNom) *outNom = "Nau Milano (Coet)";
+		return true;
+	}
+	if (escenari != nullptr) {
+		const Object* obj = escenari->obtenirObjecte(id);
+		if (obj != nullptr && obj->m_enfocable) {
+			outPosicio = glm::vec3(obj->m_trMatrix[3]);
+			outRadi = obj->m_scale;
+			if (outNom) *outNom = obj->m_nom;
+			return true;
+		}
+	}
+	return false;
+}
+
+// Calcula la distancia per defecte, el zoom minim, el zoom maxim i el pas de zoom
+// de forma proporcional al radi de l'objecte enfocat (valid tant per INTUITIU com ESCALA_REAL).
+struct LimitsCameraCos {
+	double distDefecte;
+	double minR;
+	double maxR;
+	double pasZoom;
+};
+
+static LimitsCameraCos CalcularLimitsCameraPerCos(CelestialBodyId id, double radiCos)
+{
+	// Proteccio davant radis molt petits o nuls (ex. sondes o escala real en UA)
+	const double radiSegur = std::max(radiCos, 0.0005);
+
+	LimitsCameraCos lim;
+	if (id == CB_SUN) {
+		lim.distDefecte = std::max(radiSegur * 8.5, 140.0);
+		lim.minR        = std::max(radiSegur * 2.2, 2.0);
+		lim.maxR        = std::max(radiSegur * 60.0, 1200.0);
+		lim.pasZoom     = std::max(radiSegur * 0.35, 0.5);
+	} else {
+		lim.distDefecte = radiSegur * 4.5;
+		lim.minR        = std::max(radiSegur * 1.8, p_near * 10.0);
+		lim.maxR        = std::max(radiSegur * 250.0, 800.0);
+		lim.pasZoom     = std::max(radiSegur * 0.35, 0.02);
+	}
+	return lim;
+}
+
 // SincronitzarEstatSimuladorAmbOpenGL: Pont entre la interficie ImGui (g_EstatSimulador)
 // i les variables globals d'OpenGL/EntornVGI. S'executa a cada frame abans de renderitzar:
 // - Bloc 1 (configuracioInicialPendent): configura projeccio, shaders, llum solar #0, escenari i skybox.
@@ -514,17 +582,19 @@ void SincronitzarEstatSimuladorAmbOpenGL()
 		CelestialBodyId cid = g_EstatSimulador.cosEnfocatId;
 		if (cid == CB_NONE) cid = CB_SUN;
 
-		// Distancia de camera proporcional al radi del planeta seleccionat per garantir bon enquadrament
-		double distPerDefecte = 140.0;
-		if (cid != CB_NONE && escenariActual != nullptr)
-		{
-			Object* obj = escenariActual->obtenirObjecte(cid);
-			if (obj != nullptr)
-			{
-				distPerDefecte = obj->m_scale * 4.5;
-				if (distPerDefecte < 14.0) distPerDefecte = 14.0;
-			}
+		if (cid == CB_MILANO) {
+			AssegurarCoetCarregat();
 		}
+
+		// Distancia de camera proporcional al radi de l'objecte enfocat (natural o artificial)
+		glm::vec3 posObjecte(0.0f);
+		double radiObjecte = 16.0;
+		if (!ObtenirDadesEnfocament(escenariActual, cid, posObjecte, radiObjecte)) {
+			cid = CB_SUN;
+			ObtenirDadesEnfocament(escenariActual, cid, posObjecte, radiObjecte);
+		}
+		LimitsCameraCos lim = CalcularLimitsCameraPerCos(cid, radiObjecte);
+		double distPerDefecte = lim.distDefecte;
 
 		if (g_EstatSimulador.cameraConfig.mode == ModeCamera::FIXA_INCLINADA_25)
 		{
@@ -623,16 +693,15 @@ void OnPaint(GLFWwindow* window)
 				ilumina, llum_ambient, llumGL, ifixe, ilum2sides,
 				eixos, grid, hgrid);
 
-			// Quan hi ha un cos enfocat des del menu, traslladem la vista cap a la seva posicio orbital
-			// perque la camera orbiti al seu voltant
-			if (objecte == SISTEMA_SOLAR && escenariActual != nullptr && g_EstatSimulador.cosEnfocatId != CB_NONE)
+			// Quan hi ha un cos enfocat des del menu (natural o artificial), traslladem la vista
+			// cap a la seva posicio orbital perque la camera orbiti al seu voltant
+			if (objecte == SISTEMA_SOLAR && g_EstatSimulador.cosEnfocatId != CB_NONE)
 			{
-				Object* objEnfocat = escenariActual->obtenirObjecte(g_EstatSimulador.cosEnfocatId);
-				if (objEnfocat != nullptr)
+				glm::vec3 posObjecte(0.0f);
+				double radiObjecte = 1.0;
+				if (ObtenirDadesEnfocament(escenariActual, g_EstatSimulador.cosEnfocatId, posObjecte, radiObjecte))
 				{
-					glm::vec3 posPlaneta = glm::vec3(objEnfocat->m_trMatrix[3]);
-
-					ViewMatrix = glm::translate(ViewMatrix, -posPlaneta);
+					ViewMatrix = glm::translate(ViewMatrix, -posObjecte);
 					glUseProgram(shader_programID);
 					glUniformMatrix4fv(glGetUniformLocation(shader_programID, "viewMatrix"), 1, GL_FALSE, &ViewMatrix[0][0]);
 				}
@@ -733,11 +802,12 @@ void dibuixa_Escena() {
 	//	GTMatrix = glm::scale();
 
 	//	Dibuix geometria de l'escena amb comandes GL.
+	bool mostrarMilano = (camera == CAM_NAVEGA) || (g_EstatSimulador.cosEnfocatId == CB_MILANO);
 	dibuixa_EscenaGL(shader_programID, shader_programIDNormalMap, ViewMatrix, GTMatrix, sw_material,
 		escenariActual,
 		ObOBJ,				// COET: model OBJ de la nau Milano
 		g_EstatSimulador.opcionsVisualitzacio.mostrarOrbites,
-		camera == CAM_NAVEGA);
+		mostrarMilano);
 }
 
 
@@ -756,7 +826,7 @@ void draw_Menu_ImGui()
 	// Renderitza la interficie principal del simulador (selector modal, barra de menu, panell de temps i HUD)
 	InterficieUI::Renderitzar(g_EstatSimulador, escenariActual, escenaris, shader_programID, shader_programIDNormalMap);
 
-	// Projeccio de les etiquetes 2D dels 9 astres sobre la pantalla:
+	// Projeccio dinamica de les etiquetes 2D de tots els objectes observables sobre la pantalla:
 	// nomes s'executa amb la simulacio activa (selector tancat) i l'opcio del menu activada.
 	if (!g_EstatSimulador.mostrarSelectorModes &&
 		g_EstatSimulador.opcionsVisualitzacio.mostrarEtiquetes &&
@@ -764,20 +834,40 @@ void draw_Menu_ImGui()
 		escenariActual != nullptr &&
 		!escenariActual->m_objectList.empty())
 	{
-		//Ids dels objectes que tindran etiqueta
-		static const CelestialBodyId IDEtiquetes[9] = { CB_SUN, CB_MERCURY, CB_VENUS, CB_EARTH, CB_MARS, CB_JUPITER, CB_SATURN, CB_URANUS, CB_NEPTUNE};
 		glm::vec4 viewport(0.0f, 0.0f, (float)w, (float)h);
-		for (int i = 0; i < 9; i++)
+		std::vector<const Object*> enfocables = escenariActual->obtenirObjectesEnfocables();
+		for (const Object* obj : enfocables)
 		{
-			Object* obj = escenariActual->obtenirObjecte(IDEtiquetes[i]);
-			if (obj == nullptr) continue;
+			if (obj == nullptr || !obj->m_mostrarEtiqueta) continue;
+
+			// Amagar etiquetes de satel-lits naturals en vista molt allunyada excepte si estan enfocats
+			if (obj->m_categoria == CategoriaObjecte::SATELLIT_NATURAL &&
+				obj->m_id != g_EstatSimulador.cosEnfocatId &&
+				obj->m_parent != nullptr)
+			{
+				glm::vec3 posSat = glm::vec3(obj->m_trMatrix[3]);
+				glm::vec3 posPare = glm::vec3(obj->m_parent->m_trMatrix[3]);
+				glm::vec3 scrSat = glm::project(posSat, ViewMatrix, ProjectionMatrix, viewport);
+				glm::vec3 scrPare = glm::project(posPare, ViewMatrix, ProjectionMatrix, viewport);
+				if (scrSat.z > 0.0f && scrSat.z < 1.0f && scrPare.z > 0.0f && scrPare.z < 1.0f) {
+					float dx = scrSat.x - scrPare.x;
+					float dy = scrSat.y - scrPare.y;
+					if ((dx * dx + dy * dy) < (24.0f * 24.0f)) continue;
+				}
+			}
 
 			// Situa l'etiqueta lleugerament per sobre de cada cos (z = rCos * 1.15)
 			glm::vec3 centreCos = glm::vec3(obj->m_trMatrix[3]);
-			double scale = obj->m_scale;
-			glm::vec3 posMon = centreCos + glm::vec3(0.0f, 0.0f, (float)(scale * 1.15));
+			glm::vec3 posMon = centreCos + glm::vec3(0.0f, 0.0f, (float)(obj->m_scale * 1.15));
 
 			InterficieUI::DibuixarEtiquetaPlaneta(obj->m_nom, posMon, ViewMatrix, ProjectionMatrix, viewport);
+		}
+
+		// Etiqueta 2D de la Nau Milano quan es visible a l'escena
+		if (camera == CAM_NAVEGA || g_EstatSimulador.cosEnfocatId == CB_MILANO)
+		{
+			glm::vec3 posMonMilano = posMilano + glm::vec3(0.0f, 0.0f, 6.0f * 1.15f);
+			InterficieUI::DibuixarEtiquetaPlaneta("Nau Milano", posMonMilano, ViewMatrix, ProjectionMatrix, viewport);
 		}
 	}
 
@@ -807,24 +897,7 @@ void OnCameraNavega()
 	{
 		camera = CAM_NAVEGA;
 		// Carregar la Milano automàticament si encara no està carregada
-		if (ObOBJ == NULL) //COET
-		{
-			ObOBJ = new COBJModel;
-
-			char nomFitxer[] = "textures/coet/milano_gotg.obj";
-
-			int error = ObOBJ->LoadModel(nomFitxer);
-
-			if (error == 0)
-			{
-				
-				printf("Milano carregada correctament!\n");
-			}
-			else
-			{
-				printf("Error carregant la Milano: %d\n", error);
-			}
-		}
+		AssegurarCoetCarregat();
 		// Desactivació de zoom, mobil, Transformacions Geomètriques via mouse i pan 
 		//		si navega activat
 		mobil = false;	zzoom = false;	satelit = false;
@@ -972,7 +1045,8 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 			else if (key == GLFW_KEY_HOME) {
 				g_EstatSimulador.cameraConfig.mode = ModeCamera::GLOBAL_SISTEMA;
 				g_EstatSimulador.cosEnfocatId = CB_SUN;
-				InterficieUI::ActualitzarDadesCosActiu(g_EstatSimulador);
+				g_EstatSimulador.origenReferenciaSol = true;
+				InterficieUI::ActualitzarDadesCosActiu(g_EstatSimulador, escenariActual);
 				g_EstatSimulador.canviCameraPendent = true;
 				return;
 			}
@@ -987,16 +1061,13 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 				key == GLFW_KEY_DOWN))
 		{
 			const double pasAngle = 5.0;
-			// Adapta el zoom minim i pas de distancia segons el radi del cos enfocant (cosEnfocatId)
+			// Adapta el zoom minim i pas de distancia segons el radi del cos enfocat (natural o artificial)
 			CelestialBodyId cosId = g_EstatSimulador.cosEnfocatId;
-			double scale = 35.0;
-			if (escenariActual != nullptr && cosId != CB_NONE) {
-				Object* obj = escenariActual->obtenirObjecte(cosId);
-				if (obj != nullptr) scale = obj->m_scale;
-			}
-			double minR = (cosId == CB_SUN) ? 42.0 : std::max(2.5, scale * 2.2);
-			double maxR = 800.0;
-			const double pasDistancia = (cosId == CB_SUN) ? 5.0 : std::max(1.0, scale * 0.5);
+			glm::vec3 posObj(0.0f);
+			double scale = 16.0;
+			ObtenirDadesEnfocament(escenariActual, cosId, posObj, scale);
+			LimitsCameraCos lim = CalcularLimitsCameraPerCos(cosId, scale);
+			const double pasDistancia = std::max(lim.pasZoom, OPV.R * 0.08);
 
 			// Gir horitzontal al voltant del cos enfocat
 			if (key == GLFW_KEY_LEFT)
@@ -1013,10 +1084,10 @@ void OnKeyDown(GLFWwindow* window, int key, int scancode, int action, int mods)
 				OPV.R += pasDistancia;
 
 			// Evitem que la càmera travessi el cos
-			if (OPV.R < minR)
-				OPV.R = minR;
-			if (OPV.R > maxR)
-				OPV.R = maxR;
+			if (OPV.R < lim.minR)
+				OPV.R = lim.minR;
+			if (OPV.R > lim.maxR)
+				OPV.R = lim.maxR;
 
 			// Mantenim l'angle horitzontal entre 0 i 360 graus
 			while (OPV.beta >= 360.0)
@@ -1439,22 +1510,19 @@ void OnMouseWheel(GLFWwindow* window, double xoffset, double yoffset)
 		if ((zzoom || zzoomO) || (transX) || (transY) || (transZ))
 		{
 			if (camera == CAM_ESFERICA)
-			{	// Càmera Esfèrica: limits i velocitat de zoom adaptats al cos enfocant (cosEnfocatId)
+			{	// Càmera Esfèrica: limits i velocitat de zoom adaptats al cos enfocat (natural o artificial)
 				CelestialBodyId cosId = g_EstatSimulador.cosEnfocatId;
-				double scale = 35.0;
-				if (escenariActual != nullptr && cosId != CB_NONE) {
-					Object* obj = escenariActual->obtenirObjecte(cosId);
-					if (obj != nullptr) scale = obj->m_scale;
-				}
-				double minR = (cosId == CB_SUN) ? 42.0 : std::max(2.5, scale * 2.2);
-				double maxR = 800.0;
-				double pasZoom = (cosId == CB_SUN) ? 5.0 : std::max(1.0, scale * 0.5);
+				glm::vec3 posObj(0.0f);
+				double scale = 16.0;
+				ObtenirDadesEnfocament(escenariActual, cosId, posObj, scale);
+				LimitsCameraCos lim = CalcularLimitsCameraPerCos(cosId, scale);
+				double pasZoom = std::max(lim.pasZoom, OPV.R * 0.08);
 
 				OPV.R = OPV.R - yoffset * pasZoom;
-				if (OPV.R < minR)
-					OPV.R = minR;
-				if (OPV.R > maxR)
-					OPV.R = maxR;
+				if (OPV.R < lim.minR)
+					OPV.R = lim.minR;
+				if (OPV.R > lim.maxR)
+					OPV.R = lim.maxR;
 
 				cam_Esferica[0] = (float)OPV.R;
 				cam_Esferica[1] = (float)OPV.alfa;
